@@ -1,22 +1,25 @@
 # Fusionbase: Fast access to the world's data
 
-[![📦 PyPI](https://github.com/FusionbaseHQ/fusionbase-python/actions/workflows/publish-to-pypi.yml/badge.svg)](https://github.com/FusionbaseHQ/fusionbase-python/actions/workflows/publish-to-pypi.yml)
+<!-- !TODO -->
+![Build](https://github.com/facebook/prophet/workflows/Build/badge.svg)
+[![Pypi_Version](https://img.shields.io/pypi/v/prophet.svg)](https://pypi.python.org/pypi/prophet)
+[![Conda_Version](https://anaconda.org/conda-forge/prophet/badges/version.svg)](https://anaconda.org/conda-forge/prophet/)
 
 We believe that working with data, specifically the exploration and integration part, should be fun! Therefore, our API and Python package is designed to seamlessly support a data scientist's and engineer's daily work.
 
 If you have questions, feel free to reach out! 
 
 
-[Fusionbase](https://fusionbase.com/) is open source software released by Fusionbase's Engineering Team. It is available for download on [PyPI](https://pypi.python.org/pypi/fusionbase/).
+The [Fusionbase](https://fusionbase.com/) python package is open source software released by Fusionbase's Engineering Team. It is available for download on [PyPI](https://pypi.python.org/pypi/fusionbase/).
 
 ## Important links
 
 - Homepage: https://fusionbase.com
 - HTML documentation: https://developer.fusionbase.com/fusionbase-api/
-- Issue tracker: https://github.com/FusionbaseHQ/fusionbase-python/issues
-- Source code repository: https://github.com/FusionbaseHQ/fusionbase-python
+- Issue tracker: https://github.com/FusionbaseHQ/fusionbase/issues
+- Source code repository: https://github.com/FusionbaseHQ/fusionbase
 - Contributing: Reach out to us! info@fusionbase.com
-- Prophet Python package: https://pypi.python.org/pypi/fusionbase/
+- Fusionbase Python package: https://pypi.python.org/pypi/fusionbase/
 
 ## Installation in Python - PyPI release
 
@@ -26,9 +29,13 @@ Fusionbase is on PyPI, so you can use `pip` to install it.
 pip install fusionbase
 ```
 
+### Anaconda
+
+The easiest way to install Fusionbase is through conda-forge: `conda install -c fusionbase`.
+
 ## Getting Started
 
-Got to [examples](https://github.com/FusionbaseHQ/fusionbase-python/tree/main/examples) to deep dive into Fusionbase and see various examples on how to use the package.
+Got to [examples](https://github.com/FusionbaseHQ/fb_user__fusionbase_py/examples/) to deep dive into Fusionbase and see various examples on how to use the package.
 
 Here are some Examples for a quick start:
 
@@ -99,10 +106,10 @@ data_service.pretty_request_definition(key=data_service_key)
 ```python
 # Invoke a service by providing input data
 payload = [
-{
-	"name": "address_string", # THIS IS THE NAME OF THE INPUT VALUE
-	"value": "Agnes-Pockels-Bogen 1, 80992 München" # THE VALUE FOR THE INPUT
-}
+    {
+        "name": "address_string", # THIS IS THE NAME OF THE INPUT VALUE
+        "value": "Agnes-Pockels-Bogen 1, 80992 München" # THE VALUE FOR THE INPUT
+    }
 ]
 
 result = data_service.invoke(key=data_service_key, parameters=payload)
@@ -113,14 +120,18 @@ print(result)
 
 ## Changelog
 
-### Version 0.1.0 (2022.05.07)
+### Version 0.1.1 (2022.05.12)
+
+- Bugfix: `fields` parameter in `get_data` and `get_dataframe` works as intended now.
+
+### Version 0.1.0 (2022.04.20)
 
 - Initial release
 
 ## Contributing
 
-Contributing to Fusionbase can be in contributions to the code base, sharing your experience and insights in the community on the Forums, or contributing to projects that make use of Fusionbase. Please see the [contributing guide](https://github.com/FusionbaseHQ/fusionbase-python/blob/main/docs/CONTRIBUTING.md) for more specifics.
+Contributing to Fusionbase can be in contributions to the code base, sharing your experience and insights in the community on the Forums, or contributing to projects that make use of Fusionbase. Please see the [contributing guide](docs/CONTRIBUTING.md) for more specifics.
 
 ## License
 
-Fusionbase is licensed under the [GPL 3](LICENSE).
+The Fusionbase python package is licensed under the [GPL 3](LICENSE).

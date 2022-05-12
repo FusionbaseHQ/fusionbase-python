@@ -12,6 +12,7 @@ import re
 import tempfile
 import time
 import traceback
+import urllib.parse
 from pathlib import Path, PurePath
 from typing import IO, Union
 
@@ -24,8 +25,7 @@ from rich.prompt import Prompt
 from rich.table import Table
 from tqdm import tqdm
 
-from fusionbase.exceptions.DataStreamNotExistsError import DataStreamNotExistsError
-from fusionbase.exceptions.ResponseEvaluator import ResponseEvaluator
+from exceptions.ResponseEvaluator import ResponseEvaluator
 
 
 class DataStream:
@@ -101,7 +101,7 @@ class DataStream:
             # 102161 is just a random prime number, could by any number < 150k
             skip_limit_chunks = list(chunks(range(0, limit+1), 102161))
             skip_limits = [(chunk[0], chunk[-1]+1)
-                           for chunk in skip_limit_chunks]
+                       for chunk in skip_limit_chunks]
 
         return skip_limits
 
@@ -237,9 +237,9 @@ class DataStream:
         return True
 
     def _create(self, unique_label: str, name: dict, description: Union[dict, set], scope: str, source: str,
-                data,
-                data_file: IO = None,
-                provision: str = "MARKETPLACE") -> dict:
+               data,
+               data_file: IO = None,
+               provision: str = "MARKETPLACE") -> dict:
         """
         Used to create a new Datastream
         :param unique_label: The unique label of the datastream
@@ -452,11 +452,7 @@ class DataStream:
         upsert_type = None
 
         for data_chunk_file_index, data_chunk_file in enumerate(data_chunk_files):
-            
-            try:
-                stream_meta = self.get_meta_data_by_label(unique_label)
-            except DataStreamNotExistsError as e:
-                stream_meta = None
+            stream_meta = self.get_meta_data_by_label(unique_label)
 
             if isinstance(data_chunk_file, str):
                 # print(data_file_path)
@@ -469,7 +465,7 @@ class DataStream:
                 # Datasetream does not exist create a new one
                 if stream_meta is None or not isinstance(stream_meta, dict) or "_key" not in stream_meta:
                     result = self._create(unique_label, name,
-                                          description, scope, source, data, data_file, provision)
+                                         description, scope, source, data, data_file, provision)
                     upsert_type = "CREATE"
                     result["upsert_type"] = upsert_type
                 else:
@@ -621,21 +617,21 @@ class DataStream:
         :param multithread: Whether multithreading should be used or not (Default is True)
         :return: The data as a list of dictionaries
         """
+
         # Add Fusionbase columns by default to fields
-        if fields is None:
-            fields = []
+        if isinstance(fields, list) and len(fields) > 0:
+            fields.extend(["fb_id", "fb_data_version", "fb_datetime"])
+            fields = list(dict.fromkeys(fields))  # Remove duplicates
+        else:
+            fields = None
+
 
         if isinstance(limit, int) and limit > 150000:
-            self._log(
-                "[red]Limit can't exceed 150.000. Use multiple requests in batches instead![/red]")
+            self._log("[red]Limit can't exceed 150.000. Use multiple requests in batches instead![/red]")
             self._log("[red]Limit is forcefully set to 150.000[/red]")
-            self._log(
-                "[yellow]Tip: If you want to get the whole dataset, leave skip and limit empty.[/yellow]")
+            self._log("[yellow]Tip: If you want to get the whole dataset, leave skip and limit empty.[/yellow]")
             self._log("")
             limit = 150000
-
-        fields.extend(["fb_id", "fb_data_version", "fb_datetime"])
-        fields = list(dict.fromkeys(fields))  # Remove duplicates
 
         self._log(f"Getting meta data for Datastream with key {key}")
 
@@ -681,7 +677,11 @@ class DataStream:
                 f'Getting the data form {str(skip_limit[0])} to {str(skip_limit[1])} now -> This is part {str(chunk)}')
 
             # Build unique name based on input arguments
-            _tmp_name = f"fb_stream__{str(key)}__{str(limit)}___{str(skip_limit[0])}__{str(skip_limit[0])}___{'-'.join(fields)}"
+            if fields is None:
+                _tmp_name = f"fb_stream__{str(key)}__{str(limit)}___{str(skip_limit[0])}__{str(skip_limit[0])}"
+            else:
+                _tmp_name = f"fb_stream__{str(key)}__{str(limit)}___{str(skip_limit[0])}__{str(skip_limit[0])}___{'-'.join(fields)}"
+
             _tmp_name = hashlib.sha3_256(_tmp_name.encode(
                 "utf-8")).hexdigest()[:12] + '.json'
             _tmp_fpath = PurePath(self.tmp_dir, _tmp_name)
@@ -691,8 +691,17 @@ class DataStream:
                 self._log(f'Cache hit! Skip downloading part {str(chunk)}')
                 return
 
+            # Build request URL
+            request_url = f"{self.base_uri}/data-stream/get/{key}?skip={skip_limit[0]}&limit={skip_limit[1] - skip_limit[0]}&compressed_file=true"
+            if fields is not None:
+                field_query = ""
+                for field in fields:
+                    field_query = f"{field_query}&fields={urllib.parse.quote_plus(field)}"
+                field_query = field_query.strip().strip('&').strip()
+                request_url = f"{request_url}&{field_query}"
+
             r = self.requests.get(
-                f"{self.base_uri}/data-stream/get/{key}?skip={skip_limit[0]}&limit={skip_limit[1] - skip_limit[0]}&compressed_file=true",
+                request_url,
                 stream=True)  # logic! if the limit is increased, it loads n the first time, 2xn the second and so on
 
             total_download_size = int(r.headers.get('content-length', 0))
@@ -729,7 +738,6 @@ class DataStream:
                     print(traceback.format_exc())
                 else:
                     pass
-                    # print(url)
 
         self._log(f'\n✅ Data successfully retrieved.')
         self._log(f'Building the final result object...')
@@ -747,6 +755,7 @@ class DataStream:
         self._log(f'✅  Done.')
 
         return result_datastream_data
+
 
     def get_delta_data(self, key: Union[str, int], version: str, fields: list = None, live: bool = True) -> list:
         """
@@ -857,7 +866,7 @@ class DataStream:
 
         return result_datastream_data
 
-    def get_delta_dataframe(self, key: Union[str, int], version: str, fields: list = None) -> pd.DataFrame:
+    def get_delta_dataframe(self, key:Union[str, int], version: str, fields: list=None) -> pd.DataFrame:
         """
         Retrieve data from the Fusionbase API since a specified fb_data_version and return it as a valid pandas Dataframe
         :param key: The key of the datastream provided as an integer or string
