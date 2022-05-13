@@ -35,8 +35,16 @@ class ResponseEvaluator:
 
         if response.status_code == 200:
             return True
-
-        content = response.json()['detail'][0]
+        
+        
+            
+        content = response.json()['detail']
+    
+        if content == 'DATA_STREAM_NOT_FOUND':
+            raise DataStreamNotExistsError
+        else:
+            content = content[0]
+            
         message = content['msg']
         error_type = content['type']
 

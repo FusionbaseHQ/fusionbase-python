@@ -12,7 +12,7 @@ data_stream = DataStream(auth={"api_key": "*** SECRET CREDENTIALS ***"},
 unique_label = 'MUNICH_OKTOBERFEST_BEER_CONSUMPTION'
 
 # Get the datastream by it's unique label
-data_stream_meta = data_stream.get_meta_data_by_label(label=unique_label)
+data_stream_meta = data_stream._get_meta_data_by_label(label=unique_label)
 
 # Load the data for which you want to create a datastream
 # Currenty, only lists of dictionaries are supported, i.e., orient="records"

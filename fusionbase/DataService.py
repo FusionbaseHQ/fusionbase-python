@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 from typing import Union
 
@@ -10,9 +12,10 @@ from fusionbase.exceptions.ResponseEvaluator import ResponseEvaluator
 
 class DataService:
 
-    def __init__(self, auth: dict, connection: dict, log: bool = False) -> None:
+    def __init__(self, key: Union[str, int], auth: dict, connection: dict = {"base_uri": "https://api.fusionbase.com/api/v1"}, log: bool = False) -> None:
         """
         Used to initialise a new DataService Object
+        :param key: The key of the service either as a string or integer value
         :param auth: the standard authentication object to authenticate yourself towards the fusionbase API
         Example:
         auth = {"api_key": " ***** Hidden credentials *****"}
@@ -24,6 +27,15 @@ class DataService:
         :param log: Whether the the output of any given operation should be logged to console
         """
 
+        if not isinstance(key, int) and not isinstance(key, str):
+            raise TypeError(
+                f'Key must be either of type int or str but was {type(key)}')
+        else:
+            self.__key = key
+        
+        for k,v in self.get_meta_data().items():
+            setattr(self, k, v)
+        
         self.auth = auth
         self.connection = connection
         self.base_uri = self.connection["base_uri"]
@@ -32,6 +44,23 @@ class DataService:
         self.log = log
         self.console = Console()
         self.evaluator = ResponseEvaluator()
+        self.get_meta_data()
+
+    @property
+    def key(self):
+        return self.__key
+
+    def __str__(self) -> str:
+        meta_data = self.get_meta_data()
+        return f"""{meta_data["name"]["en"]}
+        =============================
+        Key             -> {meta_data["_key"]}
+        Source          -> {meta_data["source"]["label"]}
+        Source Key      -> {meta_data["source"]["_key"]}
+        --------------------
+        Description: 
+        {meta_data["description"]["en"]}
+        """
 
     def _log(self, message, force=False):
         if not self.log and not force:
@@ -39,26 +68,24 @@ class DataService:
         else:
             self.console.log(message)
 
-    def get_meta_data(self, key: Union[str, int]) -> dict:
+    def get_meta_data(self) -> dict:
         """
         Retrieves the metadata from a Service by giving a Service specific key
-        :param key: The key of the service either as a string or integer value
         :return: The metadata for the given service as a python dictionary
         """
 
         r = self.requests.get(
-            f"{self.base_uri}/data-service/get/{key}")
+            f"{self.base_uri}/data-service/get/{self.key}")
 
         self.evaluator.evaluate(r)
         meta = r.json()
         return meta
 
-    def pretty_meta_data(self, key: Union[str, int]) -> None:
+    def pretty_meta_data(self) -> None:
         """
         Retrieves the metadata from a Service by giving a Service specific key and prints it nicely to console
-        :param key: The key of the service either as a string or integer value
         """
-        meta_data = self.get_meta_data(key=key)
+        meta_data = self.get_meta_data()
         table = Table(title=meta_data["name"]["en"],
                       caption=meta_data["description"]["en"])
 
@@ -80,21 +107,19 @@ class DataService:
         self._log(table, True)
         print("\n" * 2)
 
-    def request_definition(self, key: Union[str, int]) -> dict:
+    def request_definition(self) -> dict:
         """
         Retrieves the request definition (such as required parameters) from a Service by giving a Service specific key and prints it nicely to console
-        :param key: The key of the service either as a string or integer value
         :return: The request definition for the given service as a python dictionary
         """
-        meta_data = self.get_meta_data(key=key)
+        meta_data = self.get_meta_data()
         return meta_data['request_definition']
 
-    def pretty_request_definition(self, key: Union[str, int]) -> None:
+    def pretty_request_definition(self) -> None:
         """
        Retrieves the request definition (such as required parameters) from a Service by giving a Service specific key and prints it nicely to console
-       :param key: The key of the service either as a string or integer value
        """
-        request_definition = self.request_definition(key=key)
+        request_definition = self.request_definition()
         parameters = request_definition['parameters']
 
         print("\n")
@@ -123,8 +148,9 @@ class DataService:
 
         print("\n" * 2)
 
-    def __validate_parameters(self, key: Union[str, int], given_parameters: Union[dict, list]):
-        expected_parameters = self.request_definition(key=key)['parameters']
+    def __validate_parameters(self, given_parameters: Union[dict, list]):
+        expected_parameters = self.request_definition()[
+            'parameters']
 
         assert len(given_parameters) <= len(
             expected_parameters), "MORE PARAMETERS GIVEN THAN EXPECTED"
@@ -141,10 +167,9 @@ class DataService:
             assert p['name'] in expected_names, f"THE GIVEN PARAMETER NAMED {p['name']} WAS NOT AN EXPECTED " \
                                                 f"PARAMETER NAME "
 
-    def invoke(self, key: Union[str, int], parameters: Union[dict, list]) -> dict:
+    def invoke(self, parameters: Union[dict, list]) -> dict:
         """
         Invokes a given Dataservice defined by its key and returns the requested result
-        :param key: The key of the service either as a string or integer value
         :param parameters: The parameters to invoke the Dataservice with provided as either a dict if its one parameter
         or a list of dictionaries if you want to provide more than one input
         :return: The output for the given service invocation as a python dictionary
@@ -155,7 +180,7 @@ class DataService:
         elif not isinstance(parameters, list):
             raise Exception('PARAMETERS_MUST_BE_EITHER_LIST_OR_DICT')
 
-        self.__validate_parameters(key=key, given_parameters=parameters)
+        self.__validate_parameters(key=self.key, given_parameters=parameters)
 
         r = self.requests.post(
             url=f"{self.base_uri}/data-service/invoke",
@@ -164,7 +189,7 @@ class DataService:
             },
             data=json.dumps({
                 "inputs": parameters,
-                "data_service_key": key
+                "data_service_key": self.key
             })
         )
 
