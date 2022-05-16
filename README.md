@@ -1,9 +1,10 @@
 # Fusionbase: Fast access to the world's data
 
-<!-- !TODO -->
+
 ![Build](https://github.com/facebook/prophet/workflows/Build/badge.svg)
-[![Pypi_Version](https://img.shields.io/pypi/v/prophet.svg)](https://pypi.python.org/pypi/prophet)
-[![Conda_Version](https://anaconda.org/conda-forge/prophet/badges/version.svg)](https://anaconda.org/conda-forge/prophet/)
+[![Tests](https://github.com/FusionbaseHQ/fusionbase-python/actions/workflows/tests.yml/badge.svg)](https://github.com/FusionbaseHQ/fusionbase-python/actions/workflows/tests.yml)
+[![Pypi_Version](https://img.shields.io/pypi/v/fusionbase.svg)](https://pypi.python.org/pypi/fusionbase)
+
 
 We believe that working with data, specifically the exploration and integration part, should be fun! Therefore, our API and Python package is designed to seamlessly support a data scientist's and engineer's daily work.
 
