@@ -167,18 +167,26 @@ class DataService:
             assert p['name'] in expected_names, f"THE GIVEN PARAMETER NAMED {p['name']} WAS NOT AN EXPECTED " \
                                                 f"PARAMETER NAME "
 
-    def invoke(self, parameters: Union[dict, list]) -> dict:
+    def invoke(self, parameters: Union[dict, list] = None, **kwargs) -> dict:
         """
         Invokes a given Dataservice defined by its key and returns the requested result
+        
         :param parameters: The parameters to invoke the Dataservice with provided as either a dict if its one parameter
         or a list of dictionaries if you want to provide more than one input
+        
+        **kwargs: You can also provide the parameters as keyword arguments, e.g if the service requires an address_string just call the function like this:
+        service.invoke(address_string='Your Address String')
+        
         :return: The output for the given service invocation as a python dictionary
         """
-        if isinstance(parameters, dict):
-            parameters = [parameters]
-
-        elif not isinstance(parameters, list):
-            raise Exception('PARAMETERS_MUST_BE_EITHER_LIST_OR_DICT')
+        if len(kwargs.items()) == 0 and parameters is not None:
+            if isinstance(parameters, dict):
+                parameters = [parameters]
+        
+        elif parameters is None and len(kwargs.items()) != 0:
+            parameters = [{'name': key, 'value': str(value)} for key, value in kwargs.items()]
+        else:
+            raise Exception('Either parameters or keyword arguments have to be provided')
 
         self.__validate_parameters(given_parameters=parameters)
 

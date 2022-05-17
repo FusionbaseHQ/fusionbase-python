@@ -49,7 +49,16 @@ def test_get_request_definition(data_service: DataService):
     assert k in request_definition.keys(
     ), f'{k} IS MISSING IN REQUEST DEFINITION'
 
+def test_invoke_missing(data_service: DataService):
+  with pytest.raises(Exception):
+    data_service.invoke()
 
+def test_invoke_valid(data_service: DataService):
+  result = data_service.invoke(q='Fusionbase GmbH')
+  result_keys = ['@context', '@type', 'fb_entity_id', 'lei_code', 'legal_name', 'legal_form', 'address', 'registration_data', 'founding_date', 'members', 'make_offers', 'alternate_names']
+  for key in result_keys:
+    assert key in result[0].keys(), f'DIFFERENT RESPONSE EXPECTED FOR VALID INPUT {parameters}'
+    
 def test_invoke_valid(data_service: DataService):
   parameters = [
       {'name': 'q',
@@ -57,9 +66,11 @@ def test_invoke_valid(data_service: DataService):
   ]
   result = data_service.invoke(parameters=parameters)
   result_keys = ['@context', '@type', 'fb_entity_id', 'lei_code', 'legal_name', 'legal_form', 'address', 'registration_data', 'founding_date', 'members', 'make_offers', 'alternate_names']
+  
   for key in result_keys:
     assert key in result[0].keys(), f'DIFFERENT RESPONSE EXPECTED FOR VALID INPUT {parameters}'
 
+    
 def test_invoke_invalid(data_service: DataService):
   parameters = [
       {'name': 'NotAParameter',
@@ -67,4 +78,9 @@ def test_invoke_invalid(data_service: DataService):
   ]
   with pytest.raises(Exception):
     data_service.invoke(parameters=parameters)
+    
+
+def test_invoke_invalid(data_service: DataService):
+  with pytest.raises(Exception):
+    data_service.invoke(qd='Fusionbase GmbH')
   
