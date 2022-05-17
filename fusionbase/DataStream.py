@@ -25,7 +25,8 @@ from rich.prompt import Prompt
 from rich.table import Table
 from tqdm import tqdm
 
-from exceptions.ResponseEvaluator import ResponseEvaluator
+from fusionbase.exceptions.DataStreamNotExistsError import DataStreamNotExistsError
+from fusionbase.exceptions.ResponseEvaluator import ResponseEvaluator
 
 
 class DataStream:
@@ -44,6 +45,7 @@ class DataStream:
        :param config: Let the user specify e.g a specific caching directory
        :param log: Whether the the output of any given operation should be logged to console
        """
+        print("YEAAAH")
         if config is None:
             config = {}
 
@@ -452,7 +454,11 @@ class DataStream:
         upsert_type = None
 
         for data_chunk_file_index, data_chunk_file in enumerate(data_chunk_files):
-            stream_meta = self.get_meta_data_by_label(unique_label)
+            
+            try:
+                stream_meta = self.get_meta_data_by_label(unique_label)
+            except DataStreamNotExistsError as e:
+                stream_meta = None
 
             if isinstance(data_chunk_file, str):
                 # print(data_file_path)

@@ -1,14 +1,11 @@
 # Fusionbase: Fast access to the world's data
 
 <!-- !TODO -->
-![Build](https://github.com/facebook/prophet/workflows/Build/badge.svg)
-[![Pypi_Version](https://img.shields.io/pypi/v/prophet.svg)](https://pypi.python.org/pypi/prophet)
-[![Conda_Version](https://anaconda.org/conda-forge/prophet/badges/version.svg)](https://anaconda.org/conda-forge/prophet/)
+[![Pypi_Version](https://img.shields.io/pypi/v/fusionbase.svg)](https://pypi.python.org/pypi/fusionbase)
 
 We believe that working with data, specifically the exploration and integration part, should be fun! Therefore, our API and Python package is designed to seamlessly support a data scientist's and engineer's daily work.
 
 If you have questions, feel free to reach out! 
-
 
 The [Fusionbase](https://fusionbase.com/) python package is open source software released by Fusionbase's Engineering Team. It is available for download on [PyPI](https://pypi.python.org/pypi/fusionbase/).
 
@@ -29,13 +26,9 @@ Fusionbase is on PyPI, so you can use `pip` to install it.
 pip install fusionbase
 ```
 
-### Anaconda
-
-The easiest way to install Fusionbase is through conda-forge: `conda install -c fusionbase`.
-
 ## Getting Started
 
-Got to [examples](https://github.com/FusionbaseHQ/fb_user__fusionbase_py/examples/) to deep dive into Fusionbase and see various examples on how to use the package.
+Got to [examples](https://github.com/FusionbaseHQ/fusionbase-python/tree/main/examples) to deep dive into Fusionbase and see various examples on how to use the package.
 
 Here are some Examples for a quick start:
 
@@ -120,6 +113,10 @@ print(result)
 
 ## Changelog
 
+### Version 0.1.2 (2022.05.13)
+
+- Bugfix: Fix exception handling in `update_create` method
+
 ### Version 0.1.1 (2022.05.12)
 
 - Bugfix: `fields` parameter in `get_data` and `get_dataframe` works as intended now.
@@ -130,7 +127,7 @@ print(result)
 
 ## Contributing
 
-Contributing to Fusionbase can be in contributions to the code base, sharing your experience and insights in the community on the Forums, or contributing to projects that make use of Fusionbase. Please see the [contributing guide](docs/CONTRIBUTING.md) for more specifics.
+Contributing to Fusionbase can be in contributions to the code base, sharing your experience and insights in the community on the Forums, or contributing to projects that make use of Fusionbase. Please see the [contributing guide](https://github.com/FusionbaseHQ/fusionbase-python/blob/main/docs/CONTRIBUTING.md) for more specifics.
 
 ## License
 
