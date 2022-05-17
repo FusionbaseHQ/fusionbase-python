@@ -33,9 +33,6 @@ class DataService:
         else:
             self.__key = key
         
-        for k,v in self.get_meta_data().items():
-            setattr(self, k, v)
-        
         self.auth = auth
         self.connection = connection
         self.base_uri = self.connection["base_uri"]
@@ -45,6 +42,9 @@ class DataService:
         self.console = Console()
         self.evaluator = ResponseEvaluator()
         self.get_meta_data()
+        
+        for k,v in self.get_meta_data().items():
+            setattr(self, k, v)
 
     @property
     def key(self):
@@ -107,7 +107,7 @@ class DataService:
         self._log(table, True)
         print("\n" * 2)
 
-    def request_definition(self) -> dict:
+    def get_request_definition(self) -> dict:
         """
         Retrieves the request definition (such as required parameters) from a Service by giving a Service specific key and prints it nicely to console
         :return: The request definition for the given service as a python dictionary
@@ -119,7 +119,7 @@ class DataService:
         """
        Retrieves the request definition (such as required parameters) from a Service by giving a Service specific key and prints it nicely to console
        """
-        request_definition = self.request_definition()
+        request_definition = self.get_request_definition()
         parameters = request_definition['parameters']
 
         print("\n")
@@ -149,7 +149,7 @@ class DataService:
         print("\n" * 2)
 
     def __validate_parameters(self, given_parameters: Union[dict, list]):
-        expected_parameters = self.request_definition()[
+        expected_parameters = self.get_request_definition()[
             'parameters']
 
         assert len(given_parameters) <= len(
@@ -180,7 +180,7 @@ class DataService:
         elif not isinstance(parameters, list):
             raise Exception('PARAMETERS_MUST_BE_EITHER_LIST_OR_DICT')
 
-        self.__validate_parameters(key=self.key, given_parameters=parameters)
+        self.__validate_parameters(given_parameters=parameters)
 
         r = self.requests.post(
             url=f"{self.base_uri}/data-service/invoke",

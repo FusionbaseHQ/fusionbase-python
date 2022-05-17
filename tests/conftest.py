@@ -39,5 +39,5 @@ def data_stream_editable(fusionbase: Fusionbase):
 
 @pytest.fixture()
 def data_service(fusionbase: Fusionbase):
-  service = fusionbase.get_datastream(pytest.generic_service_key)
+  service = fusionbase.get_dataservice(pytest.generic_service_key)
   return service
