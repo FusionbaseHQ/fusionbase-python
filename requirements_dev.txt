@@ -4,3 +4,8 @@ pytest==6.2.5
 pytest-cov==2.12.1
 mypy===0.910
 python-dotenv
+numpy
+pandas
+requests-toolbelt
+tqdm
+rich
