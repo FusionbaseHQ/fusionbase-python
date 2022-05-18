@@ -358,7 +358,7 @@ class DataStream:
             pass
     return result
 
-  def replace(self, unique_label: str, cascade: bool = True, inplace: bool = False, data: list[dict] = None,
+  def replace(self, cascade: bool = True, inplace: bool = False, data: list[dict] = None,
               data_file_path: IO = None,
               sanity_check: bool = True) -> dict:
     """
@@ -400,10 +400,10 @@ class DataStream:
             }
     else:
         self.console.print(
-            "YOU ARE ABOUT TO REPLACE DATA STREAM '{unique_label}'  -- God bless you and good luck.",
+            "YOU ARE ABOUT TO REPLACE DATA STREAM '{self.label}'  -- God bless you and good luck.",
             style="blink bold red underline")
 
-    stream_meta = self._get_meta_data_by_label(unique_label)
+    stream_meta = self._get_meta_data_by_label()
 
     data_file = None
     # Check if file is used as data

@@ -1,5 +1,9 @@
+import binascii
+import os
+import numpy as np
+import pandas as pd
 import pytest
-from fusionbase.Fusionbase import DataStream
+from fusionbase.Fusionbase import DataStream, Fusionbase
 import io
 import sys
 
@@ -34,13 +38,17 @@ def test_update_metadata(data_stream: DataStream):
 def test_set_source(data_stream: DataStream):
   raise NotImplementedError
 
-@pytest.mark.skip(reason="not implemented yet")
 def test_update(data_stream_editable: DataStream):
-  raise NotImplementedError
+  df = pd.DataFrame(np.random.randint(0,10000,size=(100, 4)), columns=list('ABCD'))
+  data = df.to_dict('records')
+  result = data_stream_editable.update(data=data)
+  assert result['success'] == True
 
-@pytest.mark.skip(reason="not implemented yet")
 def test_replace(data_stream_editable: DataStream):
-  raise NotImplementedError
+  df = pd.DataFrame(np.random.randint(0,100,size=(100, 4)), columns=list('ABCD'))
+  data = df.to_dict('records')
+  result = data_stream_editable.replace(data=data, sanity_check=False)
+  assert result['success'] == True
 
 def test_get_data(data_stream: DataStream):
   data = data_stream.get_data()
@@ -50,15 +58,18 @@ def test_get_dataframe(data_stream: DataStream):
   df = data_stream.get_dataframe()
   assert len(df) >= 5
 
-@pytest.mark.skip(reason="not implemented yet")
 def test_get_delta_data(data_stream: DataStream):
-  delta_version = ''
+  delta_version = '87bd0300-08d6-4aee-9a95-348d2356fa06'
   delta_data = data_stream.get_delta_data(delta_version)
   assert len(delta_data) >= 5
 
-
-@pytest.mark.skip(reason="not implemented yet")
 def test_get_delta_dataframe(data_stream: DataStream):
-  delta_version = ''
+  delta_version = '87bd0300-08d6-4aee-9a95-348d2356fa06'
   df = data_stream.get_delta_dataframe(delta_version)
   assert len(df) >= 5
+  
+def test_create_stream(fusionbase: Fusionbase):
+  unique_label = f'python_package_test_stream__{str(binascii.b2a_hex(os.urandom(10)))}'
+  df = pd.read_csv('./tests/data/oktoberfest_beer.csv')
+  result_stream = fusionbase.create_stream(unique_label=unique_label, name={"en": f"OKTOBER_FEST_{unique_label.upper()}"}, description={"en": "A TEST STREAM TO TEST THE CREATE STREAM FUNCTION OF THE PYTHON PACKAGE"}, scope="PUBLIC", source={"_id": "data_sources/17255624", "stream_specific": {"uri": "https://fusionbase.com"}}, data=df)
+  assert isinstance(result_stream, DataStream), 'RESULT OF UPDATE CREATE MUST BE A DATASTREAM'

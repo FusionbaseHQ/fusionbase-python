@@ -57,7 +57,7 @@ def test_invoke_valid(data_service: DataService):
   result = data_service.invoke(q='Fusionbase GmbH')
   result_keys = ['@context', '@type', 'fb_entity_id', 'lei_code', 'legal_name', 'legal_form', 'address', 'registration_data', 'founding_date', 'members', 'make_offers', 'alternate_names']
   for key in result_keys:
-    assert key in result[0].keys(), f'DIFFERENT RESPONSE EXPECTED FOR VALID INPUT {parameters}'
+    assert key in result[0].keys(), f'DIFFERENT RESPONSE EXPECTED FOR VALID INPUT: "Fusionbase GmbH"'
     
 def test_invoke_valid(data_service: DataService):
   parameters = [
