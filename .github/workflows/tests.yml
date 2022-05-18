@@ -38,5 +38,5 @@ jobs:
             FUSIONBASE_API_KEY: ${{ secrets.FUSIONBASE_API_KEY }}
             FUSIONBASE_API_URI: ${{ secrets.FUSIONBASE_API_URI }}
             GENERIC_STREAM_KEY: ${{ secrets.GENERIC_STREAM_KEY }}
-            EDITABLE_STREAM_KEY: ${{ secrets.EDITABLE_STREAM_KEY }}
+            EDITABLE_STREAM_LABEL: ${{ secrets.EDITABLE_EDITABLE_STREAM_LABEL }}
             GENERIC_SERVICE_KEY: ${{ secrets.GENERIC_SERVICE_KEY }}
