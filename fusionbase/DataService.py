@@ -1,6 +1,11 @@
 from __future__ import annotations
 
 import json
+import os
+import platform
+import shelve
+import tempfile
+from pathlib import Path, PurePath
 from typing import Union
 
 import requests
@@ -10,9 +15,39 @@ from rich.table import Table
 from fusionbase.exceptions.ResponseEvaluator import ResponseEvaluator
 
 
+def cache():
+    """
+    A Helper function to cache service data to specified cache
+    """
+
+    def decorator(func):
+        def new_func(*args, **kwargs):
+            # get self argument from wrapped function to access the temporary directory
+            self = args[0]
+            d = shelve.open(os.path.join(self.tmp_dir, 'cache.shelve'))
+            # generate a key to store the data to cache
+            args_cleaned = args[1:]
+            key = args_cleaned + tuple(sorted(kwargs.items()))
+            key = str(key)
+            if self.cache:
+                if key not in d:
+                    # caching not yet cached
+                    d[key] = func(*args, **kwargs)
+                # otherwise it is cached -> return either way
+                return d[key]
+            else:
+                # cache was not specified so not caching at all
+                return func(*args, **kwargs)
+
+        return new_func
+
+    return decorator
+
+
 class DataService:
 
-    def __init__(self, key: Union[str, int], auth: dict, connection: dict = {"base_uri": "https://api.fusionbase.com/api/v1"}, log: bool = False) -> None:
+    def __init__(self, key: Union[str, int], auth: dict, connection=None, log: bool = False,
+                 config: dict = None, cache: bool = False) -> None:
         """
         Used to initialise a new DataService Object
         :param key: The key of the service either as a string or integer value
@@ -25,15 +60,24 @@ class DataService:
         connection={"base_uri": "https://api.fusionbase.com/api/v1"}
 
         :param log: Whether the the output of any given operation should be logged to console
+
+        :param cache: Whether the results of the service should be cached in the default tmp or if in te constructor
+        specified cache directory
         """
 
+        if config is None:
+            config = {}
+
+        if connection is None:
+            connection = {"base_uri": "https://api.fusionbase.com/api/v1"}
         if not isinstance(key, int) and not isinstance(key, str):
             raise TypeError(
                 f'Key must be either of type int or str but was {type(key)}')
         else:
             self.__key = key
-        
+
         self.auth = auth
+        self.cache = cache
         self.connection = connection
         self.base_uri = self.connection["base_uri"]
         self.requests = requests.Session()
@@ -42,9 +86,17 @@ class DataService:
         self.console = Console()
         self.evaluator = ResponseEvaluator()
         self.get_meta_data()
-        
-        for k,v in self.get_meta_data().items():
+
+        for k, v in self.get_meta_data().items():
             setattr(self, k, v)
+
+        if "cache_dir" in config:
+            self.tmp_dir = PurePath(Path(config["cache_dir"]))
+        else:
+            self.tmp_dir = PurePath(Path(
+                "/tmp" if platform.system() == "Darwin" else tempfile.gettempdir()), 'fusionbase')
+        # Ensure that tmp/cache directory exists
+        Path(self.tmp_dir).mkdir(parents=True, exist_ok=True)
 
     @property
     def key(self):
@@ -109,16 +161,18 @@ class DataService:
 
     def get_request_definition(self) -> dict:
         """
-        Retrieves the request definition (such as required parameters) from a Service by giving a Service specific key and prints it nicely to console
-        :return: The request definition for the given service as a python dictionary
+        Retrieves the request definition (such as required parameters) from a Service by giving a Service specific
+        key and prints it nicely to console :return: The request definition for the given service as a python
+        dictionary
         """
         meta_data = self.get_meta_data()
         return meta_data['request_definition']
 
     def pretty_request_definition(self) -> None:
         """
-       Retrieves the request definition (such as required parameters) from a Service by giving a Service specific key and prints it nicely to console
-       """
+        Retrieves the request definition (such as required parameters) from a Service by giving a Service specific
+        key and prints it nicely to console
+        """
         request_definition = self.get_request_definition()
         parameters = request_definition['parameters']
 
@@ -167,22 +221,23 @@ class DataService:
             assert p['name'] in expected_names, f"THE GIVEN PARAMETER NAMED {p['name']} WAS NOT AN EXPECTED " \
                                                 f"PARAMETER NAME "
 
+    @cache()
     def invoke(self, parameters: Union[dict, list] = None, **kwargs) -> dict:
         """
         Invokes a given Dataservice defined by its key and returns the requested result
-        
+
         :param parameters: The parameters to invoke the Dataservice with provided as either a dict if its one parameter
         or a list of dictionaries if you want to provide more than one input
         
-        **kwargs: You can also provide the parameters as keyword arguments, e.g if the service requires an address_string just call the function like this:
-        service.invoke(address_string='Your Address String')
+        **kwargs: You can also provide the parameters as keyword arguments, e.g. if the service requires an
+        address_string just call the function like this: service.invoke(address_string='Your Address String')
         
         :return: The output for the given service invocation as a python dictionary
         """
         if len(kwargs.items()) == 0 and parameters is not None:
             if isinstance(parameters, dict):
                 parameters = [parameters]
-        
+
         elif parameters is None and len(kwargs.items()) != 0:
             parameters = [{'name': key, 'value': str(value)} for key, value in kwargs.items()]
         else:

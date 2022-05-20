@@ -104,16 +104,17 @@ data_service.pretty_request_definition(key=data_service_key)
 ```
 
 **Invoke a dataservice:**
+
 ```python
 # Invoke a service by providing input data
 payload = [
     {
-        "name": "address_string", # THIS IS THE NAME OF THE INPUT VALUE
-        "value": "Agnes-Pockels-Bogen 1, 80992 München" # THE VALUE FOR THE INPUT
+        "name": "address_string",  # THIS IS THE NAME OF THE INPUT VALUE
+        "value": "Agnes-Pockels-Bogen 1, 80992 München"  # THE VALUE FOR THE INPUT
     }
 ]
 
-result = data_service.invoke(key=data_service_key, parameters=payload)
+result = data_service.invoke(parameters=payload, key=data_service_key)
 
 print(result)
 ```

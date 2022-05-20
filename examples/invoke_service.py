@@ -17,5 +17,5 @@ payload = [
     }
 ]
 
-result = data_service.invoke(key=data_service_key, parameters=payload)
+result = data_service.invoke(parameters=payload, key=data_service_key)
 print(result)

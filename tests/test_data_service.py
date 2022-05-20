@@ -7,11 +7,11 @@ import sys
 
 
 def test_print(data_service: DataService):
-  capturedOutput = io.StringIO()
-  sys.stdout = capturedOutput
+  captured_output = io.StringIO()
+  sys.stdout = captured_output
   print(data_service)
   sys.stdout = sys.__stdout__
-  assert len(capturedOutput.getvalue()) > 5
+  assert len(captured_output.getvalue()) > 5
 
 
 def test_key_property(data_service: DataService):
@@ -19,11 +19,11 @@ def test_key_property(data_service: DataService):
 
 
 def test_pretty_meta_data(data_service: DataService):
-  capturedOutput = io.StringIO()
-  sys.stdout = capturedOutput
+  captured_output = io.StringIO()
+  sys.stdout = captured_output
   data_service.pretty_meta_data()
   sys.stdout = sys.__stdout__
-  assert len(capturedOutput.getvalue()) > 5
+  assert len(captured_output.getvalue()) > 5
 
 
 def test_get_meta_data(data_service: DataService):
@@ -35,11 +35,11 @@ def test_get_meta_data(data_service: DataService):
 
 
 def test_pretty_request_definition(data_service: DataService):
-  capturedOutput = io.StringIO()
-  sys.stdout = capturedOutput
+  captured_output = io.StringIO()
+  sys.stdout = captured_output
   data_service.pretty_request_definition()
   sys.stdout = sys.__stdout__
-  assert len(capturedOutput.getvalue()) > 5
+  assert len(captured_output.getvalue()) > 5
 
 
 def test_get_request_definition(data_service: DataService):
@@ -51,7 +51,7 @@ def test_get_request_definition(data_service: DataService):
 
 def test_invoke_missing(data_service: DataService):
   with pytest.raises(Exception):
-    data_service.invoke()
+      data_service.invoke()
 
 def test_invoke_valid(data_service: DataService):
   result = data_service.invoke(q='Fusionbase GmbH')
@@ -77,10 +77,10 @@ def test_invoke_invalid(data_service: DataService):
        'value': 'Fusionbase GmbH'}
   ]
   with pytest.raises(Exception):
-    data_service.invoke(parameters=parameters)
+      data_service.invoke(parameters=parameters)
     
 
 def test_invoke_invalid(data_service: DataService):
   with pytest.raises(Exception):
-    data_service.invoke(qd='Fusionbase GmbH')
+      data_service.invoke(qd='Fusionbase GmbH')
   
