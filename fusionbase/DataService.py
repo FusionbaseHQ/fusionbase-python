@@ -24,11 +24,11 @@ def cache():
         def new_func(*args, **kwargs):
             # get self argument from wrapped function to access the temporary directory
             self = args[0]
-            d = shelve.open(os.path.join(self.tmp_dir, 'cache.shelve'))
+            d = shelve.open(os.path.join(self.tmp_dir, f'cache_{self.key}.shelve'))
             # generate a key to store the data to cache
             args_cleaned = args[1:]
             key = args_cleaned + tuple(sorted(kwargs.items()))
-            key = str(key)
+            key = f'{str(key)}_{self.key}'
             if self.cache:
                 if key not in d:
                     # caching not yet cached
@@ -258,3 +258,13 @@ class DataService:
 
         self.evaluator.evaluate(r)
         return r.json()
+    
+    def clear_cache(self):
+        """Used to clear the cache files for the current service
+        """
+        cache_file = os.path.join(self.tmp_dir, f'cache_{self.key}.shelve.db')
+        if os.path.exists(cache_file):
+            os.remove(cache_file)
+        else: 
+            self._log('NO CACHE FILE FOUND FOR THIS SERVICE!')
+        

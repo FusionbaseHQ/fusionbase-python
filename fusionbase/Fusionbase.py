@@ -96,12 +96,12 @@ class Fusionbase:
     """
     return DataStream(key=key, label=label, auth=self.auth, connection=self.connection, log=self.log, config=self.config)
 
-  def get_dataservice(self, key: Union[str, int], cache: bool = False) -> DataService:
+  def get_dataservice(self, key: Union[str, int], cache:bool=False) -> DataService:
     """Factory Method used to create a DataService object
 
     Args:
         key (Union[str, int]): the key of the dataservice
-        cache (bool): whether the services result should be cached to the default or specified tmp dir
+        cache (bool): whether caching should be enabled or not
 
     Returns:
         DataService: Returns an instance of the requested dataservice by key
