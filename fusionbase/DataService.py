@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import json
+from multiprocessing.sharedctypes import Value
 import os
 import platform
 import shelve
 import tempfile
+from datetime import datetime
 from pathlib import Path, PurePath
 from typing import Union
 
@@ -24,17 +26,46 @@ def cache():
         def new_func(*args, **kwargs):
             # get self argument from wrapped function to access the temporary directory
             self = args[0]
-            d = shelve.open(os.path.join(self.tmp_dir, f'cache_{self.key}.shelve'))
-            # generate a key to store the data to cache
-            args_cleaned = args[1:]
-            key = args_cleaned + tuple(sorted(kwargs.items()))
-            key = f'{str(key)}_{self.key}'
-            if self.cache:
-                if key not in d:
-                    # caching not yet cached
-                    d[key] = func(*args, **kwargs)
-                # otherwise it is cached -> return either way
-                return d[key]
+            if not isinstance(self.cache, int):
+                raise TypeError(f'Parameter cache must be of type int but was {type(self.cache)}')
+            
+            if self.cache < 0:
+                raise ValueError(f'Parameter cache must a positive integer or 0 if you want caching disabled, but was: {self.cache}!')
+            
+            if self.cache > 0:
+                cache_filepath = os.path.join(
+                    self.tmp_dir, f'cache_{self.key}.shelve')
+
+                # generate a key to store the data to cache
+                args_cleaned = args[1:]
+                key = args_cleaned + tuple(sorted(kwargs.items()))
+                key = f'{str(key)}_{self.key}'
+
+                with shelve.open(cache_filepath) as db:
+                    # check if cached value exists for current input
+                    if key not in db:
+                        print('not found')
+                        # data not yet cached or cache to old
+                        db[key] = {
+                            'time_of_caching': datetime.now(),
+                            'value' : func(*args, **kwargs)}
+                    else:
+                        # value exists
+                        # calculate age of cached result
+                        time_of_caching = db[key]['time_of_caching']
+                        now = datetime.now()
+                        difference = now - time_of_caching
+                        difference_minutes = difference.total_seconds() / 60
+                        
+                        # check if cached result is older than the provided threshold
+                        # cache new value with new timestamp
+                        if difference_minutes > self.cache:
+                            db[key] = {
+                            'time_of_caching': datetime.now(),
+                            'value' : func(*args, **kwargs)}
+                               
+                    # otherwise it is cached -> return either way (return just the function value)
+                    return db[key].get('value')
             else:
                 # cache was not specified so not caching at all
                 return func(*args, **kwargs)
@@ -47,7 +78,7 @@ def cache():
 class DataService:
 
     def __init__(self, key: Union[str, int], auth: dict, connection=None, log: bool = False,
-                 config: dict = None, cache: bool = False) -> None:
+                 config: dict = None, cache: int = 0) -> None:
         """
         Used to initialise a new DataService Object
         :param key: The key of the service either as a string or integer value
@@ -61,8 +92,8 @@ class DataService:
 
         :param log: Whether the the output of any given operation should be logged to console
 
-        :param cache: Whether the results of the service should be cached in the default tmp or if in te constructor
-        specified cache directory
+        :param cache (int): the time in minutes data should be cached (0 [default] if caching should be disabled)
+                      e.g. cache = 5 * 24 * 60 -> caching for 5 days
         """
 
         if config is None:
@@ -239,9 +270,11 @@ class DataService:
                 parameters = [parameters]
 
         elif parameters is None and len(kwargs.items()) != 0:
-            parameters = [{'name': key, 'value': str(value)} for key, value in kwargs.items()]
+            parameters = [{'name': key, 'value': str(
+                value)} for key, value in kwargs.items()]
         else:
-            raise Exception('Either parameters or keyword arguments have to be provided')
+            raise Exception(
+                'Either parameters or keyword arguments have to be provided')
 
         self.__validate_parameters(given_parameters=parameters)
 
@@ -258,13 +291,12 @@ class DataService:
 
         self.evaluator.evaluate(r)
         return r.json()
-    
+
     def clear_cache(self):
         """Used to clear the cache files for the current service
         """
         cache_file = os.path.join(self.tmp_dir, f'cache_{self.key}.shelve.db')
         if os.path.exists(cache_file):
             os.remove(cache_file)
-        else: 
+        else:
             self._log('NO CACHE FILE FOUND FOR THIS SERVICE!')
-        
