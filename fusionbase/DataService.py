@@ -48,7 +48,6 @@ def cache():
                 with shelve.open(cache_filepath) as db:
                     # check if cached value exists for current input
                     if key not in db:
-                        print('not found')
                         # data not yet cached or cache to old
                         db[key] = {
                             'time_of_caching': datetime.now(),
