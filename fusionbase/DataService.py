@@ -26,6 +26,10 @@ def cache():
         def new_func(*args, **kwargs):
             # get self argument from wrapped function to access the temporary directory
             self = args[0]
+            
+            if self.cache == None:
+                self.cache = 0
+            
             if not isinstance(self.cache, int):
                 raise TypeError(f'Parameter cache must be of type int but was {type(self.cache)}')
             
