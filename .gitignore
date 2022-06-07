@@ -26,6 +26,8 @@ examples/data/*
 *.json.gz
 *.json
 
+!tests/data/oktoberfest_beer.csv
+
 # Distribution / packaging
 .Python
 build/

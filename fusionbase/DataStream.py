@@ -45,7 +45,7 @@ class DataStream:
        :param config: Let the user specify e.g a specific caching directory
        :param log: Whether the the output of any given operation should be logged to console
        """
-        print("YEAAAH")
+
         if config is None:
             config = {}
 
@@ -541,7 +541,7 @@ class DataStream:
                 }
         else:
             self.console.print(
-                "YOU ARE ABOUT TO REPLACE DATA STREAM '{unique_label}'  -- God bless you and good luck.",
+                f"YOU ARE ABOUT TO REPLACE DATA STREAM '{unique_label}'  -- God bless you and good luck.",
                 style="blink bold red underline")
 
         stream_meta = self.get_meta_data_by_label(unique_label)
