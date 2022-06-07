@@ -113,9 +113,10 @@ print(result)
 
 ## Changelog
 
-### Version 0.1.2 (2022.05.13)
+### Version 0.1.2 (2022.06.07)
 
 - Bugfix: Fix exception handling in `update_create` method
+- Added tests for DataStream and DataService classes
 
 ### Version 0.1.1 (2022.05.12)
 
