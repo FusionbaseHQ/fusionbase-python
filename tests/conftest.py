@@ -23,7 +23,7 @@ def pytest_configure():
 def data_stream():
   auth = {"api_key": os.getenv('FUSIONBASE_API_KEY')}
   connection = {"base_uri": os.getenv('FUSIONBASE_API_URI')}
-  stream = DataStream(auth=auth, connection=connection)
+  stream = DataStream(auth=auth, connection=connection, log=True)
   return stream
 
 @pytest.fixture()

@@ -53,8 +53,14 @@ def test_get_data(data_stream: DataStream):
   assert len(data) >= 5
 
 def test_get_dataframe(data_stream: DataStream):
-  df = data_stream.get_dataframe(key=pytest.generic_stream_key)
-  assert len(df) >= 5
+  df = data_stream.get_dataframe(key=pytest.generic_stream_key, live=True)
+  meta_data = data_stream.get_meta_data(key=pytest.generic_stream_key)
+
+  assert len(df) == meta_data["meta"]["entry_count"]
+
+def test_get_dataframe_skip_limit(data_stream: DataStream):
+  df = data_stream.get_dataframe(key=pytest.generic_stream_key, skip=3000, limit=10, live=True)
+  assert len(df) == 10
 
 def test_get_dataframe_specific_fields(data_stream: DataStream):
   df = data_stream.get_dataframe(key=pytest.generic_stream_key, fields=["A", "B"])
@@ -66,6 +72,11 @@ def test_get_delta_data(data_stream: DataStream):
   assert len(delta_data) >= 5
 
 def test_get_delta_dataframe(data_stream: DataStream):
+  delta_version = '87bd0300-08d6-4aee-9a95-348d2356fa06'
+  df = data_stream.get_delta_dataframe(key=pytest.generic_stream_key, version=delta_version)
+  assert len(df) >= 5
+
+def test_get_delta_dataframe_limit(data_stream: DataStream):
   delta_version = '87bd0300-08d6-4aee-9a95-348d2356fa06'
   df = data_stream.get_delta_dataframe(key=pytest.generic_stream_key, version=delta_version)
   assert len(df) >= 5

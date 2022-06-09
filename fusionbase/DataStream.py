@@ -83,27 +83,34 @@ class DataStream:
                 return False
 
     @staticmethod
-    def _calc_skip_limit_tuples(limit: int, max_batches: int = 20):
+    def _calc_skip_limit_tuples(limit: int, max_batches: int = 20, initial_skip=0):
 
         def chunks(it, size):
             it = iter(it)
             return iter(lambda: tuple(islice(it, size)), ())
 
         part_duration = math.floor(limit / max_batches)
-        skip_limits = [(i * part_duration, (i + 1) * part_duration)
+        skip_limits = [(i * part_duration + initial_skip, (i + 1) * part_duration - i * part_duration)
                        for i in range(max_batches)]
-        if skip_limits[-1][1] < limit:
-            skip_limits.append((skip_limits[-1][1], limit))
-        # remove (0,0) tuple values
+        if (skip_limits[-1][0] + skip_limits[-1][1]) < limit:
+            skip_limits.append((skip_limits[-1][0] + skip_limits[-1][1], limit-(skip_limits[-1][0] + skip_limits[-1][1]) + 1))
+        # Remove (0,0) tuple values
         skip_limits = list(filter(lambda x: x > (0, 0), skip_limits))
+
+        # Remove tuples that contain higher starting numbers the the actual data stream size
+        skip_limits = list(filter(lambda x: x[0] <= limit, skip_limits))
 
         # Chunks are bigger than 150k entries, i.e. they exceed the hard limit
         # Make chunks into smaller batches of 100k each
         if skip_limits[0][1] >= 150000:
             # 102161 is just a random prime number, could by any number < 150k
             skip_limit_chunks = list(chunks(range(0, limit+1), 102161))
-            skip_limits = [(chunk[0], chunk[-1]+1)
-                       for chunk in skip_limit_chunks]
+            skip_limits = [(chunk[0]+initial_skip, chunk[-1]+1 - chunk[0])
+                       for i, chunk in enumerate(skip_limit_chunks)]
+
+        # Remove tuples that contain higher starting numbers the the actual data stream size
+        # It is indended to filter it twice
+        skip_limits = list(filter(lambda x: x[0] <= limit, skip_limits))
 
         return skip_limits
 
@@ -633,9 +640,9 @@ class DataStream:
 
 
         if isinstance(limit, int) and limit > 150000:
-            self._log("[red]Limit can't exceed 150.000. Use multiple requests in batches instead![/red]")
-            self._log("[red]Limit is forcefully set to 150.000[/red]")
-            self._log("[yellow]Tip: If you want to get the whole dataset, leave skip and limit empty.[/yellow]")
+            self._log("[red]Limit can't exceed 150.000. Use multiple requests in batches instead![/red]", force=True)
+            self._log("[red]Limit is forcefully set to 150.000[/red]", force=True)
+            self._log("[yellow]Tip: If you want to get the whole dataset, leave skip and limit empty.[/yellow]", force=True)
             self._log("")
             limit = 150000
 
@@ -656,6 +663,22 @@ class DataStream:
         # meta_data["meta"]["entry_count"] is calculate on each /get request and should be safe to use
         if skip is not None and int(skip) > -1 and limit is not None and int(limit) > -1:
             skip_limit_batches = [(skip, limit)]
+        
+        # Only limit is set without skip
+        elif skip is None and limit is not None:
+            skip_limit_batches = [(0, limit)]
+        
+        # Only skip is set without limit
+        elif skip is not None and (limit is None or limit == -1):
+
+            if int(meta_data["meta"]["entry_count"])-skip < 1:
+                raise Exception(
+                    f"YOU CAN'T SKIP MORE ENTRIES THAN THE STREAM HAVE ROWS")                
+
+            if meta_data is not None and "meta" in meta_data and "entry_count" in meta_data["meta"]:
+                skip_limit_batches = self._calc_skip_limit_tuples(
+                        limit=int(meta_data["meta"]["entry_count"]), max_batches=max_batches, initial_skip=skip)
+
         else:
             if meta_data is not None and "meta" in meta_data and "entry_count" in meta_data["meta"]:
                 if int(meta_data["meta"]["entry_count"]) / max_batches < 500000:
@@ -680,7 +703,7 @@ class DataStream:
         def __get_data_from_fusionbase(self, skip_limit, chunk):
 
             self._log(
-                f'Getting the data form {str(skip_limit[0])} to {str(skip_limit[1])} now -> This is part {str(chunk)}')
+                f'Getting the data form {str(skip_limit[0])} to {str(skip_limit[0] + skip_limit[1])} now -> This is part {str(chunk)}')
 
             # Build unique name based on input arguments
             if fields is None:
@@ -698,7 +721,8 @@ class DataStream:
                 return
 
             # Build request URL
-            request_url = f"{self.base_uri}/data-stream/get/{key}?skip={skip_limit[0]}&limit={skip_limit[1] - skip_limit[0]}&compressed_file=true"
+            request_url = f"{self.base_uri}/data-stream/get/{key}?skip={skip_limit[0]}&limit={skip_limit[1]}&compressed_file=true"
+
             if fields is not None:
                 field_query = ""
                 for field in fields:
@@ -907,4 +931,5 @@ class DataStream:
         data = self.get_data(key=key, fields=fields, skip=skip,
                              limit=limit, live=live, multithread=multithread)
         df = pd.DataFrame(data)
+        #df.drop_duplicates(subset=["fb_id"], inplace=True)
         return df

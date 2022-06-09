@@ -113,6 +113,10 @@ print(result)
 
 ## Changelog
 
+### Version 0.1.3 (2022.06.09)
+
+- Bugfix: Skip and limit parameters now work as intended
+
 ### Version 0.1.2 (2022.06.07)
 
 - Bugfix: Fix exception handling in `update_create` method
