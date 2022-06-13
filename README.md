@@ -122,7 +122,7 @@ print(result)
 
 ## Changelog
 
-### Version 0.2 (2022.06.13)
+### Version 0.2.0 (2022.06.13)
 - Feature: Add top-level authentication (breaking change)
 - New API for invoking data services
 - New caching method for data services

@@ -32,4 +32,3 @@ data_stream = fusionbase.create_stream(unique_label=unique_label, name={"en": "M
 
 # Print new data stream instance
 print(data_stream)
-
