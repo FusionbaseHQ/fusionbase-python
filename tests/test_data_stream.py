@@ -56,7 +56,13 @@ def test_get_data(data_stream: DataStream):
 
 def test_get_dataframe(data_stream: DataStream):
   df = data_stream.get_dataframe()
-  assert len(df) >= 5
+  meta_data = data_stream.get_meta_data()
+  assert len(df) == meta_data["meta"]["entry_count"]
+
+def test_get_dataframe_skip_limit(data_stream: DataStream):
+  df = data_stream.get_dataframe(skip=3000, limit=10, live=True)
+  print(df)
+  assert len(df) == 10
 
 def test_get_delta_data(data_stream: DataStream):
   delta_version = '87bd0300-08d6-4aee-9a95-348d2356fa06'
@@ -72,4 +78,6 @@ def test_create_stream(fusionbase: Fusionbase):
   unique_label = f'python_package_test_stream__{str(binascii.b2a_hex(os.urandom(10)))}'
   df = pd.read_csv('./tests/data/oktoberfest_beer.csv')
   result_stream = fusionbase.create_stream(unique_label=unique_label, name={"en": f"OKTOBER_FEST_{unique_label.upper()}"}, description={"en": "A TEST STREAM TO TEST THE CREATE STREAM FUNCTION OF THE PYTHON PACKAGE"}, scope="PUBLIC", source={"_id": "data_sources/17255624", "stream_specific": {"uri": "https://fusionbase.com"}}, data=df)
+  print(result_stream)
   assert isinstance(result_stream, DataStream), 'RESULT OF UPDATE CREATE MUST BE A DATASTREAM'
+  

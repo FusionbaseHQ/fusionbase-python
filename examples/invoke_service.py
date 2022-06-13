@@ -1,15 +1,17 @@
 # Import Fusionbase
-from fusionbase.DataService import DataService
+from fusionbase.Fusionbase import Fusionbase
+import os
 
-# Create a new dataservice
+# Create a new datastream
 # Provide your API Key and the Fusionbase API URI (usually: https://api.fusionbase.com/api/v1)
-data_service = DataService(auth={"api_key": "*** SECRET CREDENTIALS ***"},
+fusionbase = Fusionbase(auth={"api_key": os.getenv('FUSIONBASE_API_KEY')},
                       connection={"base_uri": "https://api.fusionbase.com/api/v1"})
 
 
-data_service_key = 23622632
+data_service_key = "23622632"
+data_service = fusionbase.get_dataservice(key=data_service_key)
 
-# Retrieves the request definition (such as required parameters) from a Service by giving a Service specific key and prints it nicely to console
+# Get data since a specific version as pandas dataframe
 payload = [
     {
         "name": "address_string", # THIS IS THE NAME OF THE INPUT VALUE
@@ -17,5 +19,10 @@ payload = [
     }
 ]
 
-result = data_service.invoke(parameters=payload, key=data_service_key)
+result = data_service.invoke(parameters=payload)
+print(result)
+
+
+# OR, the following is equivalent
+result = data_service.invoke(address_string="Agnes-Pockels-Bogen 1, 80992 München")
 print(result)

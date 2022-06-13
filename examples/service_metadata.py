@@ -1,13 +1,13 @@
 # Import Fusionbase
-from fusionbase.DataService import DataService
+from fusionbase.Fusionbase import Fusionbase
+import os
 
-# Create a new dataservice
+# Create a new datastream
 # Provide your API Key and the Fusionbase API URI (usually: https://api.fusionbase.com/api/v1)
-data_service = DataService(auth={"api_key": "*** SECRET CREDENTIALS ***"},
+fusionbase = Fusionbase(auth={"api_key": os.getenv('FUSIONBASE_API_KEY')},
                       connection={"base_uri": "https://api.fusionbase.com/api/v1"})
 
 
-data_service_key = 23622632
-
-# Retrieves the metadata from a Service by giving a Service specific key and prints it nicely to console
-data_service.pretty_meta_data(key=data_service_key)
+data_service_key = "23622632"
+data_service = fusionbase.get_dataservice(key=data_service_key)
+data_service.pretty_meta_data()

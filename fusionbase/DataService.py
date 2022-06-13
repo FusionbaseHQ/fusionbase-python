@@ -26,16 +26,16 @@ def cache():
         def new_func(*args, **kwargs):
             # get self argument from wrapped function to access the temporary directory
             self = args[0]
-            
+
             if self.cache == None:
                 self.cache = 0
-            
+
             if not isinstance(self.cache, int):
                 raise TypeError(f'Parameter cache must be of type int but was {type(self.cache)}')
-            
+
             if self.cache < 0:
                 raise ValueError(f'Parameter cache must a positive integer or 0 if you want caching disabled, but was: {self.cache}!')
-            
+
             if self.cache > 0:
                 cache_filepath = os.path.join(
                     self.tmp_dir, f'cache_{self.key}.shelve')
@@ -59,14 +59,14 @@ def cache():
                         now = datetime.now()
                         difference = now - time_of_caching
                         difference_minutes = difference.total_seconds() / 60
-                        
+
                         # check if cached result is older than the provided threshold
                         # cache new value with new timestamp
                         if difference_minutes > self.cache:
                             db[key] = {
                             'time_of_caching': datetime.now(),
                             'value' : func(*args, **kwargs)}
-                               
+
                     # otherwise it is cached -> return either way (return just the function value)
                     return db[key].get('value')
             else:
@@ -262,10 +262,10 @@ class DataService:
 
         :param parameters: The parameters to invoke the Dataservice with provided as either a dict if its one parameter
         or a list of dictionaries if you want to provide more than one input
-        
+
         **kwargs: You can also provide the parameters as keyword arguments, e.g. if the service requires an
         address_string just call the function like this: service.invoke(address_string='Your Address String')
-        
+
         :return: The output for the given service invocation as a python dictionary
         """
         if len(kwargs.items()) == 0 and parameters is not None:

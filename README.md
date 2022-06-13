@@ -46,31 +46,32 @@ The Data Stream module lets you conveniently access data and metadata of all Dat
 **Setup**
 ```python
 # Import Fusionbase
-from fusionbase.DataStream import DataStream
+from fusionbase.Fusionbase import Fusionbase
 
 # Create a new datastream
 # Provide your API Key and the Fusionbase API URI (usually: https://api.fusionbase.com/api/v1)
-data_stream = DataStream(auth={"api_key": "*** SECRET CREDENTIALS ***"},
+fusionbase = Fusionbase(auth={"api_key": "*** SECRET CREDENTIALS ***"},
                       connection={"base_uri": "https://api.fusionbase.com/api/v1"})
 
-data_stream_key = 28654971
+data_stream_key = "28654971"
+data_stream = fusionbase.get_datastream(data_stream_key)
 ```
 
 **Human readable datastream information:**
 ```python
 # Print a nice table containing the meta data of the stream
-data_stream.pretty_meta_data(key=data_stream_key)
+data_stream.pretty_meta_data()
 ```
 
 **Get Data:**
 ```python
-data = data_stream.get_data(key=data_stream_key)
+data = data_stream.get_data()
 print(data)
 ```
 
 **Get Data as a [pandas](https://pandas.pydata.org/) Dataframe:**
 ```python
-df = data_stream.get_dataframe(key=data_stream_key)
+df = data_stream.get_dataframe()
 print(df)
 ```
 
@@ -81,40 +82,47 @@ For example, our address [normalization service](https://app.fusionbase.com/shar
 **Setup**
 ```python
 # Import Fusionbase
-from fusionbase.DataService import DataService
+from fusionbase.Fusionbase import Fusionbase
 
 # Create a new dataservice
 # Provide your API Key and the Fusionbase API URI (usually: https://api.fusionbase.com/api/v1)
-data_service = DataService(auth={"api_key": "*** SECRET CREDENTIALS ***"},
+fusionbase = Fusionbase(auth={"api_key": "*** SECRET CREDENTIALS ***"},
                       connection={"base_uri": "https://api.fusionbase.com/api/v1"})
 
-data_service_key = 23622632
+data_service_key = "23622632"
+data_service = fusionbase.get_dataservice(data_service_key)
 ```
 
 **Human readable dataservice information:**
 ```python
 # Retrieves the metadata from a Service by giving a Service specific key and prints it nicely to console
-data_service.pretty_meta_data(key=data_service_key)
+data_service.pretty_meta_data()
 ```
 
 **Human readable dataservice definition:**
 ```python
 # Retrieve the request definition (such as required parameters) from a Service by giving a Service specific key and print it to console.
-data_service.pretty_request_definition(key=data_service_key)
+data_service.pretty_request_definition()
 ```
 
 **Invoke a dataservice:**
 
 ```python
 # Invoke a service by providing input data
+
+# The following lines of code are equivalent
+# Services can be invokes directly by their parameter names
+result = data_service.invoke(address_string="Agnes-Pockels-Bogen 1, 80992 München")
+
+
+# Or using a list of parameter key and value pairs
 payload = [
     {
         "name": "address_string",  # THIS IS THE NAME OF THE INPUT VALUE
         "value": "Agnes-Pockels-Bogen 1, 80992 München"  # THE VALUE FOR THE INPUT
     }
 ]
-
-result = data_service.invoke(parameters=payload, key=data_service_key)
+result = data_service.invoke(parameters=payload)
 
 print(result)
 ```
@@ -122,12 +130,22 @@ print(result)
 
 ## Changelog
 
-### Version 0.1.1 (2022.05.12)
+### Version 0.2 (2022.06.13)
+- Feature: Add top-level authentication (breaking change)
+- New API for invoking data services
+- New caching method for data services
 
+### Version 0.1.3 (2022.06.09)
+- Bugfix: Skip and limit parameters now work as intended
+
+### Version 0.1.2 (2022.06.07)
+- Bugfix: Fix exception handling in update_create method
+- Added tests for DataStream and DataService classes
+
+### Version 0.1.1 (2022.05.12)
 - Bugfix: `fields` parameter in `get_data` and `get_dataframe` works as intended now.
 
 ### Version 0.1.0 (2022.04.20)
-
 - Initial release
 
 ## Contributing
