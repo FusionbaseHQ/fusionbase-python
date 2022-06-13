@@ -29,6 +29,7 @@ pip install fusionbase
 ## Getting Started
 
 Got to [examples](https://github.com/FusionbaseHQ/fusionbase-python/tree/main/examples) to deep dive into Fusionbase and see various examples on how to use the package.
+If you want to use all features, you must make sure that pandas and numpy are installed.
 
 Here are some Examples for a quick start:
 

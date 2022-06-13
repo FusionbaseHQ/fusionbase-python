@@ -15,13 +15,18 @@ from itertools import islice
 from pathlib import Path, PurePath
 from typing import IO, Union
 
-import pandas as pd
 import requests
 from requests_toolbelt import MultipartEncoder
 from rich.console import Console
 from rich.prompt import Prompt
 from rich.table import Table
 from tqdm import tqdm
+
+try:
+    import pandas as pd
+except ImportError as e:
+    pd = None
+
 
 from fusionbase.exceptions.DataStreamNotExistsError import \
     DataStreamNotExistsError
@@ -72,7 +77,6 @@ class DataStream:
 
         elif self.__key is not None:
             # CHECK IF STREAM EXISTS
-
             self.get_meta_data()["_key"]
 
         for k,v in self.get_meta_data().items():
@@ -335,6 +339,9 @@ class DataStream:
         """
         assert (
             unique_label is None and self.key is None) == False, "NO_KEY_OR_UNIQUE_LABEL_GIVEN"
+
+        if pd is None:
+            raise ModuleNotFoundError('You must install pandas to use this feature.')
 
         stream_meta = dict()
         if self.key is None:
@@ -754,6 +761,9 @@ class DataStream:
         :param version: The  fb_data_version starting from from which new data should be downloaded
         :return: The data as a pandas Dataframe
         """
+        if pd is None:
+            raise ModuleNotFoundError('You must install pandas to use this feature.')
+
         if fields is None:
             fields = []
 
@@ -774,6 +784,9 @@ class DataStream:
         :param multithread: Whether multithreading should be used or not (Default is True)
         :return: The data as a pandas Dataframe
         """
+        if pd is None:
+            raise ModuleNotFoundError('You must install pandas to use this feature.')
+
         if fields is None:
             fields = []
 

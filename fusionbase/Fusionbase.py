@@ -8,12 +8,20 @@ import tempfile
 import time
 from pathlib import Path, PurePath
 from typing import IO, Union
-
-import numpy as np
-import pandas as pd
 import requests
 from requests_toolbelt import MultipartEncoder
 from rich.console import Console
+
+try:
+    import numpy as np
+except ImportError as e:
+    np = None
+
+try:
+    import pandas as pd
+except ImportError as e:
+    pd = None
+
 
 from fusionbase.DataService import DataService
 from fusionbase.DataStream import DataStream
@@ -199,6 +207,12 @@ class Fusionbase:
         :return: The result dict returned by the Fusionbase API
         """
 
+        if pd is None:
+            raise ModuleNotFoundError('You must install pandas to use this feature.')
+
+        if np is None:
+            raise ModuleNotFoundError('You must install numpy to use this feature.')
+
         start_time = time.time()
         data_chunks = []
         data_chunk_files = []
@@ -296,6 +310,13 @@ class Fusionbase:
         :param chunk_size: The size of the chunks during the upload
         :return:
         """
+
+        if pd is None:
+            raise ModuleNotFoundError('You must install pandas to use this feature.')
+
+        if np is None:
+            raise ModuleNotFoundError('You must install numpy to use this feature.')
+
         try:
             data_stream = self.get_datastream(label=unique_label)
             data_stream.update(unique_label=unique_label,
