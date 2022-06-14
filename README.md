@@ -26,7 +26,7 @@ Fusionbase is on PyPI, so you can use `pip` to install it.
 pip install fusionbase
 ```
 
-If you want to use all features, you must make sure that pandas and numpy are installed.
+If you want to use all features and be able to retrieve the data directly as pandas dataframes, you must make sure that pandas and numpy are installed.
 
 ```bash
 pip install pandas
@@ -110,7 +110,7 @@ data_service.pretty_request_definition()
 # Invoke a service by providing input data
 
 # The following lines of code are equivalent
-# Services can be invokes directly by their parameter names
+# Services can be invoked directly by their parameter names
 result = data_service.invoke(address_string="Agnes-Pockels-Bogen 1, 80992 München")
 
 
