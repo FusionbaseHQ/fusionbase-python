@@ -1,18 +1,17 @@
 # Import Fusionbase
-from fusionbase.DataStream import DataStream
-
-#Import pandas
+from fusionbase.Fusionbase import Fusionbase
 import pandas as pd
+import os
 
 # Create a new datastream
 # Provide your API Key and the Fusionbase API URI (usually: https://api.fusionbase.com/api/v1)
-data_stream = DataStream(auth={"api_key": "*** SECRET CREDENTIALS ***"},
+fusionbase = Fusionbase(auth={"api_key": os.getenv('FUSIONBASE_API_KEY')},
                       connection={"base_uri": "https://api.fusionbase.com/api/v1"})
 
 # Load the data for which you want to create a datastream
 # Currenty, only lists of dictionaries are supported, i.e., orient="records"
-beer_consum_dataset = pd.read_csv(
- "data/oktoberfest_beer.csv").to_dict(orient="records")
+beer_consum_dataset_df = pd.read_csv(
+ "data/oktoberfest_beer.csv")
 
 # Unique label for the dataset
 unique_label = 'MUNICH_OKTOBERFEST_BEER_CONSUMPTION'
@@ -26,10 +25,10 @@ source ={
  }
 }
 
-# Creates the dataset
-# Data entries are deduplicated by default
-result = data_stream.update_create(unique_label=unique_label, name={"en": "Munich Oktoberfest Beer Consumption"}, description={
-                         "en": "This is a cool description"}, scope="PUBLIC", source=source, data=beer_consum_dataset)
 
-# On success, this will return the id and the key of the newly created data stream
-print(result)
+# Create a new data stream
+data_stream = fusionbase.create_stream(unique_label=unique_label, name={"en": "Munich Oktoberfest Beer Consumption"}, description={
+                         "en": "This is a cool description"}, scope="PUBLIC", source=source, data=beer_consum_dataset_df)
+
+# Print new data stream instance
+print(data_stream)

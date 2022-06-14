@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import concurrent.futures
-from itertools import islice
 import gzip
 import hashlib
 import json
@@ -10,14 +9,12 @@ import os
 import platform
 import re
 import tempfile
-import time
 import traceback
 import urllib.parse
+from itertools import islice
 from pathlib import Path, PurePath
 from typing import IO, Union
 
-import numpy as np
-import pandas as pd
 import requests
 from requests_toolbelt import MultipartEncoder
 from rich.console import Console
@@ -25,38 +22,66 @@ from rich.prompt import Prompt
 from rich.table import Table
 from tqdm import tqdm
 
-from fusionbase.exceptions.DataStreamNotExistsError import DataStreamNotExistsError
+try:
+    import pandas as pd
+except ImportError as e:
+    pd = None
+
+
+from fusionbase.exceptions.DataStreamNotExistsError import \
+    DataStreamNotExistsError
 from fusionbase.exceptions.ResponseEvaluator import ResponseEvaluator
 
 
 class DataStream:
 
-    def __init__(self, auth: dict, connection: dict, config: dict = None, log: bool = False) -> None:
+    def __init__(self, auth: dict, key: Union[str, int] = None,  label: str = None, connection: dict = {"base_uri": "https://api.fusionbase.com/api/v1"}, config: dict = None, log: bool = False) -> None:
         """
-       Used to initialise a new DataStream Object
-       :param auth: the standard authentication object to authenticate yourself towards the fusionbase API
-       Example:
-       auth = {"api_key": " ***** Hidden credentials *****"}
+        Used to initialise a new DataStream Object
+        :param key: The key of the datastream provided as an integer or string
+        :param auth: the standard authentication object to authenticate yourself towards the fusionbase, API
+        Example:
+        auth = {"api_key": " ***** Hidden credentials *****"}
 
-       :param connection: the standard authentication object used to verify e.g which uri should be used
-       Example:
-       connection={"base_uri": "https://api.fusionbase.com/api/v1"}
+        :param connection: the standard authentication object used to verify e.g which uri should be used
+        Example:
+        connection={"base_uri": "https://api.fusionbase.com/api/v1"}
 
-       :param config: Let the user specify e.g a specific caching directory
-       :param log: Whether the the output of any given operation should be logged to console
-       """
-
+        :param config: Let the user specify e.g a specific caching directory
+        :param log: Whether the the output of any given operation should be logged to console
+        """
         if config is None:
             config = {}
 
+        if key is None and label is None:
+            raise TypeError(f'Either key or label has to be provided')
+
+        elif not isinstance(key, int) and label is None and not isinstance(key, str):
+            raise TypeError(
+                f'Key must be either of type int or str but was {type(key)}')
+        else:
+            self.__key = key
+            self.__label = label
+
+        self.__log = log
         self.auth = auth
         self.connection = connection
         self.base_uri = self.connection["base_uri"]
+        self.evaluator = ResponseEvaluator()
         self.requests = requests.Session()
         self.requests.headers.update({'x-api-key': self.auth["api_key"]})
-        self.log = log
         self.console = Console()
-        self.evaluator = ResponseEvaluator()
+
+        if self.__label is not None and self.__key is None:
+            self.__key = self._get_meta_data_by_label()["_key"]
+
+        elif self.__key is not None:
+            # CHECK IF STREAM EXISTS
+            self.get_meta_data()["_key"]
+
+        for k,v in self.get_meta_data().items():
+            setattr(self, k, v)
+
 
         if "cache_dir" in config:
             self.tmp_dir = PurePath(Path(config["cache_dir"]))
@@ -65,6 +90,37 @@ class DataStream:
                 "/tmp" if platform.system() == "Darwin" else tempfile.gettempdir()), 'fusionbase')
         # Ensure that tmp/cache directory exists
         Path(self.tmp_dir).mkdir(parents=True, exist_ok=True)
+
+    def __str__(self) -> str:
+        meta_data = self.get_meta_data()
+        return f"""{meta_data["name"]["en"]}
+    =============================
+    Key             -> {meta_data["_key"]}
+    Unique Label    -> {meta_data["unique_label"]}
+    Entries         -> {meta_data["meta"]["entry_count"]}
+    Props           -> {meta_data["meta"]["main_property_count"]}
+    Data Version    -> {meta_data["data_version"]}
+    Data Update     -> {meta_data["data_updated_at"]}
+    Store Version   -> {meta_data["store_version"]}
+    Source          -> {meta_data["source"]["label"]}
+    Source Key      -> {meta_data["source"]["_key"]}
+    """
+
+    @property
+    def key(self):
+        return self.__key
+
+    @property
+    def label(self):
+        return self.__label
+
+    @property
+    def log(self):
+        return self.__log
+
+    @log.setter
+    def log(self, log: bool):
+        self.__log = log
 
     def _log(self, message: str, force=False) -> None:
         if not self.log and not force:
@@ -114,12 +170,11 @@ class DataStream:
 
         return skip_limits
 
-    def pretty_meta_data(self, key: Union[str, int]) -> None:
+    def pretty_meta_data(self) -> None:
         """
         Retrieves the metadata from a Stream by giving a Service specific key and prints it nicely to console
-        :param key: The key of the Stream either as a string or integer value
         """
-        meta_data = self.get_meta_data(key=key)
+        meta_data = self.get_meta_data()
         table = Table(title=meta_data["name"]["en"])
 
         table.add_column("Property", justify="right",
@@ -146,45 +201,42 @@ class DataStream:
         self._log(table, True)
         print("\n" * 2)
 
-    def get_meta_data(self, key: Union[str, int]) -> Union[None, dict]:
+    def get_meta_data(self) -> Union[None, dict]:
         """
-       Retrieves the metadata from a Stream by giving a Stream specific key
-       :param key: The key of the Stream either as a string or integer value
-       :return: The metadata for the given service as a python dictionary
-       """
+        Retrieves the metadata from a Stream by giving a Stream specific key
+        :return: The metadata for the given service as a python dictionary
+        """
+
         r = self.requests.get(
-            f"{self.base_uri}/data-stream/get/{key}/meta")
+            f"{self.base_uri}/data-stream/get/{self.key}/meta")
+
         self.evaluator.evaluate(r)
         meta = r.json()
         return meta
 
-    def get_meta_data_by_label(self, label: str) -> dict:
-        """
-        Retrieves the metadata from a Stream by providing the unique label of the Datastream
-        :param label: The unique label of the Datastream
-        :return: the metadata as a python dictionary
-        """
+    def _get_meta_data_by_label(self) -> dict:
         # 1. Get ID by the label
-        r = self.requests.get(f"{self.base_uri}/data-stream/get/label/{label}")
+        r = self.requests.get(
+            f"{self.base_uri}/data-stream/get/label/{self.label}")
         self.evaluator.evaluate(response=r)
         data = r.json()
-
         # 2. Get the data stream
         if data is None or r.status_code != 200 or "_key" not in data:
             self._log(
-                f"Datastream with unique label [bold]{label}[/bold] does not exist")
+                f"Datastream with unique label [bold]{self.label}[/bold] does not exist")
             return None
 
-        data_stream_meta_data = self.get_meta_data(data["_key"])
+        self.__key = data['_key']
+        data_stream_meta_data = self.get_meta_data()
         return data_stream_meta_data
 
-    def get_schema_by_label(self, label: str) -> dict:
+    def _get_schema_by_label(self) -> dict:
         """
         Returns the schema of a datastream by providing the unique label
         :param label: The unique label of the datastream
         :return: The schema of the datastream as a dict
         """
-        meta_data = self.get_meta_data_by_label(label)
+        meta_data = self._get_meta_data_by_label()
         dics = meta_data["data_item_collections"]
         for i, dic in enumerate(dics):
             # Add to 'key' for making it update compatible
@@ -213,7 +265,7 @@ class DataStream:
         self._log(r.text)
         return r.status_code
 
-    def set_source(self, data_stream_key: Union[int, str], source_key: Union[int, str], stream_specific: dict) -> bool:
+    def set_source(self, source_key: Union[int, str], stream_specific: dict) -> bool:
         """
         Used to set the source of a provided Datastream
         :param stream_specific:
@@ -223,7 +275,7 @@ class DataStream:
         """
         assert "uri" in stream_specific, "STREAM_SPECIFIC_URI_IS_REQUIRED"
         update_dict = {
-            "data_stream_key": data_stream_key,
+            "data_stream_key": self.key,
             "source_key": source_key,
             "stream_specific_uri": stream_specific["uri"]
         }
@@ -245,87 +297,13 @@ class DataStream:
             "✅ [green]Source of the stream has been successfully updated.[/green]")
         return True
 
-    def _create(self, unique_label: str, name: dict, description: Union[dict, set], scope: str, source: str,
-               data,
-               data_file: IO = None,
-               provision: str = "MARKETPLACE") -> dict:
-        """
-        Used to create a new Datastream
-        :param unique_label: The unique label of the datastream
-        :param name: The name of the Datastream as a dict
-        :param description: The Description of the datastream as a dict
-        :param scope: The Scope of the stream either "PUBLIC" or "PRIVATE"
-        :param source: The Datastream source
-        :param data: The data provided as a json or a list of dictionaries
-        :param data_file: You can also provide the data as a gzipped file
-        :param provision: ["MARKETPLACE", "PRIVATE"]
-        :return: The result dict returned by the Fusionbase API
-        """
-        unique_label = unique_label.strip()
-
-        assert len(unique_label) > 0, "UNIQUE_LABEL_REQUIRED"
-        assert isinstance(name, dict), "NAME_MUST_BE_A_DICT"
-        assert "en" in name.keys() and len(
-            name["en"]) > 0, "NAME_EN_MUST_BE_SET"
-        assert isinstance(description, dict), "DESCRIPTION_MUST_BE_A_DICT"
-        assert "en" in description.keys() and len(
-            description["en"]) > 0, "DESCRIPTION_EN_MUST_BE_SET"
-        assert scope in [
-            "PUBLIC", "PRIVATE"], "SCOPE_MUST_BE_PUBLIC_OR_PRIVATE"
-
-        assert isinstance(
-            data, list) or data is None, "DATA_MUST_BE_LIST_OF_DICTS"
-        assert data is not None or data_file is not None, "DATA_MUST_BE_LIST_OF_DICTS_OR_FILE"
-
-        assert provision in ["MARKETPLACE",
-                             "PRIVATE"], "INCORRECT_PROVISION_TYPE"
-
-        data_stream_definition = {
-            "unique_label": unique_label,
-            "name": name,
-            "description": description,
-            "provision": provision,
-            "scope": scope,
-            "source": source,
-            "data": data
-        }
+    def _update(self, data: list[dict], data_file: IO = None):
 
         if data_file is not None:
-            # assert self._is_gzipped_file(data_file), "ONLY_GZIPPED_DATA_FILES_ARE_SUPPORTED"
             data_file = ("data.json.gz", data_file, "application/json")
 
         m = MultipartEncoder(
-            fields={'data_stream_definition': json.dumps(data_stream_definition),
-                    "data_file": data_file}
-        )
-
-        result = self.requests.post(
-            f"{self.base_uri}/data-stream/new", data=m, headers={'Content-Type': m.content_type}, stream=False)
-
-        self.evaluator.evaluate(response=result)
-        result = result.json()
-
-        if "detail" in result and "error" in result["detail"]:
-            return {
-                "success": False,
-                **result
-            }
-
-        assert "_key" in result, "ERROR_CREATE"
-
-        return {
-            "success": True,
-            "detail": result
-        }
-
-    def _update(self, key: Union[str, int], data: list[dict], data_file: IO = None):
-
-        if data_file is not None:
-            # assert self._is_gzipped_file(data_file), "ONLY_GZIPPED_DATA_FILES_ARE_SUPPORTED"
-            data_file = ("data.json.gz", data_file, "application/json")
-
-        m = MultipartEncoder(
-            fields={"key": key,
+            fields={"key": self.key,
                     "data": json.dumps(data) if data is not None else "[]",
                     "data_file": data_file}
         )
@@ -342,10 +320,8 @@ class DataStream:
             for d in result["detail"]:
                 # Currently only check if data stream key exists
                 if d["type"] == 'data_warning.empty':
-                    return {
-                        "success": False,
-                        "detail": "DATA_STREAM_DOES_NOT_EXIST"
-                    }
+                    raise DataStreamNotExistsError
+
         assert "_key" in result, "ERROR_UPDATE"
 
         return {
@@ -353,23 +329,25 @@ class DataStream:
             "detail": result
         }
 
-    def update(self, unique_label: str = None, key: Union[str, int] = None, data: list[dict] = None,
+    def update(self, unique_label: str = None, data: list[dict] = None,
                data_file_path: IO = None) -> dict:
         """
         Used to update a Datastream
         :param unique_label: The unique label of the datastream
-        :param key: The key of the Datatsream you want to update either as an integer or string
         :param data: The data provided as a json or a list of dictionaries
         :param data_file_path: You can also provide the data as a gzipped file
         """
         assert (
-            unique_label is None and key is None) == False, "NO_KEY_OR_UNIQUE_LABEL_GIVEN"
+            unique_label is None and self.key is None) == False, "NO_KEY_OR_UNIQUE_LABEL_GIVEN"
+
+        if pd is None:
+            raise ModuleNotFoundError('You must install pandas to use this feature.')
 
         stream_meta = dict()
-        if key is None:
-            stream_meta = self.get_meta_data_by_label(unique_label)
+        if self.key is None:
+            stream_meta = self._get_meta_data_by_label(unique_label)
         else:
-            stream_meta["_key"] = key
+            stream_meta["_key"] = self.key
 
         data_file = None
         # Check if file is used as data
@@ -381,7 +359,10 @@ class DataStream:
             # Set data to None to only use the file
             data = None
 
-        result = self._update(stream_meta["_key"], data, data_file)
+        if isinstance(data, pd.core.frame.DataFrame):
+            data = data.to_dict('records')
+
+        result = self._update(data, data_file)
 
         # Close file
         if data_file is not None:
@@ -391,122 +372,7 @@ class DataStream:
                 pass
         return result
 
-    def update_create(self, unique_label: str, name, description, scope, source, data: list[dict] = None,
-                      data_file_path: IO = None,
-                      provision: str = "MARKETPLACE",
-                      chunk: bool = False,
-                      chunk_size: int = None) -> dict:
-        """
-        Main method to invoke the update or creation of a new Datastream
-        :param unique_label: The unique label of the datastream
-        :param name: The name of the Datastream as a dict
-        :param description: The Description of the datastream as a dict
-        :param scope: The Scope of the stream either "PUBLIC" or "PRIVATE"
-        :param source: The Datastream source
-        :param data: The data provided as a json or a list of dictionaries
-        :param data_file_path: You can also provide the data as a gzipped file
-        :param provision: ["MARKETPLACE", "PRIVATE"]
-        :param chunk: Whether you want to upload the data in junks or not default is False
-        :param chunk_size: The size of the chunks during the upload
-        :return:
-        """
-
-        start_time = time.time()
-        data_chunks = []
-        data_chunk_files = []
-
-        if data is not None and data_file_path is not None:
-            self._log(
-                "[red]WARNING:[/red] YOU PROVIDED DATA IN MEMORY AND VIA FILE. TAKE ONLY MEMORY NOW")
-
-        # Check if data is provided via file path
-        if data is None and isinstance(data_file_path, str):
-            assert self._is_gzipped_file(
-                data_file_path), "ONLY_GZIPPED_DATA_FILES_ARE_SUPPORTED"
-            data_chunk_files.append(data_file_path)
-        else:
-            data_chunks = [data]
-
-            # Chunk the data
-        if chunk:
-            # Read only if chunks are required
-            if isinstance(data_file_path, str):
-                data = pd.read_json(data_file_path)
-                # Remove the full file from the chunk files
-                data_chunk_files = []
-            if chunk_size is None or isinstance(chunk_size, int) == False:
-                chunk_size = math.ceil(len(data) / 1_000_000)
-            self._log(
-                f"Split dataset with {len(data)} rows into {1 if chunk_size is None else chunk_size} chunks.")
-            data_chunks = np.array_split(data, chunk_size)
-
-        # Build files for upload
-        for chunk_index, data_chunk in enumerate(data_chunks):
-            chunk_file_path = str(
-                PurePath(self.tmp_dir, f"__tmp_df_upload_{chunk_index}.json.gz"))
-            # Check if data is provided as dataframe
-            if isinstance(data_chunk, pd.core.frame.DataFrame):
-                data_chunk.to_json(chunk_file_path, orient="records")
-            elif isinstance(data_chunk, np.ndarray):
-                data_chunk = list(data_chunk)
-                with gzip.open(chunk_file_path, 'wt', encoding='UTF-8') as zipfile:
-                    json.dump(data_chunk, zipfile)
-            else:
-                raise Exception(
-                    "INCORRECT DATA TYPE PROVIDED, EITHER LIST OF DICTS, DATAFRAME OR .JSON.GZ FILE!!")
-
-            data_chunk_files.append(chunk_file_path)
-
-        result = None
-        upsert_type = None
-
-        for data_chunk_file_index, data_chunk_file in enumerate(data_chunk_files):
-            
-            try:
-                stream_meta = self.get_meta_data_by_label(unique_label)
-            except DataStreamNotExistsError as e:
-                stream_meta = None
-
-            if isinstance(data_chunk_file, str):
-                # print(data_file_path)
-                assert self._is_gzipped_file(
-                    data_chunk_file), "ONLY_GZIPPED_DATA_FILES_ARE_SUPPORTED"
-                data_file = open(data_chunk_file, "rb")
-                # Set data to None to only use the file
-                data = None
-
-                # Datasetream does not exist create a new one
-                if stream_meta is None or not isinstance(stream_meta, dict) or "_key" not in stream_meta:
-                    result = self._create(unique_label, name,
-                                         description, scope, source, data, data_file, provision)
-                    upsert_type = "CREATE"
-                    result["upsert_type"] = upsert_type
-                else:
-                    result = self._update(stream_meta["_key"], data, data_file)
-
-                    if upsert_type != "CREATE":
-                        upsert_type = "UPDATE"
-
-                    result["upsert_type"] = upsert_type
-                    # Close file
-                    if data_file is not None:
-                        try:
-                            data_file.close()
-                        except AttributeError:
-                            pass
-
-                self._log(
-                    f"Push chunk {data_chunk_file_index + 1} of {1 if chunk_size is None else chunk_size} chunks.")
-
-                if not result["success"]:
-                    self._log(
-                        f"[red]ERROR: CHUNK {data_chunk_file_index} FAILED -- REST IS STILL GOING.[/red]")
-
-        self._log(f"All chunks done.")
-        self._log(f"Execution time :: {time.time() - start_time}")
-        return result
-
-    def replace(self, unique_label: str, cascade: bool = True, inplace: bool = False, data: list[dict] = None,
+    def replace(self, cascade: bool = True, inplace: bool = False, data: list[dict] = None,
                 data_file_path: IO = None,
                 sanity_check: bool = True) -> dict:
         """
@@ -548,10 +414,10 @@ class DataStream:
                 }
         else:
             self.console.print(
-                f"YOU ARE ABOUT TO REPLACE DATA STREAM '{unique_label}'  -- God bless you and good luck.",
+                f"YOU ARE ABOUT TO REPLACE DATA STREAM '{self.label}'  -- God bless you and good luck.",
                 style="blink bold red underline")
 
-        stream_meta = self.get_meta_data_by_label(unique_label)
+        stream_meta = self._get_meta_data_by_label()
 
         data_file = None
         # Check if file is used as data
@@ -571,7 +437,7 @@ class DataStream:
                     data_file.close()
                 except AttributeError:
                     pass
-            raise Exception("DATA_STREAM_DOES_NOT_EXIST")
+            raise DataStreamNotExistsError
         else:
             if data_file is not None:
                 # assert self._is_gzipped_file(data_file), "ONLY_GZIPPED_DATA_FILES_ARE_SUPPORTED"
@@ -605,11 +471,8 @@ class DataStream:
                 for d in result["detail"]:
                     # Currently only check if data stream key exists
                     if d["type"] == 'data_warning.empty':
-                        return {
-                            "success": False,
-                            "upsert_type": "REPLACE",
-                            "detail": "DATA_STREAM_DOES_NOT_EXIST"
-                        }
+                        raise DataStreamNotExistsError
+
             assert "_key" in result, "ERROR_UPDATE"
 
             return {
@@ -618,11 +481,10 @@ class DataStream:
                 "detail": result
             }
 
-    def get_data(self, key: Union[str, int], fields: list = None, skip: int = None, limit: int = None,
+    def get_data(self, fields: list = None, skip: int = None, limit: int = None,
                  live: bool = False, multithread: bool = True) -> list:
         """
         Retrieve data from the Fusionbase API
-        :param key: The key of the datastream provided as an integer or string
         :param fields: The fields or columns of the data you want to retrieve (Projection)
         :param skip: Pagination parameter to skip rows
         :param limit: Pagination parameter to limit rows
@@ -638,7 +500,6 @@ class DataStream:
         else:
             fields = None
 
-
         if isinstance(limit, int) and limit > 150000:
             self._log("[red]Limit can't exceed 150.000. Use multiple requests in batches instead![/red]", force=True)
             self._log("[red]Limit is forcefully set to 150.000[/red]", force=True)
@@ -646,10 +507,10 @@ class DataStream:
             self._log("")
             limit = 150000
 
-        self._log(f"Getting meta data for Datastream with key {key}")
+        self._log(f"Getting meta data for Datastream with key {self.key}")
 
         # First get only the meta data
-        meta_data = self.get_meta_data(key=key)
+        meta_data = self.get_meta_data()
         self._log(f'✅ Meta data successfully retrieved')
         self._log(
             f'Preparing data for stream [bold underline cyan]{meta_data["name"]["en"]}[/bold underline cyan]')
@@ -663,11 +524,11 @@ class DataStream:
         # meta_data["meta"]["entry_count"] is calculate on each /get request and should be safe to use
         if skip is not None and int(skip) > -1 and limit is not None and int(limit) > -1:
             skip_limit_batches = [(skip, limit)]
-        
+
         # Only limit is set without skip
         elif skip is None and limit is not None:
             skip_limit_batches = [(0, limit)]
-        
+
         # Only skip is set without limit
         elif skip is not None and (limit is None or limit == -1):
 
@@ -707,9 +568,9 @@ class DataStream:
 
             # Build unique name based on input arguments
             if fields is None:
-                _tmp_name = f"fb_stream__{str(key)}__{str(limit)}___{str(skip_limit[0])}__{str(skip_limit[0])}"
+                _tmp_name = f"fb_stream__{str(self.key)}__{str(limit)}___{str(skip_limit[0])}__{str(skip_limit[0])}"
             else:
-                _tmp_name = f"fb_stream__{str(key)}__{str(limit)}___{str(skip_limit[0])}__{str(skip_limit[0])}___{'-'.join(fields)}"
+                _tmp_name = f"fb_stream__{str(self.key)}__{str(limit)}___{str(skip_limit[0])}__{str(skip_limit[0])}___{'-'.join(fields)}"
 
             _tmp_name = hashlib.sha3_256(_tmp_name.encode(
                 "utf-8")).hexdigest()[:12] + '.json'
@@ -721,8 +582,7 @@ class DataStream:
                 return
 
             # Build request URL
-            request_url = f"{self.base_uri}/data-stream/get/{key}?skip={skip_limit[0]}&limit={skip_limit[1]}&compressed_file=true"
-
+            request_url = f"{self.base_uri}/data-stream/get/{self.key}?skip={skip_limit[0]}&limit={skip_limit[1]}&compressed_file=true"
             if fields is not None:
                 field_query = ""
                 for field in fields:
@@ -779,18 +639,16 @@ class DataStream:
                 with gzip.open(f"{_tmp}.gz", 'r') as fin:
                     data = json.loads(fin.read().decode('utf-8'))["data"]
                     result_datastream_data.extend(data)
-            except gzip.BadGzipFile as e:
+            except gzip.BadGzipFile:
                 continue
 
         self._log(f'✅  Done.')
 
         return result_datastream_data
 
-
-    def get_delta_data(self, key: Union[str, int], version: str, fields: list = None, live: bool = True) -> list:
+    def get_delta_data(self, version: str, fields: list = None, live: bool = True) -> list:
         """
         Retrieve data from the Fusionbase API since a specified fb_data_version
-        :param key: The key of the datastream provided as an integer or string
         :param fields: The fields or columns of the data you want to retrieve (Projection)
         :param version: The  fb_data_version starting from from which new data should be downloaded
         :return: The data as a list of dictionaries
@@ -803,7 +661,7 @@ class DataStream:
 
         version_matched = re.match(VERSION_PATTERN, version)
 
-        if key is None or '':
+        if self.key is None or '':
             raise Exception('A VALID KEY MUST BE SPECIFIED!')
 
         if (version is None or '') or not bool(version_matched):
@@ -813,10 +671,10 @@ class DataStream:
         fields.extend(["fb_id", "fb_data_version", "fb_datetime"])
         fields = list(dict.fromkeys(fields))  # Remove duplicates
 
-        self._log(f"Getting meta data for Datastream with key {key}")
+        self._log(f"Getting meta data for Datastream with key {self.key}")
 
         # First get only the meta data
-        meta_data = self.get_meta_data(key=key)
+        meta_data = self.get_meta_data()
         self._log(f'✅ Meta data successfully retrieved')
         self._log(
             f'Preparing delta data for stream [bold underline cyan]{meta_data["name"]["en"]}[/bold underline cyan] since version: [bold]{version}[/bold]')
@@ -841,17 +699,17 @@ class DataStream:
 
         else:
             r = self.requests.get(
-                f"{self.base_uri}/data-stream/get/delta/{key}/{version}", stream=True)
+                f"{self.base_uri}/data-stream/get/delta/{self.key}/{version}", stream=True)
 
             self.evaluator.evaluate(response=r)
 
             if r.status_code == 401 and r.content == b'{"detail":[{"loc":"","msg":"You are not authorized to access this resource.","type":"authorization_error.missing"}]}':
                 raise Exception(
-                    f"IT SEEMS LIKE YOU DON'T HAVE ACCESS TO DATASTREAM WITH STREAM-ID {key}")
+                    f"IT SEEMS LIKE YOU DON'T HAVE ACCESS TO DATASTREAM WITH STREAM-ID {self.key}")
 
             if r.status_code != 200:
                 raise Exception(
-                    f"SOMETHING WEN'T WRONG WHILE REQUESTING DATASTREAM WITH STREAM-ID {key} and DATA AFTER VERSION: {version}, \n RESPONSE CODE WAS : {r.status_code}")
+                    f"SOMETHING WEN'T WRONG WHILE REQUESTING DATASTREAM WITH STREAM-ID {self.key} and DATA AFTER VERSION: {version}, \n RESPONSE CODE WAS : {r.status_code}")
 
             total_download_size = int(r.headers.get('content-length', 0))
 
@@ -886,7 +744,7 @@ class DataStream:
 
         except gzip.BadGzipFile as e:
             raise Exception(
-                f"DATA STREAM WITH KEY {key} AND VERSION {version}: COMPRESSED FILE: {_tmp_fpath}.gz COULDN'T BE UNPACKED SEE: \n {e}")
+                f"DATA STREAM WITH KEY {self.key} AND VERSION {version}: COMPRESSED FILE: {_tmp_fpath}.gz COULDN'T BE UNPACKED SEE: \n {e}")
 
         if len(result_datastream_data) == 0:
             self.console.print(
@@ -896,28 +754,29 @@ class DataStream:
 
         return result_datastream_data
 
-    def get_delta_dataframe(self, key:Union[str, int], version: str, fields: list=None) -> pd.DataFrame:
+    def get_delta_dataframe(self, version: str, fields: list = None) -> pd.DataFrame:
         """
         Retrieve data from the Fusionbase API since a specified fb_data_version and return it as a valid pandas Dataframe
-        :param key: The key of the datastream provided as an integer or string
         :param fields: The fields or columns of the data you want to retrieve (Projection)
         :param version: The  fb_data_version starting from from which new data should be downloaded
         :return: The data as a pandas Dataframe
         """
+        if pd is None:
+            raise ModuleNotFoundError('You must install pandas to use this feature.')
+
         if fields is None:
             fields = []
 
-        data = self.get_delta_data(key=key, version=version, fields=fields)
+        data = self.get_delta_data(version=version, fields=fields)
 
         df = pd.DataFrame(data)
         return df
 
-    def get_dataframe(self, key: Union[str, int], fields: list = None, skip: int = None, limit: int = None,
+    def get_dataframe(self, fields: list = None, skip: int = None, limit: int = None,
                       live: bool = False,
                       multithread: bool = True) -> pd.DataFrame:
         """
         Retrieve data from the Fusionbase API and return it as a valid pandas Dataframe
-        :param key: The key of the datastream provided as an integer or string
         :param fields: The fields or columns of the data you want to retrieve (Projection)
         :param skip: Pagination parameter to skip rows
         :param limit: Pagination parameter to limit rows
@@ -925,10 +784,13 @@ class DataStream:
         :param multithread: Whether multithreading should be used or not (Default is True)
         :return: The data as a pandas Dataframe
         """
+        if pd is None:
+            raise ModuleNotFoundError('You must install pandas to use this feature.')
+
         if fields is None:
             fields = []
 
-        data = self.get_data(key=key, fields=fields, skip=skip,
+        data = self.get_data(fields=fields, skip=skip,
                              limit=limit, live=live, multithread=multithread)
         df = pd.DataFrame(data)
         #df.drop_duplicates(subset=["fb_id"], inplace=True)

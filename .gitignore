@@ -22,7 +22,7 @@ update_meta_data.py
 update.py
 examples/data/*
 *.feather
-*.csv
+# *.csv
 *.json.gz
 *.json
 
