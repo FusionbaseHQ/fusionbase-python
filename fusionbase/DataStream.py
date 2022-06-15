@@ -14,6 +14,7 @@ import urllib.parse
 from itertools import islice
 from pathlib import Path, PurePath
 from typing import IO, Union
+import warnings
 
 import requests
 from requests_toolbelt import MultipartEncoder
@@ -653,6 +654,9 @@ class DataStream:
         :param version: The  fb_data_version starting from from which new data should be downloaded
         :return: The data as a list of dictionaries
         """
+        if fields is not None and len(fields) > 0:
+            warnings.warn("You set the fields parameter on the delta data method. However, the fields parameter is currently ignored.", UserWarning, stacklevel=3)
+
         if fields is None:
             fields = []
 
@@ -698,9 +702,25 @@ class DataStream:
             self._log(f'Cache hit! Skip downloading ... ')
 
         else:
-            r = self.requests.get(
-                f"{self.base_uri}/data-stream/get/delta/{self.key}/{version}", stream=True)
 
+            request_url = f"{self.base_uri}/data-stream/get/delta/{self.key}/{version}"
+
+            # TODO: Retrieving only specific fields using the delta data is currently not implemented on the server side
+            if fields is not None:
+                field_query = "" 
+                for _index, field in enumerate(fields):
+                    if _index == 0:
+                        # Check if this is the first query parameter
+                        if "?" not in request_url:
+                            field_query = f"?fields={urllib.parse.quote_plus(field)}"
+                        else:
+                            field_query = f"&fields={urllib.parse.quote_plus(field)}"
+                    else:
+                        field_query = f"{field_query}&fields={urllib.parse.quote_plus(field)}" 
+                field_query = field_query.strip().strip('&').strip()
+                request_url = f"{request_url}{field_query}"
+
+            r = self.requests.get(request_url, stream=True)
             self.evaluator.evaluate(response=r)
 
             if r.status_code == 401 and r.content == b'{"detail":[{"loc":"","msg":"You are not authorized to access this resource.","type":"authorization_error.missing"}]}':

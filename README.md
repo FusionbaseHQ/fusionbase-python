@@ -58,7 +58,7 @@ data_stream = fusionbase.get_datastream(data_stream_key)
 
 **Human readable datastream information:**
 ```python
-# Print a nice table containing the meta data of the stream
+# Prints a nice table containing the meta data of the stream
 data_stream.pretty_meta_data()
 ```
 
@@ -100,7 +100,7 @@ data_service.pretty_meta_data()
 
 **Human readable dataservice definition:**
 ```python
-# Retrieve the request definition (such as required parameters) from a Service by giving a Service specific key and print it to console.
+# Retrieves the request definition (such as required parameters) from a Service by giving a Service specific key and print it to console.
 data_service.pretty_request_definition()
 ```
 
@@ -128,6 +128,9 @@ print(result)
 
 
 ## Changelog
+
+### Version 0.2.1 (2022.06.15)
+- Minor fixes and improvements
 
 ### Version 0.2.0 (2022.06.13)
 - Feature: Add top-level authentication (breaking change)
