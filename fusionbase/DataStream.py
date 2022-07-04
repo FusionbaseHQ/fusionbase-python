@@ -159,9 +159,9 @@ class DataStream:
 
         # Chunks are bigger than 150k entries, i.e. they exceed the hard limit
         # Make chunks into smaller batches of 100k each
-        if skip_limits[0][1] >= 150000:
+        if skip_limits[0][1] >= 5000:
             # 102161 is just a random prime number, could by any number < 150k
-            skip_limit_chunks = list(chunks(range(0, limit+1), 102161))
+            skip_limit_chunks = list(chunks(range(0, limit+1), 4357))
             skip_limits = [(chunk[0]+initial_skip, chunk[-1]+1 - chunk[0])
                        for i, chunk in enumerate(skip_limit_chunks)]
 
@@ -501,12 +501,12 @@ class DataStream:
         else:
             fields = None
 
-        if isinstance(limit, int) and limit > 150000:
-            self._log("[red]Limit can't exceed 150.000. Use multiple requests in batches instead![/red]", force=True)
-            self._log("[red]Limit is forcefully set to 150.000[/red]", force=True)
+        if isinstance(limit, int) and limit > 5000:
+            self._log("[red]Limit can't exceed 5.000. Use multiple requests in batches instead![/red]", force=True)
+            self._log("[red]Limit is forcefully set to 5.000[/red]", force=True)
             self._log("[yellow]Tip: If you want to get the whole dataset, leave skip and limit empty.[/yellow]", force=True)
             self._log("")
-            limit = 150000
+            limit = 5000
 
         self._log(f"Getting meta data for Datastream with key {self.key}")
 
@@ -518,6 +518,10 @@ class DataStream:
 
         # Make sure max batches is always at least 1
         max_batches = (os.cpu_count() - 1) if os.cpu_count() > 1 else 1
+        
+        # Remove stress from the server to only allow 10 concurrent threads
+        if max_batches > 10:
+            max_batches = 10
 
         self._log(
             f'We will use {max_batches if multithread else 1} cores/threads to retrieve the data.{str(" Multithreading is [bold red]OFF[/bold red]") if not multithread else str("")}')
@@ -561,6 +565,9 @@ class DataStream:
 
         _tmp_path_set = set()
         result_datastream_data = list()
+        
+        #print(skip_limit_batches)
+        #return 1
 
         def __get_data_from_fusionbase(self, skip_limit, chunk):
 
@@ -617,7 +624,7 @@ class DataStream:
                     fopen.close()
 
         # Parallelize download
-        with concurrent.futures.ThreadPoolExecutor(max_workers=os.cpu_count() - 1 if multithread else 1) as executor:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max_batches if multithread else 1) as executor:
             data_part = {executor.submit(__get_data_from_fusionbase, self, skip_limit, chunk): (
                 skip_limit, chunk) for chunk, skip_limit in enumerate(skip_limit_batches)}
             for future in concurrent.futures.as_completed(data_part):
@@ -634,14 +641,37 @@ class DataStream:
         self._log(f'Building the final result object...')
 
         # Load the downloaded files into a data frame
-        for _tmp in _tmp_path_set:
-            # Unpack gzip and put into df
+        # Variant without ThreadPoolExecutor
+        # for _tmp in _tmp_path_set:
+        #     # Unpack gzip and put into df
+        #     try:
+        #         with gzip.open(f"{_tmp}.gz", 'r') as fin:
+        #             data = json.loads(fin.read().decode('utf-8'))["data"]
+        #             result_datastream_data.extend(data)
+        #     except gzip.BadGzipFile:
+        #         continue
+            
+        def __load__tmp_files(self, tmp_path):
             try:
-                with gzip.open(f"{_tmp}.gz", 'r') as fin:
+                with gzip.open(f"{tmp_path}.gz", 'r') as fin:
                     data = json.loads(fin.read().decode('utf-8'))["data"]
-                    result_datastream_data.extend(data)
+                    return data
             except gzip.BadGzipFile:
-                continue
+                return []
+
+            
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max_batches if multithread else 1) as executor:
+            data_part = {executor.submit(__load__tmp_files, self, _tmp_path): _tmp_path for _tmp_path in list(_tmp_path_set)}
+            for future in concurrent.futures.as_completed(data_part):
+                url = data_part[future]
+                try:
+                    data = future.result()
+                    result_datastream_data.extend(data)
+                except Exception as exc:
+                    print('%r generated an exception: %s' % (url, exc))
+                    print(traceback.format_exc())
+                else:
+                    pass
 
         self._log(f'✅  Done.')
 

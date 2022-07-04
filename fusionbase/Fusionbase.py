@@ -46,6 +46,8 @@ class Fusionbase:
 
         :param log: Whether the the output of any given operation should be logged to console
         """
+        
+        print("THIIIISSS")
 
         if config is None:
             config = {}
