@@ -46,8 +46,6 @@ class Fusionbase:
 
         :param log: Whether the the output of any given operation should be logged to console
         """
-        
-        print("THIIIISSS")
 
         if config is None:
             config = {}
@@ -265,12 +263,8 @@ class Fusionbase:
         upsert_type = None
 
         for data_chunk_file_index, data_chunk_file in enumerate(data_chunk_files):
-            # data_stream = DataStream(auth=self.auth, label=unique_label, connection=self.connection, config=self.config, log=self.log)
-            # stream_meta = data_stream._get_meta_data_by_label()
-            # # stream_meta = self._get_meta_data_by_label(unique_label)
 
             if isinstance(data_chunk_file, str):
-            # print(data_file_path)
                 assert self._is_gzipped_file(
                     data_chunk_file), "ONLY_GZIPPED_DATA_FILES_ARE_SUPPORTED"
                 data_file = open(data_chunk_file, "rb")

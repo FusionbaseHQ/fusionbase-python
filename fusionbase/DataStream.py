@@ -157,10 +157,10 @@ class DataStream:
         # Remove tuples that contain higher starting numbers the the actual data stream size
         skip_limits = list(filter(lambda x: x[0] <= limit, skip_limits))
 
-        # Chunks are bigger than 150k entries, i.e. they exceed the hard limit
-        # Make chunks into smaller batches of 100k each
+        # Chunks are bigger than 5k entries, i.e. they exceed the hard limit
+        # Make chunks into smaller batches of 4357 each
         if skip_limits[0][1] >= 5000:
-            # 102161 is just a random prime number, could by any number < 150k
+            # 4357 is just a random prime number, could by any number < 5k
             skip_limit_chunks = list(chunks(range(0, limit+1), 4357))
             skip_limits = [(chunk[0]+initial_skip, chunk[-1]+1 - chunk[0])
                        for i, chunk in enumerate(skip_limit_chunks)]
