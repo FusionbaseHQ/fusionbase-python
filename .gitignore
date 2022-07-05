@@ -25,6 +25,8 @@ examples/data/*
 # *.csv
 *.json.gz
 *.json
+examples/data-v2
+examples/data
 
 !tests/data/oktoberfest_beer.csv
 

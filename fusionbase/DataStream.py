@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import glob
-
+import pickle
+import csv
 import concurrent.futures
 import gzip
 import hashlib
@@ -42,6 +42,8 @@ except ImportError as e:
 from fusionbase.exceptions.DataStreamNotExistsError import \
     DataStreamNotExistsError
 from fusionbase.exceptions.ResponseEvaluator import ResponseEvaluator
+
+from fusionbase.constants.ResultType import ResultType
 
 
 class DataStream:
@@ -493,14 +495,16 @@ class DataStream:
             }
 
     def get_data(self, fields: list = None, skip: int = None, limit: int = None,
-                 live: bool = False, multithread: bool = True, fast_mode=False) -> list:
+                 live: bool = False, multithread: bool = True, result_type: ResultType = ResultType.MEMORY_LIST, storage_path:Path = None) -> list:
         """
         Retrieve data from the Fusionbase API
         :param fields: The fields or columns of the data you want to retrieve (Projection)
         :param skip: Pagination parameter to skip rows
         :param limit: Pagination parameter to limit rows
-        :param live:
+        :param live: Ignore cached results
         :param multithread: Whether multithreading should be used or not (Default is True)
+        :param result_type: Defines how the data is returned / stored (Default is a Python list of dictionaries)
+        :param storage_path: Path where the data is stored, only for valid result types
         :return: The data as a list of dictionaries
         """
 
@@ -510,6 +514,17 @@ class DataStream:
             fields = list(dict.fromkeys(fields))  # Remove duplicates
         else:
             fields = None
+
+        # Make sure pandas is installed for pandas dependened return types
+        if result_type in [ResultType.CSV_FILES, ResultType.FEATHER_FILES, ResultType.PARQUET_FILES]:
+            if pd is None:
+                raise ModuleNotFoundError('You must install pandas to use this feature.')
+
+        # Create storage path folder if it does not exist
+        if result_type in [ResultType.JSON_FILES, ResultType.CSV_FILES, ResultType.PICKLE_FILES, ResultType.FEATHER_FILES, ResultType.PARQUET_FILES]:
+            storage_path = storage_path.joinpath(self.key).joinpath("data")
+            storage_path.mkdir(parents=True, exist_ok=True)
+
 
         if isinstance(limit, int) and limit > 5000:
             self._log("[red]Limit can't exceed 5.000. Use multiple requests in batches instead![/red]", force=True)
@@ -631,8 +646,7 @@ class DataStream:
                         size = fopen.write(data)
                     fopen.close()
 
-        # Parallelize download
-        
+        # Parallelize download        
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_batches if multithread else 1) as executor:
             data_part = {executor.submit(__get_data_from_fusionbase, self, skip_limit, chunk): (
                 skip_limit, chunk) for chunk, skip_limit in enumerate(skip_limit_batches)}
@@ -647,25 +661,7 @@ class DataStream:
                     pass
 
         self._log(f'\n✅ Data successfully retrieved.')
-        self._log(f'Building the final result object...')
-
-        # Load the downloaded files into a data frame
-        # Variant without ThreadPoolExecutor
-        # for _tmp in _tmp_path_set:
-        #     # Unpack gzip and put into df
-        #     try:
-        #         with gzip.open(f"{_tmp}.gz", 'r') as fin:
-        #             if fast_mode == False:
-        #                 data = json.loads(fin.read().decode('utf-8'))["data"]
-        #             else:
-        #                 parser = simdjson.Parser()
-        #                 data = parser.parse(fin.read().decode('utf-8'))
-        #                 data = data["data"].as_list()
-        #             result_datastream_data.extend(data)
-        #             del parser
-        #             del data
-        #     except gzip.BadGzipFile:
-        #         continue
+        self._log(f'\n \nBuilding the final result object...')
         
         def __load__tmp_files():
             data = None
@@ -673,83 +669,100 @@ class DataStream:
                 # Unpack gzip and put into df
                 try:
                     with gzip.open(f"{_tmp}.gz", 'r') as fin:
-                        if fast_mode == True:
-                            data = json.loads(fin.read().decode('utf-8'))["data"]
-                            yield data
-                        else:
-                            parser = simdjson.Parser()
-                            data = parser.parse(fin.read().decode('utf-8'))
-                            data = data["data"]
-                            yield data
-                            del parser
-                            del data
-                            
-                        #result_datastream_data.extend(data)
-
-                        
+                        data = json.loads(fin.read().decode('utf-8'))["data"]
+                        yield data                        
                 except gzip.BadGzipFile:
-                    continue
-        
+                    continue        
 
-        import psutil
-        import pickle
-        with tqdm(total=len(_tmp_path_set)) as progress_bar:
-            for i, data in enumerate(__load__tmp_files()):
-                result_datastream_data.extend(data)                
-                if i % 50 == 0 and i > 0:
-                    self._log(f'Pickling...please wait')
-                    with open(PurePath(self.tmp_dir, f'ds_{self.key}_{i}.pkl'), 'wb') as f:
-                        pickle.dump(result_datastream_data, f)
-                        del result_datastream_data
-                        result_datastream_data = []                       
-                              
+        if self.log:
+            progress_bar = tqdm(total=len(_tmp_path_set))
+
+        for i, data in enumerate(__load__tmp_files()):                
+            if result_type == ResultType.MEMORY_LIST:
+                result_datastream_data.extend(data)
+            elif result_type == ResultType.PD_DATAFRAME:
+                result_datastream_data.extend(data)
+            elif result_type == ResultType.JSON_FILES:
+                with open(PurePath(storage_path, f'ds_{self.key}_part_{i}_unordered.json'), 'w') as fp:
+                    json.dump(data, fp)
+                    fp.close()
+            elif result_type == ResultType.CSV_FILES:
+                df = pd.DataFrame(data)
+                df.to_csv(PurePath(storage_path, f'ds_{self.key}_part_{i}_unordered.csv'), index=False, quoting=csv.QUOTE_ALL)
+            elif result_type == ResultType.FEATHER_FILES:
+                df = pd.DataFrame(data)
+                df.to_feather(PurePath(storage_path, f'ds_{self.key}_part_{i}_unordered.feather'))
+            elif result_type == ResultType.PARQUET_FILES:
+                df = pd.DataFrame(data)
+                df.to_parquet(PurePath(storage_path, f'ds_{self.key}_part_{i}_unordered.parquet'), index=False)   
+            elif result_type == ResultType.PICKLE_FILES:
+                with open(PurePath(storage_path, f'ds_{self.key}_part_{i}_unordered.pkl'), 'wb') as fp:
+                    pickle.dump(data, fp)
+                    fp.close()
+
+            if self.log:
                 progress_bar.update(1) # update progress
-                
+
+        if self.log:
+            progress_bar.close()
                 
 
-        # def __load__tmp_files(self, tmp_path):            
+                     
+        # Multithread implementation
+        # def __process_tmp_files(self, tmp_path):    
+        #     i = hashlib.sha3_256(str(tmp_path).encode(
+        #         "utf-8")
+        #     ).hexdigest()[:12]      
         #     try:
-        #         with gzip.open(f"{tmp_path}.gz", 'r') as fin:
-                    
-        #             # TODO: MORE CLEAR
-        #             if fast_mode == False:
-        #                 data = json.loads(fin.read().decode('utf-8'))["data"]
-        #             else:        
-        #                 parser = simdjson.Parser()                
-        #                 data = parser.parse(fin.read().decode('utf-8'))
-        #                 data = data["data"]
-        #                 del parser 
-        #             return data
+        #         with gzip.open(f"{tmp_path}.gz", 'r') as fin:  
+        #             data = json.loads(fin.read().decode('utf-8'))["data"]
+        #             if result_type == ResultType.MEMORY_LIST:
+        #                 return data
+        #             elif result_type == ResultType.PD_DATAFRAME:
+        #                 return data
+        #             elif result_type == ResultType.JSON_FILES:
+        #                 with open(PurePath(storage_path, f'ds_{self.key}_part_{i}_unordered.json'), 'w') as fp:
+        #                     json.dump(data, fp)
+        #                     fp.close()
+        #             elif result_type == ResultType.CSV_FILES:
+        #                 df = pd.DataFrame(data)
+        #                 df.to_csv(PurePath(storage_path, f'ds_{self.key}_part_{i}_unordered.csv'), index=False, quoting=csv.QUOTE_ALL)
+        #             elif result_type == ResultType.FEATHER_FILES:
+        #                 df = pd.DataFrame(data)
+        #                 df.to_feather(PurePath(storage_path, f'ds_{self.key}_part_{i}_unordered.feather'))
+        #             elif result_type == ResultType.PARQUET_FILES:
+        #                 df = pd.DataFrame(data)
+        #                 df.to_parquet(PurePath(storage_path, f'ds_{self.key}_part_{i}_unordered.parquet'), index=False)   
+        #             elif result_type == ResultType.PICKLE_FILES:
+        #                 with open(PurePath(storage_path, f'ds_{self.key}_part_{i}_unordered.pkl'), 'wb') as fp:
+        #                     pickle.dump(data, fp)
+        #                     fp.close()                    
         #     except gzip.BadGzipFile:
         #         return []
 
-        # import time
-        # start = time.time()
-        # with concurrent.futures.ThreadPoolExecutor(max_workers=2 if multithread else 1) as executor:
-        #     data_part = {executor.submit(__load__tmp_files, self, _tmp_path): _tmp_path for _tmp_path in list(_tmp_path_set)}
+        # with concurrent.futures.ThreadPoolExecutor(max_workers=5 if multithread else 1) as executor:
+        #     data_part = {executor.submit(__process_tmp_files, self, _tmp_path): _tmp_path for _tmp_path in list(_tmp_path_set)}
         #     for future in concurrent.futures.as_completed(data_part):
         #         url = data_part[future]
         #         try:
         #             data = future.result()
-        #             result_datastream_data.extend(data)
+        #             if result_type in [ResultType.MEMORY_LIST, ResultType.PD_DATAFRAME]:
+        #                 result_datastream_data.extend(data)
         #         except Exception as exc:
         #             print('%r generated an exception: %s' % (url, exc))
         #             print(traceback.format_exc())
         #         else:
         #             pass
-        
-        result_datastream_data = []
-        for _pickle_file in glob.glob(f'{self.tmp_dir}/ds_{self.key}_*.pkl'):
-            with open(_pickle_file, "rb") as fp:
-                result_datastream_data.extend(pickle.load(fp))
-                fp.close()
-            
-                
 
+        self._log(f'\n\n✅  Done getting data.')
 
-        self._log(f'✅  Done reading data.')
+        result = result_datastream_data
+        if result_type == ResultType.PD_DATAFRAME:
+            result = pd.DataFrame(result_datastream_data)
+        elif result_type in [ResultType.JSON_FILES, ResultType.CSV_FILES, ResultType.PICKLE_FILES, ResultType.FEATHER_FILES, ResultType.PARQUET_FILES]:
+            result = None        
 
-        return result_datastream_data
+        return result
 
     def get_delta_data(self, version: str, fields: list = None, live: bool = True) -> list:
         """
@@ -901,7 +914,7 @@ class DataStream:
 
     def get_dataframe(self, fields: list = None, skip: int = None, limit: int = None,
                       live: bool = False,
-                      multithread: bool = True, fast_mode=False) -> pd.DataFrame:
+                      multithread: bool = True) -> pd.DataFrame:
         """
         Retrieve data from the Fusionbase API and return it as a valid pandas Dataframe
         :param fields: The fields or columns of the data you want to retrieve (Projection)
@@ -917,19 +930,8 @@ class DataStream:
         if fields is None:
             fields = []
 
-        data = self.get_data(fields=fields, skip=skip,
-                             limit=limit, live=live, multithread=multithread, fast_mode=fast_mode)
+        df = self.get_data(fields=fields, skip=skip,
+                             limit=limit, live=live, multithread=multithread, result_type=ResultType.PD_DATAFRAME)
         
-        self._log(f'Building dataframe...')
-        
-        # TODO fastmode
-        try:
-            data[0] = data[0].as_dict()
-            print("works")
-        except Exception as e:
-            pass
-        
-        df = pd.DataFrame(data)
-        self._log(f'✅  Done building dataframe.')
-        #df.drop_duplicates(subset=["fb_id"], inplace=True)
+        df.drop_duplicates(subset=["fb_id"], inplace=True)
         return df
