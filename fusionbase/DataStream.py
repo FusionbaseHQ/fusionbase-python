@@ -1,13 +1,15 @@
 from __future__ import annotations
 
+import glob
+
 import concurrent.futures
 import gzip
 import hashlib
-import json
 import math
 import os
 import platform
 import re
+
 import tempfile
 import traceback
 import urllib.parse
@@ -22,11 +24,19 @@ from rich.console import Console
 from rich.prompt import Prompt
 from rich.table import Table
 from tqdm import tqdm
+from yaml import parse
 
 try:
     import pandas as pd
 except ImportError as e:
     pd = None
+
+# Use orjson if available, otherwise fallback to built-in
+try:
+    import orjson as json
+    import simdjson
+except ImportError as e:
+    import json
 
 
 from fusionbase.exceptions.DataStreamNotExistsError import \
@@ -483,7 +493,7 @@ class DataStream:
             }
 
     def get_data(self, fields: list = None, skip: int = None, limit: int = None,
-                 live: bool = False, multithread: bool = True) -> list:
+                 live: bool = False, multithread: bool = True, fast_mode=False) -> list:
         """
         Retrieve data from the Fusionbase API
         :param fields: The fields or columns of the data you want to retrieve (Projection)
@@ -558,7 +568,7 @@ class DataStream:
             else:
                 # Entry count metadata is missing
                 raise Exception(
-                    f"DATA STREAM WITH KEY {key} HAS NO ENTRY COUNTY.")
+                    f"DATA STREAM WITH KEY {self.key} HAS NO ENTRY COUNTY.")
 
         self._log(
             f'The Datastream [bold underline cyan]{meta_data["name"]["en"]}[/bold underline cyan] has {meta_data["meta"]["entry_count"]} rows and {meta_data["meta"]["main_property_count"]} columns\n')
@@ -566,8 +576,6 @@ class DataStream:
         _tmp_path_set = set()
         result_datastream_data = list()
         
-        #print(skip_limit_batches)
-        #return 1
 
         def __get_data_from_fusionbase(self, skip_limit, chunk):
 
@@ -624,6 +632,7 @@ class DataStream:
                     fopen.close()
 
         # Parallelize download
+        
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_batches if multithread else 1) as executor:
             data_part = {executor.submit(__get_data_from_fusionbase, self, skip_limit, chunk): (
                 skip_limit, chunk) for chunk, skip_limit in enumerate(skip_limit_batches)}
@@ -646,34 +655,99 @@ class DataStream:
         #     # Unpack gzip and put into df
         #     try:
         #         with gzip.open(f"{_tmp}.gz", 'r') as fin:
-        #             data = json.loads(fin.read().decode('utf-8'))["data"]
+        #             if fast_mode == False:
+        #                 data = json.loads(fin.read().decode('utf-8'))["data"]
+        #             else:
+        #                 parser = simdjson.Parser()
+        #                 data = parser.parse(fin.read().decode('utf-8'))
+        #                 data = data["data"].as_list()
         #             result_datastream_data.extend(data)
+        #             del parser
+        #             del data
         #     except gzip.BadGzipFile:
         #         continue
-            
-        def __load__tmp_files(self, tmp_path):
-            try:
-                with gzip.open(f"{tmp_path}.gz", 'r') as fin:
-                    data = json.loads(fin.read().decode('utf-8'))["data"]
-                    return data
-            except gzip.BadGzipFile:
-                return []
-
-            
-        with concurrent.futures.ThreadPoolExecutor(max_workers=max_batches if multithread else 1) as executor:
-            data_part = {executor.submit(__load__tmp_files, self, _tmp_path): _tmp_path for _tmp_path in list(_tmp_path_set)}
-            for future in concurrent.futures.as_completed(data_part):
-                url = data_part[future]
+        
+        def __load__tmp_files():
+            data = None
+            for _tmp in _tmp_path_set:
+                # Unpack gzip and put into df
                 try:
-                    data = future.result()
-                    result_datastream_data.extend(data)
-                except Exception as exc:
-                    print('%r generated an exception: %s' % (url, exc))
-                    print(traceback.format_exc())
-                else:
-                    pass
+                    with gzip.open(f"{_tmp}.gz", 'r') as fin:
+                        if fast_mode == True:
+                            data = json.loads(fin.read().decode('utf-8'))["data"]
+                            yield data
+                        else:
+                            parser = simdjson.Parser()
+                            data = parser.parse(fin.read().decode('utf-8'))
+                            data = data["data"]
+                            yield data
+                            del parser
+                            del data
+                            
+                        #result_datastream_data.extend(data)
 
-        self._log(f'✅  Done.')
+                        
+                except gzip.BadGzipFile:
+                    continue
+        
+
+        import psutil
+        import pickle
+        with tqdm(total=len(_tmp_path_set)) as progress_bar:
+            for i, data in enumerate(__load__tmp_files()):
+                result_datastream_data.extend(data)                
+                if i % 50 == 0 and i > 0:
+                    self._log(f'Pickling...please wait')
+                    with open(PurePath(self.tmp_dir, f'ds_{self.key}_{i}.pkl'), 'wb') as f:
+                        pickle.dump(result_datastream_data, f)
+                        del result_datastream_data
+                        result_datastream_data = []                       
+                              
+                progress_bar.update(1) # update progress
+                
+                
+
+        # def __load__tmp_files(self, tmp_path):            
+        #     try:
+        #         with gzip.open(f"{tmp_path}.gz", 'r') as fin:
+                    
+        #             # TODO: MORE CLEAR
+        #             if fast_mode == False:
+        #                 data = json.loads(fin.read().decode('utf-8'))["data"]
+        #             else:        
+        #                 parser = simdjson.Parser()                
+        #                 data = parser.parse(fin.read().decode('utf-8'))
+        #                 data = data["data"]
+        #                 del parser 
+        #             return data
+        #     except gzip.BadGzipFile:
+        #         return []
+
+        # import time
+        # start = time.time()
+        # with concurrent.futures.ThreadPoolExecutor(max_workers=2 if multithread else 1) as executor:
+        #     data_part = {executor.submit(__load__tmp_files, self, _tmp_path): _tmp_path for _tmp_path in list(_tmp_path_set)}
+        #     for future in concurrent.futures.as_completed(data_part):
+        #         url = data_part[future]
+        #         try:
+        #             data = future.result()
+        #             result_datastream_data.extend(data)
+        #         except Exception as exc:
+        #             print('%r generated an exception: %s' % (url, exc))
+        #             print(traceback.format_exc())
+        #         else:
+        #             pass
+        
+        result_datastream_data = []
+        for _pickle_file in glob.glob(f'{self.tmp_dir}/ds_{self.key}_*.pkl'):
+            with open(_pickle_file, "rb") as fp:
+                result_datastream_data.extend(pickle.load(fp))
+                fp.close()
+            
+                
+
+
+        self._log(f'✅  Done reading data.')
 
         return result_datastream_data
 
@@ -800,7 +874,7 @@ class DataStream:
             self.console.print(
                 f"NO NEW ENTRIES FOUND. EITHER YOUR VERSION IS UP TO DATE OR YOUR SPECIFIED VERSION: {version} DOESN'T EXIST. \n PLEASE RECHECK! \n (note the datastream was last updated at: { meta_data['updated_at']})", style="bold yellow")
 
-        self._log(f'✅  Done')
+        self._log(f'✅  Done reading data.')
 
         return result_datastream_data
 
@@ -818,13 +892,16 @@ class DataStream:
             fields = []
 
         data = self.get_delta_data(version=version, fields=fields)
-
+        
+        self._log(f'Building dataframe...')
         df = pd.DataFrame(data)
+        self._log(f'✅  Done building dataframe.')
+        
         return df
 
     def get_dataframe(self, fields: list = None, skip: int = None, limit: int = None,
                       live: bool = False,
-                      multithread: bool = True) -> pd.DataFrame:
+                      multithread: bool = True, fast_mode=False) -> pd.DataFrame:
         """
         Retrieve data from the Fusionbase API and return it as a valid pandas Dataframe
         :param fields: The fields or columns of the data you want to retrieve (Projection)
@@ -841,7 +918,18 @@ class DataStream:
             fields = []
 
         data = self.get_data(fields=fields, skip=skip,
-                             limit=limit, live=live, multithread=multithread)
+                             limit=limit, live=live, multithread=multithread, fast_mode=fast_mode)
+        
+        self._log(f'Building dataframe...')
+        
+        # TODO fastmode
+        try:
+            data[0] = data[0].as_dict()
+            print("works")
+        except Exception as e:
+            pass
+        
         df = pd.DataFrame(data)
+        self._log(f'✅  Done building dataframe.')
         #df.drop_duplicates(subset=["fb_id"], inplace=True)
         return df
