@@ -53,7 +53,7 @@ def test_invoke_missing(data_service: DataService):
   with pytest.raises(Exception):
       data_service.invoke()
 
-def test_invoke_valid(data_service: DataService):
+def test_invoke_valid_kwargs(data_service: DataService):
   result = data_service.invoke(q='Fusionbase GmbH')
   result_keys = ['@context', '@type', 'fb_entity_id', 'lei_code', 'legal_name', 'legal_form', 'address', 'registration_data', 'founding_date', 'members', 'make_offers', 'alternate_names']
   for key in result_keys:
@@ -80,7 +80,34 @@ def test_invoke_invalid(data_service: DataService):
       data_service.invoke(parameters=parameters)
     
 
-def test_invoke_invalid(data_service: DataService):
+def test_invoke_invalid_kwargs(data_service: DataService):
   with pytest.raises(Exception):
       data_service.invoke(qd='Fusionbase GmbH')
+
+
+def test_apply_service(data_service: DataService):
+  import pandas as pd
+  df = pd.DataFrame([{"company": "Fusionbase GmbH"}])
+  enriched_df = data_service.apply(df, [("q", "company")])
+  assert "fusionbase_result" in enriched_df.columns.tolist()
+  assert len(df) == len(enriched_df)
+  assert len(df.columns)+1 == len(enriched_df.columns)
+
+
+def test_apply_service_with_callback(data_service: DataService):
+  import pandas as pd
+  df = pd.DataFrame([{"company": "Fusionbase GmbH"}])
+  
+
+  def cb(series, api_result):
+    series["legal_name"] = api_result[0]["legal_name"]
+    series["context"] = api_result[0]["@context"]
+    return series
+
+  enriched_df = data_service.apply(df, [("q", "company")], callback=cb)
+
+  assert "legal_name" in enriched_df.columns.tolist()
+  assert "context" in enriched_df.columns.tolist()
+  assert len(df) == len(enriched_df)
+  assert len(df.columns)+2 == len(enriched_df.columns)
   

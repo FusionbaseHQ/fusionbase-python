@@ -3,9 +3,15 @@ import os
 import numpy as np
 import pandas as pd
 import pytest
-from fusionbase.Fusionbase import DataStream, Fusionbase
+from fusionbase import DataStream, Fusionbase
+from fusionbase.constants.ResultType import ResultType
+from pathlib import Path, PurePath
 import io
 import sys
+import glob
+import shutil
+import tempfile
+import platform
 
 def test_print(data_stream: DataStream):
   capturedOutput = io.StringIO()                  
@@ -54,10 +60,131 @@ def test_get_data(data_stream: DataStream):
   data = data_stream.get_data()
   assert len(data) >= 5
 
+def test_get_data_as_json_files(data_stream: DataStream):
+  tmp_dir = PurePath(
+      Path(
+          "/tmp" if platform.system() == "Darwin" else tempfile.gettempdir()
+      ),
+      "fusionbase-test-xxx",
+  )
+  # Ensure that tmp/cache directory exists
+  Path(tmp_dir).mkdir(parents=True, exist_ok=True)
+
+  storage_path = Path(tmp_dir)
+  data_stream.get_data(result_type=ResultType.JSON_FILES, storage_path=storage_path)
+
+  data_stream_path = storage_path.joinpath(data_stream.key).joinpath("data")
+  data_stream_path = data_stream_path.resolve()
+
+  data = []
+  for _file in glob.glob(str(data_stream_path) + os.sep + "*.json"):
+    data.extend(pd.read_json(_file, orient="records").to_dict(orient="records"))
+  df = pd.DataFrame(data)
+  df.sort_values(by="fb_id", inplace=True)
+
+  df_2 = data_stream.as_dataframe()
+  df_2.sort_values(by="fb_id", inplace=True)
+
+  schema_df = df.columns.tolist()
+  schema_df.sort()
+
+  schema_df_2 = df_2.columns.tolist()
+  schema_df_2.sort()
+
+  assert schema_df == schema_df_2
+  assert len(df) == len(df_2)
+
+  shutil.rmtree(tmp_dir)
+  assert Path(tmp_dir).exists() == False
+
+def test_get_data_as_csv_files(data_stream: DataStream):
+  tmp_dir = PurePath(
+      Path(
+          "/tmp" if platform.system() == "Darwin" else tempfile.gettempdir()
+      ),
+      "fusionbase-test-xxx",
+  )
+  # Ensure that tmp/cache directory exists
+  Path(tmp_dir).mkdir(parents=True, exist_ok=True)
+
+  storage_path = Path(tmp_dir)
+  data_stream.get_data(result_type=ResultType.CSV_FILES, storage_path=storage_path)
+
+  data_stream_path = storage_path.joinpath(data_stream.key).joinpath("data")
+  data_stream_path = data_stream_path.resolve()
+
+  data = []
+  for _file in glob.glob(str(data_stream_path) + os.sep + "*.csv"):
+    data.extend(pd.read_csv(_file).to_dict(orient="records"))
+  df = pd.DataFrame(data)
+  df.sort_values(by="fb_id", inplace=True)
+
+  df_2 = data_stream.as_dataframe()
+  df_2.sort_values(by="fb_id", inplace=True)
+
+  schema_df = df.columns.tolist()
+  schema_df.sort()
+
+  schema_df_2 = df_2.columns.tolist()
+  schema_df_2.sort()
+
+  assert schema_df == schema_df_2
+  assert len(df) == len(df_2)
+
+  shutil.rmtree(tmp_dir)
+  assert Path(tmp_dir).exists() == False
+
+def test_get_data_as_pickle_files(data_stream: DataStream):
+  tmp_dir = PurePath(
+      Path(
+          "/tmp" if platform.system() == "Darwin" else tempfile.gettempdir()
+      ),
+      "fusionbase-test-xxx",
+  )
+  # Ensure that tmp/cache directory exists
+  Path(tmp_dir).mkdir(parents=True, exist_ok=True)
+
+  storage_path = Path(tmp_dir)
+  data_stream.get_data(result_type=ResultType.PICKLE_FILES, storage_path=storage_path)
+
+  data_stream_path = storage_path.joinpath(data_stream.key).joinpath("data")
+  data_stream_path = data_stream_path.resolve()
+
+  data = []
+  for _file in glob.glob(str(data_stream_path) + os.sep + "*.pkl"):
+    # pd.read_pickle just loads to pickled object, which is a Python list in our case
+    # Therefore a DataFrame needs to be created explicitly
+    data.extend(pd.DataFrame(pd.read_pickle(_file)).to_dict(orient="records"))
+  df = pd.DataFrame(data)
+  df.sort_values(by="fb_id", inplace=True)
+
+  df_2 = data_stream.as_dataframe()
+  df_2.sort_values(by="fb_id", inplace=True)
+
+  schema_df = df.columns.tolist()
+  schema_df.sort()
+
+  schema_df_2 = df_2.columns.tolist()
+  schema_df_2.sort()
+
+  assert schema_df == schema_df_2
+  assert len(df) == len(df_2)
+
+  shutil.rmtree(tmp_dir)
+  assert Path(tmp_dir).exists() == False
+
 def test_get_dataframe(data_stream: DataStream):
   df = data_stream.get_dataframe()
   meta_data = data_stream.get_meta_data()
   assert len(df) == meta_data["meta"]["entry_count"]
+
+def test_get_dataframe_as_dataframe(data_stream: DataStream):
+  df = data_stream.as_dataframe()
+  df_2 = data_stream.get_dataframe()
+  meta_data = data_stream.get_meta_data()
+  assert len(df) == meta_data["meta"]["entry_count"]
+  assert len(df) == len(df_2)
+  assert df_2.equals(df)
 
 def test_get_dataframe_skip_limit(data_stream: DataStream):
   df = data_stream.get_dataframe(skip=3000, limit=10, live=True)

@@ -9,10 +9,16 @@ import tempfile
 from datetime import datetime
 from pathlib import Path, PurePath
 from typing import Union
+import types
 
 import requests
 from rich.console import Console
 from rich.table import Table
+
+try:
+    import pandas as pd
+except ImportError as e:
+    pd = None
 
 from fusionbase.exceptions.ResponseEvaluator import ResponseEvaluator
 
@@ -148,11 +154,14 @@ class DataService:
         {meta_data["description"]["en"]}
         """
 
-    def _log(self, message, force=False):
+    def _log(self, message: str, force=False, rule=False) -> None:
         if not self.log and not force:
             return None
         else:
-            self.console.log(message)
+            if not rule:
+                self.console.print(message)
+            if rule:
+                self.console.rule(message)
 
     def get_meta_data(self) -> dict:
         """
@@ -256,7 +265,7 @@ class DataService:
                                                 f"PARAMETER NAME "
 
     @cache()
-    def invoke(self, parameters: Union[dict, list] = None, **kwargs) -> dict:
+    def invoke(self, parameters: Union[dict, list] = None, **kwargs) -> list:
         """
         Invokes a given Dataservice defined by its key and returns the requested result
 
@@ -294,6 +303,41 @@ class DataService:
 
         self.evaluator.evaluate(r)
         return r.json()
+
+
+    def apply(self, df, input_mappings:list = [], callback:types.FunctionType = None):
+        """
+        Invokes a given Dataservice on a DataFrame to enrich it
+
+        :param df: The pandas DataFrame to which you want to apply the fusionbase service.
+        :param input_mappings: List of tuples that contain the mapping from DataFrame row to service input parameter.
+        :param callback: A callback function to manipulate the fusionbase service result and the series row of the DataFrame.
+
+        :return: The enriched pandas DataFrame
+        """
+        # Make sure pandas is installed
+        if pd is None:
+            raise ModuleNotFoundError('You must install pandas to use this feature.')
+
+        def _generate_parameters(row, _input_mappings):
+            parameter_mappings = []
+            for _i_map in _input_mappings:
+                parameter_mappings.append({
+                    "name": _i_map[0],
+                    "value": row[_i_map[1]]
+                })
+            return parameter_mappings
+
+        def _series_invoke(series):
+            if isinstance(callback, types.FunctionType):
+                return callback(series, self.invoke(parameters=_generate_parameters(series, input_mappings)))
+            else:
+                series["fusionbase_result"] = self.invoke(parameters=_generate_parameters(series, input_mappings))
+                return series                
+
+        df = df.apply(_series_invoke, axis=1)
+
+        return df
 
     def clear_cache(self):
         """Used to clear the cache files for the current service

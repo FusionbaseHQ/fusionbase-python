@@ -2,7 +2,7 @@ from enum import Enum
 
 
 class ResultType(Enum):
-    MEMORY_LIST = 0
+    PYTHON_LIST = 0
     PD_DATAFRAME = 1
     JSON_FILES = 2
     PICKLE_FILES = 3

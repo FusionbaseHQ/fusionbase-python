@@ -1,5 +1,5 @@
 # Import Fusionbase
-from fusionbase.Fusionbase import Fusionbase
+from fusionbase import Fusionbase
 import os
 import pandas as pd
 

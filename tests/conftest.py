@@ -1,7 +1,7 @@
 import os
 import pytest
 
-from fusionbase.Fusionbase import Fusionbase
+from fusionbase import Fusionbase
 from dotenv import load_dotenv
 
 load_dotenv()

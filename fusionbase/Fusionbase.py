@@ -69,6 +69,9 @@ class Fusionbase:
         # Ensure that tmp/cache directory exists
         Path(self.tmp_dir).mkdir(parents=True, exist_ok=True)
 
+
+        self._log(f"[bold reverse red] [/bold reverse red][bold reverse blue] [/bold reverse blue] Fusionbase")
+
     @property
     def log(self):
         return self.__log
@@ -87,11 +90,14 @@ class Fusionbase:
             except gzip.BadGzipFile:
                 return False
 
-    def _log(self, message: str, force=False) -> None:
+    def _log(self, message: str, force=False, rule=False) -> None:
         if not self.log and not force:
             return None
         else:
-            self.console.log(message)
+            if not rule:
+                self.console.print(message)
+            if rule:
+                self.console.rule(message)
 
     def get_datastream(self, key: Union[str, int] = None, label: str = None) -> DataStream:
         """Factory Method used to create a DataStream object

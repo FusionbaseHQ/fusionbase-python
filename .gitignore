@@ -27,6 +27,8 @@ examples/data/*
 *.json
 examples/data-v2
 examples/data
+examples/play.py
+play.py
 
 !tests/data/oktoberfest_beer.csv
 
