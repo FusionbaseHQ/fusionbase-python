@@ -27,5 +27,6 @@ setup(
           'requests-toolbelt',
           'tqdm',
           'rich',
+          'pathos'
     ],
 )

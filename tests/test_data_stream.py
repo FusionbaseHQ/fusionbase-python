@@ -8,6 +8,7 @@ from fusionbase.constants.ResultType import ResultType
 from pathlib import Path, PurePath
 import io
 import sys
+import json
 import glob
 import shutil
 import tempfile
@@ -67,18 +68,26 @@ def test_get_data_as_json_files(data_stream: DataStream):
       ),
       "fusionbase-test-xxx",
   )
+
+  if Path(tmp_dir).exists():
+    shutil.rmtree(tmp_dir)
+
   # Ensure that tmp/cache directory exists
   Path(tmp_dir).mkdir(parents=True, exist_ok=True)
 
   storage_path = Path(tmp_dir)
-  data_stream.get_data(result_type=ResultType.JSON_FILES, storage_path=storage_path)
+  data_stream.get_data(result_type=ResultType.JSON_FILES, storage_path=storage_path, live=True)
 
   data_stream_path = storage_path.joinpath(data_stream.key).joinpath("data")
   data_stream_path = data_stream_path.resolve()
 
+
   data = []
   for _file in glob.glob(str(data_stream_path) + os.sep + "*.json"):
-    data.extend(pd.read_json(_file, orient="records").to_dict(orient="records"))
+    with open(_file, "r") as fp:
+      data.extend(json.load(fp))
+      fp.close()
+    #data.extend(pd.read_json(_file, orient="records").to_dict(orient="records"))
   df = pd.DataFrame(data)
   df.sort_values(by="fb_id", inplace=True)
 
@@ -104,6 +113,10 @@ def test_get_data_as_csv_files(data_stream: DataStream):
       ),
       "fusionbase-test-xxx",
   )
+
+  if Path(tmp_dir).exists():
+    shutil.rmtree(tmp_dir)
+
   # Ensure that tmp/cache directory exists
   Path(tmp_dir).mkdir(parents=True, exist_ok=True)
 
@@ -141,8 +154,12 @@ def test_get_data_as_pickle_files(data_stream: DataStream):
       ),
       "fusionbase-test-xxx",
   )
+  
+  if Path(tmp_dir).exists():
+    shutil.rmtree(tmp_dir)
+  
   # Ensure that tmp/cache directory exists
-  Path(tmp_dir).mkdir(parents=True, exist_ok=True)
+  Path(tmp_dir).mkdir(parents=True, exist_ok=True)  
 
   storage_path = Path(tmp_dir)
   data_stream.get_data(result_type=ResultType.PICKLE_FILES, storage_path=storage_path)

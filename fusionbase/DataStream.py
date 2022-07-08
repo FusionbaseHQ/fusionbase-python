@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pickle
 import csv
-import concurrent.futures
+# import concurrent.futures
 import gzip
 import hashlib
 import math
@@ -17,13 +17,15 @@ from itertools import islice
 from pathlib import Path, PurePath
 from typing import IO, Union
 import warnings
+from click import progressbar
 
 
 import requests
 from requests_toolbelt import MultipartEncoder
-from rich.console import Console
+#from rich.console import Console
 from rich.prompt import Prompt
 from rich.table import Table
+from rich.rule import Rule
 from rich.progress import (
     Progress,
     SpinnerColumn,
@@ -31,6 +33,13 @@ from rich.progress import (
     DownloadColumn,
     MofNCompleteColumn,
 )
+
+from pathos.pools import ProcessPool, ParallelPool
+import asyncio
+import aiohttp
+import aiofiles
+
+from rich import print
 
 try:
     import pandas as pd
@@ -40,13 +49,13 @@ except ImportError as e:
 # Use orjson if available, otherwise fallback to built-in
 try:
     import orjson as json
+    #import ujson as json
 except ImportError as e:
     import json
 
 
 from fusionbase.exceptions.DataStreamNotExistsError import DataStreamNotExistsError
 from fusionbase.exceptions.ResponseEvaluator import ResponseEvaluator
-
 from fusionbase.constants.ResultType import ResultType
 
 
@@ -95,7 +104,11 @@ class DataStream:
         self.evaluator = ResponseEvaluator()
         self.requests = requests.Session()
         self.requests.headers.update({"x-api-key": self.auth["api_key"]})
-        self.console = Console()
+
+
+        #self.aiohttp_session = aiohttp.ClientSession(headers={"x-api-key": self.auth["api_key"]})
+        
+        #self.console = Console()
 
         if self.__label is not None and self.__key is None:
             self.__key = self._get_meta_data_by_label()["_key"]
@@ -155,9 +168,9 @@ class DataStream:
             return None
         else:
             if not rule:
-                self.console.print(message)
+                print(message)
             if rule:
-                self.console.rule(message)
+                print(Rule(title=message))
 
     @staticmethod
     def _is_gzipped_file(file_obj) -> bool:
@@ -211,6 +224,11 @@ class DataStream:
         skip_limits = list(filter(lambda x: x[0] <= limit, skip_limits))
 
         return skip_limits
+
+    async def persistent_session(self):
+        self.aiohttp_session = session = aiohttp.ClientSession(headers={"x-api-key": self.auth["api_key"]})
+        yield
+        await session.close()
 
     def pretty_meta_data(self) -> None:
         """
@@ -447,39 +465,35 @@ class DataStream:
 
         # Sanity check, this method can be destructive
         if sanity_check:
-            self.console.print(" " * 80, style="red on white")
-            self.console.print(
-                "YOU ARE ABOUT TO REPLACE A DATA STREAM.",
-                style="blink bold red underline",
+            print(" " * 80)
+            print(
+                "[blink bold red underline]YOU ARE ABOUT TO REPLACE A DATA STREAM."
             )
-            self.console.print(
-                "IF CASCADE == TRUE AND OR INPLACE == TRUE THERE IS NO WAY BACK!",
-                style="blink bold red underline",
+            print(
+                "[blink bold red underline]IF CASCADE == TRUE AND OR INPLACE == TRUE THERE IS NO WAY BACK!"
             )
-            self.console.print(
-                "EVEN IN CASE BOTH ARE FALSE THERE IS NO IMPLEMENTED WAY BACK",
-                style="blink bold red underline",
+            print(
+                "[blink bold red underline]EVEN IN CASE BOTH ARE FALSE THERE IS NO IMPLEMENTED WAY BACK"
             )
-            self.console.print(
-                "DO YOU KNOW WHAT YOU ARE DOING?", style="blink bold red underline"
+            print(
+                "[blink bold red underline]DO YOU KNOW WHAT YOU ARE DOING?"
             )
             print("\n")
             sanity_check = Prompt.ask(
                 "Do you want to proceed? Enter [italic]yes[/italic]", default="no"
             )
-            self.console.print(" " * 80, style="red on white")
+            print(" " * 80, style="red on white")
 
             if sanity_check != "yes":
-                self.console.print("Replace aborted.")
+                print("Replace aborted.")
                 return {
                     "success": False,
                     "upsert_type": "REPLACE",
                     "detail": "USER_ABORT",
                 }
         else:
-            self.console.print(
-                f"YOU ARE ABOUT TO REPLACE DATA STREAM '{self.label}'  -- God bless you and good luck.",
-                style="blink bold red underline",
+            print(
+                f"[blink bold red underline]YOU ARE ABOUT TO REPLACE DATA STREAM '{self.label}'  -- God bless you and good luck."
             )
 
         stream_meta = self._get_meta_data_by_label()
@@ -722,13 +736,12 @@ class DataStream:
         self._log(f"[bold blue]Data", rule=True)
 
         _tmp_path_set = set()
+        # Initialize data result list
         result_datastream_data = list()
 
-        def __get_data_from_fusionbase(self, skip_limit, chunk, max_parts):
 
-            # self._log(
-            #     f"Getting the data form {str(skip_limit[0])} to {str(skip_limit[0] + skip_limit[1])} now -> This is part {str(chunk)} of {max_parts}"
-            # )
+        request_semaphore = asyncio.BoundedSemaphore(max_batches)
+        async def __get_data_from_fusionbase(skip_limit):
 
             # Build unique name based on input arguments
             if fields is None:
@@ -739,16 +752,15 @@ class DataStream:
             if isinstance(query, dict):
                 _tmp_name = f"{_tmp_name}__{json.dumps(query)}"
 
-
             _tmp_name = (
                 hashlib.sha3_256(_tmp_name.encode("utf-8")).hexdigest()[:12] + ".json"
             )
             _tmp_fpath = PurePath(self.tmp_dir, _tmp_name)
             _tmp_path_set.add(_tmp_fpath)
 
+            # Check if file is already cached
             if Path(f"{_tmp_fpath}.gz").is_file() and not live:
-                # self._log(f"Cache hit! Skip downloading part {str(chunk)}")
-                return
+                return _tmp_fpath
 
             # Build request URL
             request_url = f"{self.base_uri}/data-stream/get/{self.key}?skip={skip_limit[0]}&limit={skip_limit[1]}&compressed_file=true"
@@ -770,56 +782,52 @@ class DataStream:
                 query_parameters = "query={" + query_parameters + "}"
                 request_url = f"{request_url}&{query_parameters}"
 
-            r = self.requests.get(
-                request_url, stream=True
-            )  # logic! if the limit is increased, it loads n the first time, 2xn the second and so on
 
-            # total_download_size = int(r.headers.get("content-length", 0))
+            async with request_semaphore, aiohttp.ClientSession(headers={"x-api-key": self.auth["api_key"]}) as session:
+                async with session.get(request_url) as resp:
+                    assert resp.status == 200
+                    data = await resp.read()
+                
+                # Close session after successful download
+                await session.close()
 
-            # Store the file as gzip
-            with open(f"{_tmp_fpath}.gz", "wb") as fopen:
-                for data in r.iter_content(chunk_size=1024):
-                    size = fopen.write(data)
-                fopen.close()
+            async with aiofiles.open(
+                f"{_tmp_fpath}.gz", "wb"
+            ) as outfile:
+                await outfile.write(data)            
 
-        # Parallelize download
-        with concurrent.futures.ThreadPoolExecutor(
-            max_workers=max_batches if multithread else 1
-        ) as executor:
-            data_part = {
-                executor.submit(
-                    __get_data_from_fusionbase,
-                    self,
-                    skip_limit,
-                    chunk,
-                    len(skip_limit_batches),
-                ): (skip_limit, chunk)
-                for chunk, skip_limit in enumerate(skip_limit_batches)
-            }
-            with Progress(
-                SpinnerColumn(),
-                *Progress.get_default_columns(),
-                TimeRemainingColumn(elapsed_when_finished=True),
-                MofNCompleteColumn(),
-            ) as progress:
+            return _tmp_fpath
 
-                if self.log:
-                    downloading_task = progress.add_task(
-                        "[bold reverse green] Downloading DataStream ",
-                        total=len(data_part.keys()),
-                    )
-                for future in concurrent.futures.as_completed(data_part):
-                    url = data_part[future]
-                    try:
-                        data = future.result()
+        loop = asyncio.get_event_loop()
+        tasks = [loop.create_task(__get_data_from_fusionbase(skip_limit)) for skip_limit in skip_limit_batches]
 
-                        if self.log:
-                            progress.update(downloading_task, advance=1)
-                    except Exception as exc:
-                        print("%r generated an exception: %s" % (url, exc))
-                        print(traceback.format_exc())
+        if self.log:
+            with Progress(SpinnerColumn(),
+                                *Progress.get_default_columns(),
+                                TimeRemainingColumn(elapsed_when_finished=True),
+                                MofNCompleteColumn(),
+                            ) as progress:
 
-        # Process downloaded data
+                downloading_task = progress.add_task(
+                    "[bold reverse green] Downloading DataStream ",
+                    total=len(tasks),
+                )
+
+                # A bit hacky
+                # But didn't come up with another method to update the progress in sync method
+                for task_results in tasks:
+                    for task_result in loop.run_until_complete(asyncio.gather(*[task_results])):
+                        _tmp_path_set.add(task_result)
+                        progress.update(downloading_task, advance=1)
+        else:
+            # A bit hacky
+            # But didn't come up with another method to update the progress in sync method
+            for task_results in tasks:
+                for task_result in loop.run_until_complete(asyncio.gather(*[task_results])):
+                    _tmp_path_set.add(task_result)
+
+
+        # Generator for downloaded data
         def __load__tmp_files():
             data = None
             for _tmp in _tmp_path_set:
@@ -831,71 +839,121 @@ class DataStream:
                 except gzip.BadGzipFile:
                     continue
 
-        with Progress(
-            SpinnerColumn(),
-            *Progress.get_default_columns(),
-            TimeRemainingColumn(elapsed_when_finished=True),
-            MofNCompleteColumn(),
-        ) as progress:
+        # Process downloaded files
+        def __process_tmp_files(tmp_path_file):
+            try:
+                _part_hash = hashlib.sha3_256(str(tmp_path_file).encode("utf-8")).hexdigest()[:12]
 
-            processing_task = progress.add_task(
-                "[bold reverse green] Processing DataStream  ",
-                total=len(_tmp_path_set),
-                visible=self.log,
-            )
-
-            for i, data in enumerate(__load__tmp_files()):
-                if result_type == ResultType.PYTHON_LIST:
-                    result_datastream_data.extend(data)
-                elif result_type == ResultType.PD_DATAFRAME:
-                    result_datastream_data.extend(data)
-                elif result_type == ResultType.JSON_FILES:
-                    with open(
-                        PurePath(
-                            storage_path, f"ds_{self.key}_part_{i}_unordered.json"
-                        ),
-                        "w",
-                        encoding="utf-8"
-                    ) as fp:                        
-                        # Do not use json.dump since this is not provided if orjson is used
-                        # orjson.dumps => bytes  json.dumps => str
-                        # Unfortunate but it is like that
-                        data_json = json.dumps(data)
-                        if isinstance(data_json, bytes):
-                            data_json = data_json.decode("utf-8")                        
-                        fp.write(data_json)
-                        fp.close()
-                elif result_type == ResultType.CSV_FILES:
-                    df = pd.DataFrame(data)
-                    df.to_csv(
-                        PurePath(storage_path, f"ds_{self.key}_part_{i}_unordered.csv"),
-                        index=False,
-                        quoting=csv.QUOTE_ALL,
-                    )
-                elif result_type == ResultType.FEATHER_FILES:
-                    df = pd.DataFrame(data)
-                    df.to_feather(
-                        PurePath(
-                            storage_path, f"ds_{self.key}_part_{i}_unordered.feather"
+                with gzip.open(f"{tmp_path_file}.gz", "r") as fin:
+                    data = json.loads(fin.read().decode("utf-8"))["data"]
+                    if result_type == ResultType.PYTHON_LIST:
+                        return data
+                    elif result_type == ResultType.PD_DATAFRAME:
+                        return data
+                    elif result_type == ResultType.JSON_FILES:
+                        with open(
+                            PurePath(
+                                storage_path, f"ds_{self.key}_part_{_part_hash}_unordered.json"
+                            ),
+                            "w",
+                            encoding="utf-8"
+                        ) as fp:                        
+                            # Do not use json.dump since this is not provided if orjson is used
+                            # orjson.dumps => bytes  json.dumps => str
+                            # Unfortunate but it is like that
+                            data_json = json.dumps(data)
+                            if isinstance(data_json, bytes):
+                                data_json = data_json.decode("utf-8")                        
+                            fp.write(data_json)
+                            fp.close()
+                    elif result_type == ResultType.CSV_FILES:
+                        df = pd.DataFrame(data)
+                        df.to_csv(
+                            PurePath(storage_path, f"ds_{self.key}_part_{_part_hash}_unordered.csv"),
+                            index=False,
+                            quoting=csv.QUOTE_ALL,
                         )
-                    )
-                elif result_type == ResultType.PARQUET_FILES:
-                    df = pd.DataFrame(data)
-                    df.to_parquet(
-                        PurePath(
-                            storage_path, f"ds_{self.key}_part_{i}_unordered.parquet"
-                        ),
-                        index=False,
-                    )
-                elif result_type == ResultType.PICKLE_FILES:
-                    with open(
-                        PurePath(storage_path, f"ds_{self.key}_part_{i}_unordered.pkl"),
-                        "wb",
-                    ) as fp:
-                        pickle.dump(data, fp)
-                        fp.close()
+                    elif result_type == ResultType.FEATHER_FILES:
+                        df = pd.DataFrame(data)
+                        df.to_feather(
+                            PurePath(
+                                storage_path, f"ds_{self.key}_part_{_part_hash}_unordered.feather"
+                            )
+                        )
+                    elif result_type == ResultType.PARQUET_FILES:
+                        df = pd.DataFrame(data)
+                        df.to_parquet(
+                            PurePath(
+                                storage_path, f"ds_{self.key}_part_{_part_hash}_unordered.parquet"
+                            ),
+                            index=False,
+                        )
+                    elif result_type == ResultType.PICKLE_FILES:
+                        with open(
+                            PurePath(storage_path, f"ds_{self.key}_part_{_part_hash}_unordered.pkl"),
+                            "wb",
+                        ) as fp:
+                            pickle.dump(data, fp)
+                            fp.close()
+                            
+                    return None
+            except gzip.BadGzipFile:
+                return None
 
-                progress.update(processing_task, advance=1)
+        # Use a single process for Python list and DataFrame
+        # Performance gain was not really present, specifically for smaller datasets
+        if result_type == ResultType.PYTHON_LIST or result_type == ResultType.PD_DATAFRAME:
+            if self.log == False:
+                for i, data in enumerate(__load__tmp_files()):
+                    if result_type == ResultType.PYTHON_LIST:
+                        result_datastream_data.extend(data)
+                    elif result_type == ResultType.PD_DATAFRAME:
+                        result_datastream_data.extend(data)
+            else:
+                with Progress(
+                    SpinnerColumn(),
+                    *Progress.get_default_columns(),
+                    TimeRemainingColumn(elapsed_when_finished=True),
+                    MofNCompleteColumn(),
+                ) as progress:
+
+                    processing_task = progress.add_task(
+                        "[bold reverse green] Processing DataStream  ",
+                        total=len(_tmp_path_set),
+                        visible=self.log,
+                    )
+
+                    for i, data in enumerate(__load__tmp_files()):
+                        if result_type == ResultType.PYTHON_LIST:
+                            result_datastream_data.extend(data)
+                        elif result_type == ResultType.PD_DATAFRAME:
+                            result_datastream_data.extend(data)
+
+                        progress.update(processing_task, advance=1)
+
+        # Use multiprocessing for file generation
+        else:            
+            with ProcessPool(nodes=max_batches) as pool:
+                process_file_results = pool.imap(__process_tmp_files, _tmp_path_set)
+
+                if self.log:
+                    with Progress(
+                        SpinnerColumn(),
+                        *Progress.get_default_columns(),
+                        TimeRemainingColumn(elapsed_when_finished=True),
+                        MofNCompleteColumn(),
+                    ) as progress:
+                        processing_task = progress.add_task(
+                            "[bold reverse green] Processing DataStream  ",
+                            total=len(_tmp_path_set),
+                            visible=self.log,
+                        )
+
+                        for pif in process_file_results:
+                            progress.update(processing_task, advance=1)
+                else:
+                    process_file_results = [pif for pif in process_file_results]               
+
 
         self._log("[bold blue] Summary", rule=True)
         result = result_datastream_data
