@@ -855,8 +855,15 @@ class DataStream:
                             storage_path, f"ds_{self.key}_part_{i}_unordered.json"
                         ),
                         "w",
-                    ) as fp:
-                        json.dump(data, fp)
+                        encoding="utf-8"
+                    ) as fp:                        
+                        # Do not use json.dump since this is not provided if orjson is used
+                        # orjson.dumps => bytes  json.dumps => str
+                        # Unfortunate but it is like that
+                        data_json = json.dumps(data)
+                        if isinstance(data_json, bytes):
+                            data_json = data_json.decode("utf-8")                        
+                        fp.write(data_json)
                         fp.close()
                 elif result_type == ResultType.CSV_FILES:
                     df = pd.DataFrame(data)
@@ -1119,8 +1126,11 @@ class DataStream:
                             storage_path, f"ds_{self.key}_part_{i}_unordered.json"
                         ),
                         "w",
+                        encoding="utf-8"
                     ) as fp:
-                        json.dump(data, fp)
+                        data_json = json.dumps(data)
+                        if isinstance(data_json, bytes):
+                            data_json = data_json.decode("utf-8")
                         fp.close()
                 elif result_type == ResultType.CSV_FILES:
                     df = pd.DataFrame(data)
