@@ -27,6 +27,8 @@ setup(
           'requests-toolbelt',
           'tqdm',
           'rich',
-          'pathos'
+          'pathos',
+          'aiohttp',
+          'aiofiles'
     ],
 )
