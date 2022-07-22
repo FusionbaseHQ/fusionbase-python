@@ -64,8 +64,7 @@ def test_update(data_stream_editable: DataStream):
   ds_df_updated = ds_df_updated[list('ABCD')]
   ds_df_updated.reset_index(drop=True, inplace=True)
   
-  
-  assert ds_df_updated.equals(ds_df_local_updated), "DATA_FRAME_UPDATE_NOT_EQUAL"
+  pd.testing.assert_frame_equal(ds_df_updated, ds_df_local_updated, check_dtype=False, check_index_type=False, check_column_type=False)
   
   assert result['success'] == True
 
@@ -90,7 +89,8 @@ def test_update_in_chunks(data_stream_editable: DataStream):
   ds_df_updated = ds_df_updated[list('ABCD')]
   ds_df_updated.reset_index(drop=True, inplace=True) 
   
-  assert ds_df_updated.equals(ds_df_local_updated), "DATA_FRAME_UPDATE_NOT_EQUAL" 
+  pd.testing.assert_frame_equal(ds_df_updated, ds_df_local_updated, check_dtype=False, check_index_type=False, check_column_type=False)
+  
   assert len(data_versions.unique()) == chunk_size + start_data_version, "DATA_VERSION_MISMATCH_DATA_STREAM_UPDATE_IN_CHUNKS"
   
   assert result['success'] == True
@@ -124,10 +124,11 @@ def test_replace_with_chunks(data_stream_editable: DataStream):
   # Necessary due to pandas type guessing
   # DataStream will return int64 instead of int32
   for c in ds_df.columns.tolist(): 
-    ds_df[c] = ds_df[c].astype("int32")    
+    ds_df[c] = ds_df[c].astype("int32")   
+    
   
   # Check if data is correct
-  assert ds_df.equals(df), "DATA_FRAME_REPLACE_CHUNK_NOT_EQUAL"  
+  pd.testing.assert_frame_equal(ds_df, df, check_dtype=False, check_index_type=False, check_column_type=False)  
   
   # Check if number of data version is correct
   assert len(data_versions.unique().tolist()) == chunk_size, "DATA_VERSION_COUNT_DOES_NOT_MATCH" 
@@ -278,7 +279,8 @@ def test_get_dataframe_as_dataframe(data_stream: DataStream):
   meta_data = data_stream.get_meta_data()
   assert len(df) == meta_data["meta"]["entry_count"]
   assert len(df) == len(df_2)
-  assert df_2.equals(df)
+  
+  pd.testing.assert_frame_equal(df_2, df, check_dtype=False, check_index_type=False, check_column_type=False)
 
 def test_get_dataframe_skip_limit(data_stream: DataStream):
   df = data_stream.get_dataframe(skip=3000, limit=10, live=True)
@@ -309,8 +311,8 @@ def test_create_stream(fusionbase: Fusionbase):
   ds_df = ds_df[df.columns]
   ds_df.sort_values(by=df.columns.tolist(), inplace=True)
   ds_df.reset_index(drop=True, inplace=True)  
-  
-  assert ds_df.equals(df), "CREATED DATA STREAM DATAFRAME NOT EQUALS INPUT"  
+
+  pd.testing.assert_frame_equal(ds_df, df, check_dtype=False, check_index_type=False, check_column_type=False)
   assert data_version_length == 1, "DATA VERSION SIZE MISMATCH IN CREATE WITHOUT CHUNKS"
   
 def test_create_stream_chunk_10(fusionbase: Fusionbase):
@@ -329,7 +331,7 @@ def test_create_stream_chunk_10(fusionbase: Fusionbase):
   ds_df.sort_values(by=df.columns.tolist(), inplace=True)
   ds_df.reset_index(drop=True, inplace=True)  
   
-  assert ds_df.equals(df), "CREATED DATA STREAM DATAFRAME NOT EQUALS INPUT"  
+  pd.testing.assert_frame_equal(ds_df, df, check_dtype=False, check_index_type=False, check_column_type=False)
   assert data_version_length == chunk_size, "DATA VERSION SIZE MISMATCH IN CREATE WITH CHUNKS"
   
   
