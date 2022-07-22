@@ -3,7 +3,6 @@ from rich.console import Console
 
 
 class DataSource:
-
     def __init__(self, auth: dict, connection: dict, log: bool = False) -> None:
         """
        Used to initialise a new DataSource Object
@@ -21,7 +20,7 @@ class DataSource:
         self.connection = connection
         self.base_uri = self.connection["base_uri"]
         self.requests = requests.Session()
-        self.requests.headers.update({'x-api-key': self.auth["api_key"]})
+        self.requests.headers.update({"x-api-key": self.auth["api_key"]})
         self.log = log
         self.console = Console()
 
@@ -39,8 +38,7 @@ class DataSource:
         r = self.requests.get(f"{self.base_uri}/data-source/get/all")
 
         if r.status_code == 200:
-            self._log(
-                "✅ [green]Successfully retrieved all data sources.[/green]")
+            self._log("✅ [green]Successfully retrieved all data sources.[/green]")
             return r.json()
 
         return None

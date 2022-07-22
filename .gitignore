@@ -29,6 +29,7 @@ examples/data-v2
 examples/data
 examples/play.py
 play.py
+DataChunker_test.py
 
 !tests/data/oktoberfest_beer.csv
 

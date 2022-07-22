@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pickle
 import csv
+
 # import concurrent.futures
 import gzip
 import hashlib
@@ -11,18 +12,18 @@ import platform
 import re
 
 import tempfile
-import traceback
 import urllib.parse
 from itertools import islice
 from pathlib import Path, PurePath
 from typing import IO, Union
 import warnings
-from click import progressbar
 
 
 import requests
 from requests_toolbelt import MultipartEncoder
-#from rich.console import Console
+
+# from rich.console import Console
+from rich import print
 from rich.prompt import Prompt
 from rich.table import Table
 from rich.rule import Rule
@@ -34,12 +35,10 @@ from rich.progress import (
     MofNCompleteColumn,
 )
 
-from pathos.pools import ProcessPool, ParallelPool
+from pathos.pools import ProcessPool
 import asyncio
 import aiohttp
 import aiofiles
-
-from rich import print
 
 try:
     import pandas as pd
@@ -49,11 +48,10 @@ except ImportError as e:
 # Use orjson if available, otherwise fallback to built-in
 try:
     import orjson as json
-    #import ujson as json
 except ImportError as e:
     import json
 
-
+from fusionbase.utils.DataChunker import DataChunker
 from fusionbase.exceptions.DataStreamNotExistsError import DataStreamNotExistsError
 from fusionbase.exceptions.ResponseEvaluator import ResponseEvaluator
 from fusionbase.constants.ResultType import ResultType
@@ -105,10 +103,12 @@ class DataStream:
         self.requests = requests.Session()
         self.requests.headers.update({"x-api-key": self.auth["api_key"]})
 
+        # Instantiate data chunker
+        self.data_chunker = DataChunker(config=config)
 
-        #self.aiohttp_session = aiohttp.ClientSession(headers={"x-api-key": self.auth["api_key"]})
-        
-        #self.console = Console()
+        # self.aiohttp_session = aiohttp.ClientSession(headers={"x-api-key": self.auth["api_key"]})
+
+        # self.console = Console()
 
         if self.__label is not None and self.__key is None:
             self.__key = self._get_meta_data_by_label()["_key"]
@@ -226,7 +226,9 @@ class DataStream:
         return skip_limits
 
     async def persistent_session(self):
-        self.aiohttp_session = session = aiohttp.ClientSession(headers={"x-api-key": self.auth["api_key"]})
+        self.aiohttp_session = session = aiohttp.ClientSession(
+            headers={"x-api-key": self.auth["api_key"]}
+        )
         yield
         await session.close()
 
@@ -396,6 +398,8 @@ class DataStream:
         unique_label: str = None,
         data: list[dict] = None,
         data_file_path: IO = None,
+        chunk: bool = False,
+        chunk_size: int = 1,
     ) -> dict:
         """
         Used to update a Datastream
@@ -416,28 +420,64 @@ class DataStream:
         else:
             stream_meta["_key"] = self.key
 
-        data_file = None
-        # Check if file is used as data
-        if isinstance(data_file_path, str):
-            # print(data_file_path)
-            assert self._is_gzipped_file(
-                data_file_path
-            ), "ONLY_GZIPPED_DATA_FILES_ARE_SUPPORTED"
-            data_file = open(data_file_path, "rb")
-            # Set data to None to only use the file
-            data = None
+        if not chunk:
+            data_file = None
+            # Check if file is used as data
+            if isinstance(data_file_path, str):
+                # print(data_file_path)
+                assert self._is_gzipped_file(
+                    data_file_path
+                ), "ONLY_GZIPPED_DATA_FILES_ARE_SUPPORTED"
+                data_file = open(data_file_path, "rb")
+                # Set data to None to only use the file
+                data = None
 
-        if isinstance(data, pd.core.frame.DataFrame):
-            data = data.to_dict("records")
+            if isinstance(data, pd.core.frame.DataFrame):
+                data = data.to_dict("records")
 
-        result = self._update(data, data_file)
+            result = self._update(data, data_file)
 
-        # Close file
-        if data_file is not None:
-            try:
-                data_file.close()
-            except AttributeError:
-                pass
+            # Close file
+            if data_file is not None:
+                try:
+                    data_file.close()
+                except AttributeError:
+                    pass
+        else:
+            if isinstance(data_file_path, str):
+                data_chunk_file_paths = self.data_chunker.chunk_file(
+                    data_file_path=data_file_path,
+                    chunk_size=chunk_size,
+                    common_file_key=str(unique_label),
+                )
+            elif isinstance(data, pd.core.frame.DataFrame):
+                data_chunk_file_paths = self.data_chunker.chunk_dataframe(
+                    df=data, chunk_size=chunk_size, common_file_key=str(unique_label)
+                )
+            elif isinstance(data, list):
+                data_chunk_file_paths = self.data_chunker.chunk_list(
+                    data=data, chunk_size=chunk_size, common_file_key=str(unique_label)
+                )
+            else:
+                raise Exception(
+                    "Unsupported data type provided: Use a Python list, DataFrame or .json.gz file"
+                )
+
+            for data_chunk_file_index, data_chunk_file_path in enumerate(
+                data_chunk_file_paths
+            ):
+                data_file = open(data_chunk_file_path, "rb")
+                result = self._update(None, data_file)
+
+                assert result.get("success") == True, "UPDATE_ERROR"
+
+                # Close file
+                if data_file is not None:
+                    try:
+                        data_file.close()
+                    except AttributeError:
+                        pass
+
         return result
 
     def replace(
@@ -446,6 +486,8 @@ class DataStream:
         inplace: bool = False,
         data: list[dict] = None,
         data_file_path: IO = None,
+        chunk: bool = False,
+        chunk_size: int = 1,
         sanity_check: bool = True,
     ) -> dict:
         """
@@ -466,18 +508,14 @@ class DataStream:
         # Sanity check, this method can be destructive
         if sanity_check:
             print(" " * 80)
-            print(
-                "[blink bold red underline]YOU ARE ABOUT TO REPLACE A DATA STREAM."
-            )
+            print("[blink bold red underline]YOU ARE ABOUT TO REPLACE A DATA STREAM.")
             print(
                 "[blink bold red underline]IF CASCADE == TRUE AND OR INPLACE == TRUE THERE IS NO WAY BACK!"
             )
             print(
                 "[blink bold red underline]EVEN IN CASE BOTH ARE FALSE THERE IS NO IMPLEMENTED WAY BACK"
             )
-            print(
-                "[blink bold red underline]DO YOU KNOW WHAT YOU ARE DOING?"
-            )
+            print("[blink bold red underline]DO YOU KNOW WHAT YOU ARE DOING?")
             print("\n")
             sanity_check = Prompt.ask(
                 "Do you want to proceed? Enter [italic]yes[/italic]", default="no"
@@ -498,34 +536,31 @@ class DataStream:
 
         stream_meta = self._get_meta_data_by_label()
 
-        data_file = None
-        # Check if file is used as data
-        if isinstance(data_file_path, str):
-            # print(data_file_path)
-            assert self._is_gzipped_file(
-                data_file_path
-            ), "ONLY_GZIPPED_DATA_FILES_ARE_SUPPORTED"
-            data_file = open(data_file_path, "rb")
-            # Set data to None to only use the file
-            data = None
-
-        # Datasetream does not exist create a new one
+        # Datasetream does not exist can't replace something that does not exists
         if (
             stream_meta is None
             or not isinstance(stream_meta, dict)
             or "_key" not in stream_meta
         ):
-            # Close file
-            if data_file is not None:
-                try:
-                    data_file.close()
-                except AttributeError:
-                    pass
             raise DataStreamNotExistsError
-        else:
+
+        if not chunk:
+            data_file = None
+
+            # Check if file is used as data
+            if isinstance(data_file_path, str):
+                # print(data_file_path)
+                assert self._is_gzipped_file(
+                    data_file_path
+                ), "ONLY_GZIPPED_DATA_FILES_ARE_SUPPORTED"
+                data_file = open(data_file_path, "rb")
+                # Set data to None to only use the file
+                data = None
+
+            sent_data_file = None
             if data_file is not None:
                 # assert self._is_gzipped_file(data_file), "ONLY_GZIPPED_DATA_FILES_ARE_SUPPORTED"
-                data_file = ("data.json.gz", data_file, "application/json")
+                sent_data_file = ("data.json.gz", data_file, "application/json")
 
             m = MultipartEncoder(
                 fields={
@@ -533,7 +568,7 @@ class DataStream:
                     "inplace": "true" if inplace else "false",
                     "cascade": "true" if cascade else "false",
                     "data": json.dumps(data) if data is not None else "[]",
-                    "data_file": data_file,
+                    "data_file": sent_data_file,
                 }
             )
 
@@ -554,16 +589,67 @@ class DataStream:
                 except AttributeError:
                     pass
 
-            # Check if update was successfull
-            if "detail" in result:
-                for d in result["detail"]:
-                    # Currently only check if data stream key exists
-                    if d["type"] == "data_warning.empty":
-                        raise DataStreamNotExistsError
+        # Chunk
+        else:
+            if isinstance(data_file_path, str):
+                data_chunk_file_paths = self.data_chunker.chunk_file(
+                    data_file_path=data_file_path,
+                    chunk_size=chunk_size,
+                    common_file_key=str(self.label),
+                )
+            elif isinstance(data, pd.core.frame.DataFrame):
+                data_chunk_file_paths = self.data_chunker.chunk_dataframe(
+                    df=data, chunk_size=chunk_size, common_file_key=str(self.label)
+                )
+            elif isinstance(data, list):
+                data_chunk_file_paths = self.data_chunker.chunk_list(
+                    data=data, chunk_size=chunk_size, common_file_key=str(self.label)
+                )
+            else:
+                raise Exception(
+                    "Unsupported data type provided: Use a Python list, DataFrame or .json.gz file"
+                )
 
-            assert "_key" in result, "ERROR_UPDATE"
+            for data_chunk_file_index, data_chunk_file_path in enumerate(
+                data_chunk_file_paths
+            ):
+                data_file = open(data_chunk_file_path, "rb")
+                sent_data_file = ("data.json.gz", data_file, "application/json")
 
-            return {"success": True, "upsert_type": "REPLACE", "detail": result}
+                if data_chunk_file_index == 0:
+                    m = MultipartEncoder(
+                        fields={
+                            "key": stream_meta["_key"],
+                            "inplace": "true" if inplace else "false",
+                            "cascade": "true" if cascade else "false",
+                            "data": json.dumps(data) if data is not None else "[]",
+                            "data_file": sent_data_file,
+                        }
+                    )
+                    result = self.requests.post(
+                        f"{self.base_uri}/data-stream/replace",
+                        data=m,
+                        headers={"Content-Type": m.content_type},
+                        stream=False,
+                    )
+                    self.evaluator.evaluate(response=result)
+                    result = result.json()
+
+                else:
+                    _result = self._update(None, data_file)
+                    assert (
+                        _result.get("success") == True
+                    ), f"UPDATE_IN_REPLACE_ERROR : SEE : {_result}"
+
+                # Close file
+                if data_file is not None:
+                    try:
+                        data_file.close()
+                    except AttributeError:
+                        pass
+
+        assert "_key" in result, "ERROR_IN_REPLACE"
+        return {"success": True, "upsert_type": "REPLACE", "detail": result}
 
     def get_data(
         self,
@@ -634,8 +720,7 @@ class DataStream:
         # Result will be incorrect if the query matches more than 5000 entries.
         # TODO: Find a way to efficiently estimate results
         if isinstance(query, dict):
-            limit=5000
-
+            limit = 5000
 
         self._log(f"[bold blue]Meta Data", rule=True)
         self._log(f"Loading Datastream with key {self.key}")
@@ -739,8 +824,8 @@ class DataStream:
         # Initialize data result list
         result_datastream_data = list()
 
-
         request_semaphore = asyncio.BoundedSemaphore(max_batches)
+
         async def __get_data_from_fusionbase(skip_limit):
 
             # Build unique name based on input arguments
@@ -782,50 +867,55 @@ class DataStream:
                 query_parameters = "query={" + query_parameters + "}"
                 request_url = f"{request_url}&{query_parameters}"
 
-
-            async with request_semaphore, aiohttp.ClientSession(headers={"x-api-key": self.auth["api_key"]}) as session:
+            async with request_semaphore, aiohttp.ClientSession(
+                headers={"x-api-key": self.auth["api_key"]}
+            ) as session:
                 async with session.get(request_url) as resp:
                     assert resp.status == 200
                     data = await resp.read()
-                
+
                 # Close session after successful download
                 await session.close()
 
-            async with aiofiles.open(
-                f"{_tmp_fpath}.gz", "wb"
-            ) as outfile:
-                await outfile.write(data)            
+            async with aiofiles.open(f"{_tmp_fpath}.gz", "wb") as outfile:
+                await outfile.write(data)
 
             return _tmp_fpath
 
         loop = asyncio.get_event_loop()
-        tasks = [loop.create_task(__get_data_from_fusionbase(skip_limit)) for skip_limit in skip_limit_batches]
+        tasks = [
+            loop.create_task(__get_data_from_fusionbase(skip_limit))
+            for skip_limit in skip_limit_batches
+        ]
 
         if self.log:
-            with Progress(SpinnerColumn(),
-                                *Progress.get_default_columns(),
-                                TimeRemainingColumn(elapsed_when_finished=True),
-                                MofNCompleteColumn(),
-                            ) as progress:
+            with Progress(
+                SpinnerColumn(),
+                *Progress.get_default_columns(),
+                TimeRemainingColumn(elapsed_when_finished=True),
+                MofNCompleteColumn(),
+            ) as progress:
 
                 downloading_task = progress.add_task(
-                    "[bold reverse green] Downloading DataStream ",
-                    total=len(tasks),
+                    "[bold reverse green] Downloading DataStream ", total=len(tasks),
                 )
 
                 # A bit hacky
                 # But didn't come up with another method to update the progress in sync method
                 for task_results in tasks:
-                    for task_result in loop.run_until_complete(asyncio.gather(*[task_results])):
+                    for task_result in loop.run_until_complete(
+                        asyncio.gather(*[task_results])
+                    ):
                         _tmp_path_set.add(task_result)
                         progress.update(downloading_task, advance=1)
         else:
             # A bit hacky
             # But didn't come up with another method to update the progress in sync method
             for task_results in tasks:
-                for task_result in loop.run_until_complete(asyncio.gather(*[task_results])):
+                for task_result in loop.run_until_complete(
+                    asyncio.gather(*[task_results])
+                ):
                     _tmp_path_set.add(task_result)
-
 
         # Generator for downloaded data
         def __load__tmp_files():
@@ -842,7 +932,9 @@ class DataStream:
         # Process downloaded files
         def __process_tmp_files(tmp_path_file):
             try:
-                _part_hash = hashlib.sha3_256(str(tmp_path_file).encode("utf-8")).hexdigest()[:12]
+                _part_hash = hashlib.sha3_256(
+                    str(tmp_path_file).encode("utf-8")
+                ).hexdigest()[:12]
 
                 with gzip.open(f"{tmp_path_file}.gz", "r") as fin:
                     data = json.loads(fin.read().decode("utf-8"))["data"]
@@ -853,23 +945,27 @@ class DataStream:
                     elif result_type == ResultType.JSON_FILES:
                         with open(
                             PurePath(
-                                storage_path, f"ds_{self.key}_part_{_part_hash}_unordered.json"
+                                storage_path,
+                                f"ds_{self.key}_part_{_part_hash}_unordered.json",
                             ),
                             "w",
-                            encoding="utf-8"
-                        ) as fp:                        
+                            encoding="utf-8",
+                        ) as fp:
                             # Do not use json.dump since this is not provided if orjson is used
                             # orjson.dumps => bytes  json.dumps => str
                             # Unfortunate but it is like that
                             data_json = json.dumps(data)
                             if isinstance(data_json, bytes):
-                                data_json = data_json.decode("utf-8")                        
+                                data_json = data_json.decode("utf-8")
                             fp.write(data_json)
                             fp.close()
                     elif result_type == ResultType.CSV_FILES:
                         df = pd.DataFrame(data)
                         df.to_csv(
-                            PurePath(storage_path, f"ds_{self.key}_part_{_part_hash}_unordered.csv"),
+                            PurePath(
+                                storage_path,
+                                f"ds_{self.key}_part_{_part_hash}_unordered.csv",
+                            ),
                             index=False,
                             quoting=csv.QUOTE_ALL,
                         )
@@ -877,32 +973,40 @@ class DataStream:
                         df = pd.DataFrame(data)
                         df.to_feather(
                             PurePath(
-                                storage_path, f"ds_{self.key}_part_{_part_hash}_unordered.feather"
+                                storage_path,
+                                f"ds_{self.key}_part_{_part_hash}_unordered.feather",
                             )
                         )
                     elif result_type == ResultType.PARQUET_FILES:
                         df = pd.DataFrame(data)
                         df.to_parquet(
                             PurePath(
-                                storage_path, f"ds_{self.key}_part_{_part_hash}_unordered.parquet"
+                                storage_path,
+                                f"ds_{self.key}_part_{_part_hash}_unordered.parquet",
                             ),
                             index=False,
                         )
                     elif result_type == ResultType.PICKLE_FILES:
                         with open(
-                            PurePath(storage_path, f"ds_{self.key}_part_{_part_hash}_unordered.pkl"),
+                            PurePath(
+                                storage_path,
+                                f"ds_{self.key}_part_{_part_hash}_unordered.pkl",
+                            ),
                             "wb",
                         ) as fp:
                             pickle.dump(data, fp)
                             fp.close()
-                            
+
                     return None
             except gzip.BadGzipFile:
                 return None
 
         # Use a single process for Python list and DataFrame
         # Performance gain was not really present, specifically for smaller datasets
-        if result_type == ResultType.PYTHON_LIST or result_type == ResultType.PD_DATAFRAME:
+        if (
+            result_type == ResultType.PYTHON_LIST
+            or result_type == ResultType.PD_DATAFRAME
+        ):
             if self.log == False:
                 for i, data in enumerate(__load__tmp_files()):
                     if result_type == ResultType.PYTHON_LIST:
@@ -932,7 +1036,7 @@ class DataStream:
                         progress.update(processing_task, advance=1)
 
         # Use multiprocessing for file generation
-        else:            
+        else:
             with ProcessPool(nodes=max_batches) as pool:
                 process_file_results = pool.imap(__process_tmp_files, _tmp_path_set)
 
@@ -952,8 +1056,7 @@ class DataStream:
                         for pif in process_file_results:
                             progress.update(processing_task, advance=1)
                 else:
-                    process_file_results = [pif for pif in process_file_results]               
-
+                    process_file_results = [pif for pif in process_file_results]
 
         self._log("[bold blue] Summary", rule=True)
         result = result_datastream_data
@@ -1184,7 +1287,7 @@ class DataStream:
                             storage_path, f"ds_{self.key}_part_{i}_unordered.json"
                         ),
                         "w",
-                        encoding="utf-8"
+                        encoding="utf-8",
                     ) as fp:
                         data_json = json.dumps(data)
                         if isinstance(data_json, bytes):
@@ -1322,8 +1425,7 @@ class DataStream:
         :return: None
         """
         return self.get_data(
-            live=live,
-            result_type=ResultType.JSON_FILES, storage_path=storage_path
+            live=live, result_type=ResultType.JSON_FILES, storage_path=storage_path
         )
 
     def as_pickle_files(self, storage_path, live=False):
@@ -1334,8 +1436,7 @@ class DataStream:
         :return: None
         """
         return self.get_data(
-            live=live,
-            result_type=ResultType.PICKLE_FILES, storage_path=storage_path
+            live=live, result_type=ResultType.PICKLE_FILES, storage_path=storage_path
         )
 
     def as_csv_files(self, storage_path, live=False):
@@ -1346,6 +1447,5 @@ class DataStream:
         :return: None
         """
         return self.get_data(
-            live=live,
-            result_type=ResultType.CSV_FILES, storage_path=storage_path
+            live=live, result_type=ResultType.CSV_FILES, storage_path=storage_path
         )

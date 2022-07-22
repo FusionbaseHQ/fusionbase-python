@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import gzip
-import json
 import math
 import platform
 import tempfile
@@ -22,17 +21,30 @@ try:
 except ImportError as e:
     pd = None
 
+# Use orjson if available
+# Better performance than integrated json module
+try:
+    import orjson as json
+except ImportError as e:
+    import json
+
+
+from fusionbase.utils.DataChunker import DataChunker
 
 from fusionbase.DataService import DataService
 from fusionbase.DataStream import DataStream
-from fusionbase.exceptions.DataStreamNotExistsError import \
-    DataStreamNotExistsError
+from fusionbase.exceptions.DataStreamNotExistsError import DataStreamNotExistsError
 from fusionbase.exceptions.ResponseEvaluator import ResponseEvaluator
 
 
 class Fusionbase:
-
-    def __init__(self, auth: dict, connection: dict = {"base_uri": "https://api.fusionbase.com/api/v1"}, log: bool = False, config: dict = None) -> None:
+    def __init__(
+        self,
+        auth: dict,
+        connection: dict = {"base_uri": "https://api.fusionbase.com/api/v1"},
+        log: bool = False,
+        config: dict = None,
+    ) -> None:
         """
         Used to initialise a new Fusionbase Object to further access streams and services
         :param key: The key of the service either as a string or integer value
@@ -56,21 +68,29 @@ class Fusionbase:
         self.base_uri = self.connection["base_uri"]
         self.__log = log
         self.requests = requests.Session()
-        self.requests.headers.update({'x-api-key': self.auth["api_key"]})
+        self.requests.headers.update({"x-api-key": self.auth["api_key"]})
         self.__log = log
         self.console = Console()
         self.evaluator = ResponseEvaluator()
 
+        # Instantiate data chunker
+        self.data_chunker = DataChunker(config=config)
+
         if "cache_dir" in config:
             self.tmp_dir = PurePath(Path(config["cache_dir"]))
         else:
-            self.tmp_dir = PurePath(Path(
-                "/tmp" if platform.system() == "Darwin" else tempfile.gettempdir()), 'fusionbase')
+            self.tmp_dir = PurePath(
+                Path(
+                    "/tmp" if platform.system() == "Darwin" else tempfile.gettempdir()
+                ),
+                "fusionbase",
+            )
         # Ensure that tmp/cache directory exists
         Path(self.tmp_dir).mkdir(parents=True, exist_ok=True)
 
-
-        self._log(f"[bold reverse red] [/bold reverse red][bold reverse blue] [/bold reverse blue] Fusionbase")
+        self._log(
+            f"[bold reverse red] [/bold reverse red][bold reverse blue] [/bold reverse blue] Fusionbase"
+        )
 
     @property
     def log(self):
@@ -82,7 +102,7 @@ class Fusionbase:
 
     @staticmethod
     def _is_gzipped_file(file_obj) -> bool:
-        with gzip.open(file_obj, 'r') as fh:
+        with gzip.open(file_obj, "r") as fh:
             try:
                 fh.read(1)
                 fh.close()
@@ -99,7 +119,9 @@ class Fusionbase:
             if rule:
                 self.console.rule(message)
 
-    def get_datastream(self, key: Union[str, int] = None, label: str = None) -> DataStream:
+    def get_datastream(
+        self, key: Union[str, int] = None, label: str = None
+    ) -> DataStream:
         """Factory Method used to create a DataStream object
 
         Args:
@@ -108,9 +130,16 @@ class Fusionbase:
         Returns:
             DataStream: Returns an instance of the requested datastream by key
         """
-        return DataStream(key=key, label=label, auth=self.auth, connection=self.connection, log=self.log, config=self.config)
+        return DataStream(
+            key=key,
+            label=label,
+            auth=self.auth,
+            connection=self.connection,
+            log=self.log,
+            config=self.config,
+        )
 
-    def get_dataservice(self, key: Union[str, int], cache:bool=False) -> DataService:
+    def get_dataservice(self, key: Union[str, int], cache: bool = False) -> DataService:
         """Factory Method used to create a DataService object
 
         Args:
@@ -120,12 +149,25 @@ class Fusionbase:
         Returns:
             DataService: Returns an instance of the requested dataservice by key
         """
-        return DataService(key=key, auth=self.auth, connection=self.connection, log=self.log, cache=cache)
+        return DataService(
+            key=key,
+            auth=self.auth,
+            connection=self.connection,
+            log=self.log,
+            cache=cache,
+        )
 
-    def _create(self, unique_label: str, name: dict, description: Union[dict, set], scope: str, source: str,
-                data,
-                data_file: IO = None,
-                provision: str = "MARKETPLACE") -> dict:
+    def _create(
+        self,
+        unique_label: str,
+        name: dict,
+        description: Union[dict, set],
+        scope: str,
+        source: str,
+        data,
+        data_file: IO = None,
+        provision: str = "MARKETPLACE",
+    ) -> dict:
         """
         Used to create a new Datastream
         :param unique_label: The unique label of the datastream
@@ -142,20 +184,19 @@ class Fusionbase:
 
         assert len(unique_label) > 0, "UNIQUE_LABEL_REQUIRED"
         assert isinstance(name, dict), "NAME_MUST_BE_A_DICT"
-        assert "en" in name.keys() and len(
-            name["en"]) > 0, "NAME_EN_MUST_BE_SET"
+        assert "en" in name.keys() and len(name["en"]) > 0, "NAME_EN_MUST_BE_SET"
         assert isinstance(description, dict), "DESCRIPTION_MUST_BE_A_DICT"
-        assert "en" in description.keys() and len(
-            description["en"]) > 0, "DESCRIPTION_EN_MUST_BE_SET"
-        assert scope in [
-            "PUBLIC", "PRIVATE"], "SCOPE_MUST_BE_PUBLIC_OR_PRIVATE"
+        assert (
+            "en" in description.keys() and len(description["en"]) > 0
+        ), "DESCRIPTION_EN_MUST_BE_SET"
+        assert scope in ["PUBLIC", "PRIVATE"], "SCOPE_MUST_BE_PUBLIC_OR_PRIVATE"
 
-        assert isinstance(
-            data, list) or data is None, "DATA_MUST_BE_LIST_OF_DICTS"
-        assert data is not None or data_file is not None, "DATA_MUST_BE_LIST_OF_DICTS_OR_FILE"
+        assert isinstance(data, list) or data is None, "DATA_MUST_BE_LIST_OF_DICTS"
+        assert (
+            data is not None or data_file is not None
+        ), "DATA_MUST_BE_LIST_OF_DICTS_OR_FILE"
 
-        assert provision in ["MARKETPLACE",
-                             "PRIVATE"], "INCORRECT_PROVISION_TYPE"
+        assert provision in ["MARKETPLACE", "PRIVATE"], "INCORRECT_PROVISION_TYPE"
 
         data_stream_definition = {
             "unique_label": unique_label,
@@ -164,7 +205,7 @@ class Fusionbase:
             "provision": provision,
             "scope": scope,
             "source": source,
-            "data": data
+            "data": data,
         }
 
         if data_file is not None:
@@ -172,34 +213,42 @@ class Fusionbase:
             data_file = ("data.json.gz", data_file, "application/json")
 
         m = MultipartEncoder(
-            fields={'data_stream_definition': json.dumps(data_stream_definition),
-                    "data_file": data_file}
+            fields={
+                "data_stream_definition": json.dumps(data_stream_definition),
+                "data_file": data_file,
+            }
         )
 
         result = self.requests.post(
-            f"{self.base_uri}/data-stream/new", data=m, headers={'Content-Type': m.content_type}, stream=False)
+            f"{self.base_uri}/data-stream/new",
+            data=m,
+            headers={"Content-Type": m.content_type},
+            stream=False,
+        )
 
         self.evaluator.evaluate(response=result)
         result = result.json()
 
         if "detail" in result and "error" in result["detail"]:
-            return {
-                "success": False,
-                **result
-            }
+            return {"success": False, **result}
 
         assert "_key" in result, "ERROR_CREATE"
 
-        return {
-            "success": True,
-            "detail": result
-        }
+        return {"success": True, "detail": result}
 
-    def create_stream(self, unique_label: str, name, description, scope, source, data: list[dict] = None,
-                      data_file_path: IO = None,
-                      provision: str = "MARKETPLACE",
-                      chunk: bool = False,
-                      chunk_size: int = None) -> DataStream:
+    def create_stream(
+        self,
+        unique_label: str,
+        name,
+        description,
+        scope,
+        source,
+        data: list[dict] = None,
+        data_file_path: IO = None,
+        provision: str = "MARKETPLACE",
+        chunk: bool = False,
+        chunk_size: int = None,
+    ) -> DataStream:
         """
         Used to create a new Datastream
         :param unique_label: The unique label of the datastream
@@ -214,90 +263,116 @@ class Fusionbase:
         """
 
         if pd is None:
-            raise ModuleNotFoundError('You must install pandas to use this feature.')
+            raise ModuleNotFoundError("You must install pandas to use this feature.")
 
         if np is None:
-            raise ModuleNotFoundError('You must install numpy to use this feature.')
+            raise ModuleNotFoundError("You must install numpy to use this feature.")
 
         start_time = time.time()
-        data_chunks = []
+
         data_chunk_files = []
+
+        # Do not use chunking
+        if chunk is False or chunk_size is None:
+            chunk_size = 1
 
         if data is not None and data_file_path is not None:
             self._log(
-                "[red]WARNING:[/red] YOU PROVIDED DATA IN MEMORY AND VIA FILE. TAKE ONLY MEMORY NOW")
+                "[red]WARNING:[/red] YOU PROVIDED DATA IN MEMORY AND VIA FILE. TAKE ONLY MEMORY NOW"
+            )
 
         # Check if data is provided via file path
         if data is None and isinstance(data_file_path, str):
             assert self._is_gzipped_file(
-                data_file_path), "ONLY_GZIPPED_DATA_FILES_ARE_SUPPORTED"
-            data_chunk_files.append(data_file_path)
-        else:
-            data_chunks = [data]
+                data_file_path
+            ), "ONLY_GZIPPED_DATA_FILES_ARE_SUPPORTED"
+            # Build and store chunk file parts, return list of paths
+            data_chunk_files = self.data_chunker.chunk_file(
+                data_file_path, chunk_size=chunk_size, common_file_key=str(unique_label)
+            )
 
-        # Chunk the data
-        if chunk:
-            # Read only if chunks are required
-            if isinstance(data_file_path, str):
-                data = pd.read_json(data_file_path)
-                # Remove the full file from the chunk files
-                data_chunk_files = []
-            if chunk_size is None or isinstance(chunk_size, int) == False:
-                chunk_size = math.ceil(len(data) / 1_000_000)
-            self._log(
-                f"Split dataset with {len(data)} rows into {1 if chunk_size is None else chunk_size} chunks.")
-            data_chunks = np.array_split(data, chunk_size)
+        # Data is provided as pandas DataFrame
+        elif isinstance(data, pd.core.frame.DataFrame):
+            data_chunk_files = self.data_chunker.chunk_dataframe(
+                data, chunk_size=chunk_size, common_file_key=str(unique_label)
+            )
 
-        # Build files for upload
-        for chunk_index, data_chunk in enumerate(data_chunks):
-            chunk_file_path = str(
-                PurePath(self.tmp_dir, f"__tmp_df_upload_{chunk_index}.json.gz"))
-            # Check if data is provided as dataframe
-            if isinstance(data_chunk, pd.core.frame.DataFrame):
-                data_chunk.to_json(chunk_file_path, orient="records")
-            elif isinstance(data_chunk, np.ndarray):
-                data_chunk = list(data_chunk)
-                with gzip.open(chunk_file_path, 'wt', encoding='UTF-8') as zipfile:
-                    json.dump(data_chunk, zipfile)
-            else:
-                raise Exception(
-                    "INCORRECT DATA TYPE PROVIDED, EITHER LIST OF DICTS, DATAFRAME OR .JSON.GZ FILE!!")
+        # Data is provided as normal Python list
+        elif isinstance(data, list):
+            data_chunk_files = self.data_chunker.chunk_list(
+                data, chunk_size=chunk_size, common_file_key=str(unique_label)
+            )
 
-            data_chunk_files.append(chunk_file_path)
+        # Set data to None to only use the file and to free memory
+        data = None
 
         result = None
         upsert_type = None
 
-        for data_chunk_file_index, data_chunk_file in enumerate(data_chunk_files):
+        for data_chunk_file_index, data_chunk_file_path in enumerate(data_chunk_files):
 
-            if isinstance(data_chunk_file, str):
-                assert self._is_gzipped_file(
-                    data_chunk_file), "ONLY_GZIPPED_DATA_FILES_ARE_SUPPORTED"
-                data_file = open(data_chunk_file, "rb")
-                # Set data to None to only use the file
-                data = None
+            data_file = open(data_chunk_file_path, "rb")
 
-                result = self._create(unique_label, name,
-                                      description, scope, source, data, data_file, provision)
+            # DataStream is created
+            if data_chunk_file_index == 0:
+                result = self._create(
+                    unique_label,
+                    name,
+                    description,
+                    scope,
+                    source,
+                    data,
+                    data_file,
+                    provision,
+                )
                 upsert_type = "CREATE"
                 result["upsert_type"] = upsert_type
 
-                self._log(
-                    f"Push chunk {data_chunk_file_index + 1} of {1 if chunk_size is None else chunk_size} chunks.")
+            # DataStream is updated
+            else:
+                data_stream = self.get_datastream(label=unique_label)
 
-                if not result["success"]:
-                    self._log(
-                        f"[red]ERROR: CHUNK {data_chunk_file_index} FAILED -- REST IS STILL GOING.[/red]")
+                data_stream.update(
+                    unique_label=unique_label,
+                    data=data,
+                    data_file_path=data_chunk_file_path,
+                )
+                upsert_type = "UPDATE"
+                result["upsert_type"] = upsert_type
+
+            self._log(
+                f"Push chunk {data_chunk_file_index + 1} of {1 if chunk_size is None else chunk_size} chunks."
+            )
+
+            if not result["success"]:
+                self._log(
+                    f"[red]ERROR: CHUNK {data_chunk_file_index} FAILED -- REST IS STILL GOING.[/red]"
+                )
 
         self._log(f"All chunks done.")
         self._log(f"Execution time :: {time.time() - start_time}")
-        return DataStream(auth=self.auth, key=result['detail']['_key'],label=unique_label, connection=self.connection, config=self.config, log=self.log)
+        return DataStream(
+            auth=self.auth,
+            key=result["detail"]["_key"],
+            label=unique_label,
+            connection=self.connection,
+            config=self.config,
+            log=self.log,
+        )
 
-    def update_create(self, unique_label: str, name, description, scope, source, data: list[dict] = None,
-                      data_file_path: IO = None,
-                      provision: str = "MARKETPLACE",
-                      chunk: bool = False,
-                      chunk_size: int = None) -> dict:
+    def update_create(
+        self,
+        unique_label: str,
+        name,
+        description,
+        scope,
+        source,
+        data: list[dict] = None,
+        data_file_path: IO = None,
+        provision: str = "MARKETPLACE",
+        chunk: bool = False,
+        chunk_size: int = None,
+    ) -> dict:
         """
         Main method to invoke the update or creation of a new Datastream
         :param unique_label: The unique label of the datastream
@@ -314,17 +389,32 @@ class Fusionbase:
         """
 
         if pd is None:
-            raise ModuleNotFoundError('You must install pandas to use this feature.')
+            raise ModuleNotFoundError("You must install pandas to use this feature.")
 
         if np is None:
-            raise ModuleNotFoundError('You must install numpy to use this feature.')
+            raise ModuleNotFoundError("You must install numpy to use this feature.")
 
         try:
             data_stream = self.get_datastream(label=unique_label)
-            data_stream.update(unique_label=unique_label,
-                               data=data, data_file_path=data_file_path)
+            data_stream.update(
+                unique_label=unique_label,
+                data=data,
+                data_file_path=data_file_path,
+                chunk=chunk,
+                chunk_size=chunk_size,
+            )
         except DataStreamNotExistsError:
-            data_stream = self.create_stream(unique_label=unique_label, name=name, description=description, scope=scope, data=data,
-                                             source=source, data_file_path=data_file_path, provision=provision, chunk=chunk, chunk_size=chunk_size)
+            data_stream = self.create_stream(
+                unique_label=unique_label,
+                name=name,
+                description=description,
+                scope=scope,
+                data=data,
+                source=source,
+                data_file_path=data_file_path,
+                provision=provision,
+                chunk=chunk,
+                chunk_size=chunk_size,
+            )
 
         return data_stream

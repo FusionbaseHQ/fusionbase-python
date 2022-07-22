@@ -46,9 +46,53 @@ def test_set_source(data_stream: DataStream):
   raise NotImplementedError
 
 def test_update(data_stream_editable: DataStream):
+  ds_df_current = data_stream_editable.as_dataframe(live=True)  
+  
   df = pd.DataFrame(np.random.randint(0,10000,size=(100, 4)), columns=list('ABCD'))
   data = df.to_dict('records')
   result = data_stream_editable.update(data=data)
+  
+  
+  ds_df_local_updated = pd.concat([ds_df_current, df])
+  ds_df_local_updated.sort_values(by=list('ABCD'), inplace=True)
+  ds_df_local_updated = ds_df_local_updated[list('ABCD')]
+  ds_df_local_updated.reset_index(drop=True, inplace=True)
+  
+  
+  ds_df_updated = data_stream_editable.as_dataframe(live=True)
+  ds_df_updated.sort_values(by=list('ABCD'), inplace=True)
+  ds_df_updated = ds_df_updated[list('ABCD')]
+  ds_df_updated.reset_index(drop=True, inplace=True)
+  
+  
+  assert ds_df_updated.equals(ds_df_local_updated), "DATA_FRAME_UPDATE_NOT_EQUAL"
+  
+  assert result['success'] == True
+
+def test_update_in_chunks(data_stream_editable: DataStream):
+  chunk_size=12
+  ds_df_current = data_stream_editable.as_dataframe(live=True)  
+  start_data_version = len(ds_df_current["fb_data_version"].unique().tolist())    
+  
+  df = pd.DataFrame(np.random.randint(0,10000,size=(100, 4)), columns=list('ABCD'))
+  data = df.to_dict('records')
+  result = data_stream_editable.update(data=data, chunk=True, chunk_size=chunk_size) 
+  
+  ds_df_local_updated = pd.concat([ds_df_current, df])
+  ds_df_local_updated.sort_values(by=list('ABCD'), inplace=True)
+  ds_df_local_updated = ds_df_local_updated[list('ABCD')]
+  ds_df_local_updated.reset_index(drop=True, inplace=True)
+  
+  
+  ds_df_updated = data_stream_editable.as_dataframe(live=True)
+  data_versions = ds_df_updated["fb_data_version"]
+  ds_df_updated.sort_values(by=list('ABCD'), inplace=True)
+  ds_df_updated = ds_df_updated[list('ABCD')]
+  ds_df_updated.reset_index(drop=True, inplace=True) 
+  
+  assert ds_df_updated.equals(ds_df_local_updated), "DATA_FRAME_UPDATE_NOT_EQUAL" 
+  assert len(data_versions.unique()) == chunk_size + start_data_version, "DATA_VERSION_MISMATCH_DATA_STREAM_UPDATE_IN_CHUNKS"
+  
   assert result['success'] == True
 
 def test_replace(data_stream_editable: DataStream):
@@ -56,6 +100,39 @@ def test_replace(data_stream_editable: DataStream):
   data = df.to_dict('records')
   result = data_stream_editable.replace(data=data, sanity_check=False)
   assert result['success'] == True
+  
+def test_replace_with_chunks(data_stream_editable: DataStream): 
+  chunk_size = 13
+  df = pd.DataFrame(np.random.randint(0,100,size=(100, 4)), columns=list('ABCD'))
+  df.sort_values(by=list('ABCD'), inplace=True)
+  df.reset_index(drop=True, inplace=True)
+  
+  data = df.to_dict('records')
+  result = data_stream_editable.replace(data=data, sanity_check=False, chunk=True, chunk_size=chunk_size)  
+  assert result['success'] == True
+  
+  # Get DataFrame and check if it is equal to the base
+  # Needs to be live since it was just updated
+  ds_df = data_stream_editable.as_dataframe(live=True)
+  data_versions = ds_df["fb_data_version"]
+  ds_df = ds_df[df.columns]  
+  
+  # Need to be sorted since on push and on pull the order is more or less random
+  ds_df.sort_values(by=list('ABCD'), inplace=True)
+  ds_df.reset_index(drop=True, inplace=True)
+  
+  # Necessary due to pandas type guessing
+  # DataStream will return int64 instead of int32
+  for c in ds_df.columns.tolist(): 
+    ds_df[c] = ds_df[c].astype("int32")    
+  
+  # Check if data is correct
+  assert ds_df.equals(df), "DATA_FRAME_REPLACE_CHUNK_NOT_EQUAL"  
+  
+  # Check if number of data version is correct
+  assert len(data_versions.unique().tolist()) == chunk_size, "DATA_VERSION_COUNT_DOES_NOT_MATCH" 
+  
+  
 
 def test_get_data(data_stream: DataStream):
   data = data_stream.get_data()
@@ -205,7 +282,6 @@ def test_get_dataframe_as_dataframe(data_stream: DataStream):
 
 def test_get_dataframe_skip_limit(data_stream: DataStream):
   df = data_stream.get_dataframe(skip=3000, limit=10, live=True)
-  print(df)
   assert len(df) == 10
 
 def test_get_delta_data(data_stream: DataStream):
@@ -221,7 +297,40 @@ def test_get_delta_dataframe(data_stream: DataStream):
 def test_create_stream(fusionbase: Fusionbase):
   unique_label = f'python_package_test_stream__{str(binascii.b2a_hex(os.urandom(10)))}'
   df = pd.read_csv('./tests/data/oktoberfest_beer.csv')
+  df.sort_values(by=df.columns.tolist(), inplace=True)
+  df.reset_index(drop=True, inplace=True)
+  
   result_stream = fusionbase.create_stream(unique_label=unique_label, name={"en": f"OKTOBER_FEST_{unique_label.upper()}"}, description={"en": "A TEST STREAM TO TEST THE CREATE STREAM FUNCTION OF THE PYTHON PACKAGE"}, scope="PUBLIC", source={"_id": "data_sources/17255624", "stream_specific": {"uri": "https://fusionbase.com"}}, data=df)
-  print(result_stream)
+  
   assert isinstance(result_stream, DataStream), 'RESULT OF UPDATE CREATE MUST BE A DATASTREAM'
+  
+  ds_df = result_stream.as_dataframe(live=True)
+  data_version_length = len(ds_df["fb_data_version"].unique().tolist())
+  ds_df = ds_df[df.columns]
+  ds_df.sort_values(by=df.columns.tolist(), inplace=True)
+  ds_df.reset_index(drop=True, inplace=True)  
+  
+  assert ds_df.equals(df), "CREATED DATA STREAM DATAFRAME NOT EQUALS INPUT"  
+  assert data_version_length == 1, "DATA VERSION SIZE MISMATCH IN CREATE WITHOUT CHUNKS"
+  
+def test_create_stream_chunk_10(fusionbase: Fusionbase):
+  chunk_size = 11
+  unique_label = f'python_package_test_stream__{str(binascii.b2a_hex(os.urandom(10)))}'
+  df = pd.read_csv('./tests/data/oktoberfest_beer.csv')
+  df.sort_values(by=df.columns.tolist(), inplace=True)
+  df.reset_index(drop=True, inplace=True)
+  
+  result_stream = fusionbase.create_stream(unique_label=unique_label, name={"en": f"OKTOBER_FEST_{unique_label.upper()}"}, description={"en": "A TEST STREAM TO TEST THE CREATE STREAM FUNCTION OF THE PYTHON PACKAGE"}, scope="PUBLIC", source={"_id": "data_sources/17255624", "stream_specific": {"uri": "https://fusionbase.com"}}, data=df, chunk=True, chunk_size=chunk_size)
+  assert isinstance(result_stream, DataStream), 'RESULT OF UPDATE CREATE MUST BE A DATASTREAM'
+  
+  ds_df = result_stream.as_dataframe(live=True)
+  data_version_length = len(ds_df["fb_data_version"].unique().tolist())
+  ds_df = ds_df[df.columns]
+  ds_df.sort_values(by=df.columns.tolist(), inplace=True)
+  ds_df.reset_index(drop=True, inplace=True)  
+  
+  assert ds_df.equals(df), "CREATED DATA STREAM DATAFRAME NOT EQUALS INPUT"  
+  assert data_version_length == chunk_size, "DATA VERSION SIZE MISMATCH IN CREATE WITH CHUNKS"
+  
+  
   
