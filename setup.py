@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name                          = "fusionbase",
-    version                       = "0.2.1",
+    version                       = "0.2.2",
     author                        = "Fusionbase",
     author_email                  = "info@fusionbase.com",
     description                   = "This is the main Fusionbase python package to make handling and interacting with data a piece of cake.",
