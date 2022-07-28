@@ -210,6 +210,9 @@ print(result)
 
 ## Changelog
 
+### Version 0.2.3 (2022.07.28)
+- Hotfix: Fix DataChunker import error
+
 ### Version 0.2.2 (2022.07.22)
 - New methods to store data as files (json, csv and pickle)
 - Improve logging features and completely new progress bar
