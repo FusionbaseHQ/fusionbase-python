@@ -17,8 +17,6 @@ from itertools import islice
 from pathlib import Path, PurePath
 from typing import IO, Union
 import warnings
-from pydantic import PathError
-
 
 import requests
 from requests_toolbelt import MultipartEncoder

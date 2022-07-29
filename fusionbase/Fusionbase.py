@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import gzip
-import math
 import platform
 import tempfile
 import time
