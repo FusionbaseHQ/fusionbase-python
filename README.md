@@ -210,6 +210,9 @@ print(result)
 
 ## Changelog
 
+### Version 0.2.4 (2022.07.29)
+- Minor improvements and additional test cases
+
 ### Version 0.2.3 (2022.07.28)
 - Hotfix: Fix DataChunker import error
 

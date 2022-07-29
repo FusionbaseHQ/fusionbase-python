@@ -17,6 +17,7 @@ from itertools import islice
 from pathlib import Path, PurePath
 from typing import IO, Union
 import warnings
+from pydantic import PathError
 
 
 import requests
@@ -106,16 +107,17 @@ class DataStream:
         # Instantiate data chunker
         self.data_chunker = DataChunker(config=config)
 
-        # self.aiohttp_session = aiohttp.ClientSession(headers={"x-api-key": self.auth["api_key"]})
-
-        # self.console = Console()
-
         if self.__label is not None and self.__key is None:
             self.__key = self._get_meta_data_by_label()["_key"]
-
         elif self.__key is not None:
             # CHECK IF STREAM EXISTS
-            self.get_meta_data()["_key"]
+            _meta_data = self.get_meta_data()
+            # Not all users have access to label
+            try:
+                self.__label = _meta_data.get("unique_label")
+            except Exception as e:
+                print(e)
+                pass
 
         for k, v in self.get_meta_data().items():
             setattr(self, k, v)
@@ -133,11 +135,11 @@ class DataStream:
         Path(self.tmp_dir).mkdir(parents=True, exist_ok=True)
 
     def __str__(self) -> str:
+        new_line_indent = "\n    "
         meta_data = self.get_meta_data()
         return f"""{meta_data["name"]["en"]}
     =============================
-    Key             -> {meta_data["_key"]}
-    Unique Label    -> {meta_data["unique_label"]}
+    Key             -> {meta_data["_key"]}{"{}Unique Label    -> {}".format(new_line_indent, meta_data['unique_label']) if meta_data.get('unique_label') is not None  else ""}    
     Entries         -> {meta_data["meta"]["entry_count"]}
     Props           -> {meta_data["meta"]["main_property_count"]}
     Data Version    -> {meta_data["data_version"]}
@@ -424,7 +426,6 @@ class DataStream:
             data_file = None
             # Check if file is used as data
             if isinstance(data_file_path, str):
-                # print(data_file_path)
                 assert self._is_gzipped_file(
                     data_file_path
                 ), "ONLY_GZIPPED_DATA_FILES_ARE_SUPPORTED"
@@ -534,22 +535,11 @@ class DataStream:
                 f"[blink bold red underline]YOU ARE ABOUT TO REPLACE DATA STREAM '{self.label}'  -- God bless you and good luck."
             )
 
-        stream_meta = self._get_meta_data_by_label()
-
-        # Datasetream does not exist can't replace something that does not exists
-        if (
-            stream_meta is None
-            or not isinstance(stream_meta, dict)
-            or "_key" not in stream_meta
-        ):
-            raise DataStreamNotExistsError
-
         if not chunk:
             data_file = None
 
             # Check if file is used as data
             if isinstance(data_file_path, str):
-                # print(data_file_path)
                 assert self._is_gzipped_file(
                     data_file_path
                 ), "ONLY_GZIPPED_DATA_FILES_ARE_SUPPORTED"
@@ -564,7 +554,7 @@ class DataStream:
 
             m = MultipartEncoder(
                 fields={
-                    "key": stream_meta["_key"],
+                    "key": self.key,
                     "inplace": "true" if inplace else "false",
                     "cascade": "true" if cascade else "false",
                     "data": json.dumps(data) if data is not None else "[]",
@@ -619,7 +609,7 @@ class DataStream:
                 if data_chunk_file_index == 0:
                     m = MultipartEncoder(
                         fields={
-                            "key": stream_meta["_key"],
+                            "key": self.key,
                             "inplace": "true" if inplace else "false",
                             "cascade": "true" if cascade else "false",
                             "data": json.dumps(data) if data is not None else "[]",
@@ -660,7 +650,7 @@ class DataStream:
         live: bool = False,
         multithread: bool = True,
         result_type: ResultType = ResultType.PYTHON_LIST,
-        storage_path: Path = None,
+        storage_path: Union[Path, str] = None,
     ) -> list:
         """
         Retrieve data from the Fusionbase API
@@ -700,6 +690,13 @@ class DataStream:
             ResultType.FEATHER_FILES,
             ResultType.PARQUET_FILES,
         ]:
+            if storage_path is None:
+                raise FileNotFoundError("STORAGE PATH IS NONE!")
+
+            # Make sure storage path is of type Path
+            if isinstance(storage_path, str):
+                storage_path = Path(storage_path)
+
             storage_path = storage_path.joinpath(self.key).joinpath("data")
             storage_path.mkdir(parents=True, exist_ok=True)
 
@@ -826,7 +823,7 @@ class DataStream:
 
         request_semaphore = asyncio.BoundedSemaphore(max_batches)
 
-        async def __get_data_from_fusionbase(skip_limit):
+        async def __get_data_from_fusionbase(skip_limit, add_to_tmp_path_set=True):
 
             # Build unique name based on input arguments
             if fields is None:
@@ -841,7 +838,9 @@ class DataStream:
                 hashlib.sha3_256(_tmp_name.encode("utf-8")).hexdigest()[:12] + ".json"
             )
             _tmp_fpath = PurePath(self.tmp_dir, _tmp_name)
-            _tmp_path_set.add(_tmp_fpath)
+
+            if add_to_tmp_path_set:
+                _tmp_path_set.add(_tmp_fpath)
 
             # Check if file is already cached
             if Path(f"{_tmp_fpath}.gz").is_file() and not live:
@@ -882,7 +881,33 @@ class DataStream:
 
             return _tmp_fpath
 
+        # Get event loop
         loop = asyncio.get_event_loop()
+
+        # Check if user has access to more than 10 rows (default)
+        tasks = [
+            loop.create_task(
+                __get_data_from_fusionbase(skip_limit, add_to_tmp_path_set=False)
+            )
+            for skip_limit in [(0, 12)]
+        ]
+        # Check through the files and assert that these contain more than the default number of entries, otherwise user has no access
+        for _tmp_file_path in loop.run_until_complete(asyncio.gather(*tasks)):
+            try:
+                with gzip.open(f"{_tmp_file_path}.gz", "r") as fin:
+                    data = json.loads(fin.read().decode("utf-8"))["data"]
+                    if len(data) == 10:
+                        # Adjust skip limit if user anyhow has no access to the DataStream
+                        skip_limit_batches = [(0, 10)]
+                    fin.close()
+
+            except gzip.BadGzipFile as e:
+                continue
+            finally:
+                # Remove file
+                Path(f"{_tmp_file_path}.gz").unlink()
+
+        # Get the actual data
         tasks = [
             loop.create_task(__get_data_from_fusionbase(skip_limit))
             for skip_limit in skip_limit_batches
@@ -897,7 +922,8 @@ class DataStream:
             ) as progress:
 
                 downloading_task = progress.add_task(
-                    "[bold reverse green] Downloading DataStream ", total=len(tasks),
+                    "[bold reverse green] Downloading DataStream ",
+                    total=len(tasks),
                 )
 
                 # A bit hacky
@@ -1003,6 +1029,7 @@ class DataStream:
 
         # Use a single process for Python list and DataFrame
         # Performance gain was not really present, specifically for smaller datasets
+        seen_ids = set()
         if (
             result_type == ResultType.PYTHON_LIST
             or result_type == ResultType.PD_DATAFRAME
