@@ -212,7 +212,7 @@ print(result)
 
 ### Version 0.2.5 (2022.09.28)
 - Performance improvements
-- More flexibel `limit` parameter
+- More flexible `limit` parameter
 
 ### Version 0.2.4 (2022.07.29)
 - Minor improvements and additional test cases
