@@ -196,7 +196,7 @@ def test_get_data_as_json_files(data_stream: DataStream):
     storage_path = Path(tmp_dir)
     data_stream.get_data(
         result_type=ResultType.JSON_FILES, storage_path=storage_path, live=True
-    )
+    )        
 
     data_stream_path = storage_path.joinpath(data_stream.key).joinpath("data")
     data_stream_path = data_stream_path.resolve()

@@ -10,12 +10,15 @@ import math
 import os
 import platform
 import re
+from sys import getsizeof, stderr
+from itertools import chain
+from collections import deque
 
 import tempfile
 import urllib.parse
 from itertools import islice
 from pathlib import Path, PurePath
-from typing import IO, Union
+from typing import IO, Union, final
 import warnings
 
 import requests
@@ -34,7 +37,9 @@ from rich.progress import (
     MofNCompleteColumn,
 )
 
-from pathos.pools import ProcessPool
+from functools import partial
+from multiprocessing import Manager
+from pathos.pools import ProcessPool as PPool
 import asyncio
 import aiohttp
 import aiofiles
@@ -183,47 +188,100 @@ class DataStream:
                 return False
 
     @staticmethod
-    def _calc_skip_limit_tuples(limit: int, max_batches: int = 20, initial_skip=0):
+    def _calc_skip_limit_tuples(limit: int, max_batches: int = 20, initial_skip: int = 0, average_row_size_bytes: int = -1, stream_rows: int = 0):
         def chunks(it, size):
             it = iter(it)
             return iter(lambda: tuple(islice(it, size)), ())
 
-        part_duration = math.floor(limit / max_batches)
-        skip_limits = [
-            (
-                i * part_duration + initial_skip,
-                (i + 1) * part_duration - i * part_duration,
-            )
-            for i in range(max_batches)
-        ]
-        if (skip_limits[-1][0] + skip_limits[-1][1]) < limit:
-            skip_limits.append(
-                (
-                    skip_limits[-1][0] + skip_limits[-1][1],
-                    limit - (skip_limits[-1][0] + skip_limits[-1][1]) + 1,
-                )
-            )
-        # Remove (0,0) tuple values
-        skip_limits = list(filter(lambda x: x > (0, 0), skip_limits))
-
-        # Remove tuples that contain higher starting numbers the the actual data stream size
-        skip_limits = list(filter(lambda x: x[0] <= limit, skip_limits))
-
+        
+        # Calculate hard batch size limits based on internal memory and the maximum that the fusionbase api accepts
+        # f(x) = -14.5 * m + 2.000.000 with a maximum of 10.000.000
+        ONE_AND_A_HALF_GB = 1610612736
+        if average_row_size_bytes >= 0:           
+            # The factor 1.2 is a safety margin, since the fusionbase api also implies a hard limit. The hardlimit here is currently just estimated based on the first 150 rows
+            # TODO Retrieve actual hard limit from fusionbase api
+            hard_limit = math.floor( ONE_AND_A_HALF_GB / (average_row_size_bytes * 1.2))   
+        else:
+            hard_limit = 5_000
+       
+        if limit/hard_limit < max_batches:
+            hard_limit = math.ceil(limit/max_batches)            
+            if hard_limit == 1:
+                hard_limit = 2
+       
+            
         # Chunks are bigger than 5k entries, i.e. they exceed the hard limit
         # Make chunks into smaller batches of 4357 each
-        if skip_limits[0][1] >= 5000:
-            # 4357 is just a random prime number, could by any number < 5k
-            skip_limit_chunks = list(chunks(range(0, limit + 1), 4357))
-            skip_limits = [
-                (chunk[0] + initial_skip, chunk[-1] + 1 - chunk[0])
-                for i, chunk in enumerate(skip_limit_chunks)
-            ]
-
+        #if skip_limits[0][1] <= hard_limit or True:
+        # 4357 is just a random prime number, could by any number < 5k
+        skip_limit_chunks = list(chunks(range(0, limit + 0), hard_limit-1))
+        skip_limits = [
+            (chunk[0] + initial_skip, chunk[-1] + 1 - chunk[0])
+            for i, chunk in enumerate(skip_limit_chunks)
+        ]
+        
         # Remove tuples that contain higher starting numbers the the actual data stream size
         # It is indended to filter it twice
-        skip_limits = list(filter(lambda x: x[0] <= limit, skip_limits))
-
+        skip_limits = list(filter(lambda x: x[0] <= stream_rows, skip_limits))
         return skip_limits
+    
+    def __get_memory_size(self, o, handlers={}, verbose=False):
+        """ Returns the approximate memory footprint an object and all of its contents.
+        See: https://code.activestate.com/recipes/577504/
+
+        Automatically finds the contents of the following builtin containers and
+        their subclasses:  tuple, list, deque, dict, set and frozenset.
+        To search other containers, add handlers to iterate over their contents:
+
+            handlers = {SomeContainerClass: iter,
+                        OtherContainerClass: OtherContainerClass.get_elements}
+
+        """
+        dict_handler = lambda d: chain.from_iterable(d.items())
+        all_handlers = {tuple: iter,
+                        list: iter,
+                        deque: iter,
+                        dict: dict_handler,
+                        set: iter,
+                        frozenset: iter,
+                    }
+        all_handlers.update(handlers)     # user handlers take precedence
+        seen = set()                      # track which object id's have already been seen
+        default_size = getsizeof(0)       # estimate sizeof object without __sizeof__
+
+        def sizeof(o):
+            if id(o) in seen:       # do not double count the same object
+                return 0
+            seen.add(id(o))
+            s = getsizeof(o, default_size)
+
+            if verbose:
+                print(s, type(o), repr(o), file=stderr)
+
+            for typ, handler in all_handlers.items():
+                if isinstance(o, typ):
+                    s += sum(map(sizeof, handler(o)))
+                    break
+            return s
+
+        return sizeof(o)
+
+    
+    def _estimate_average_row_size(self):
+        """
+        Returns the average row size in bytes based on the first 180 rows
+
+        Returns:
+            float: Average row size in bytes based on the first 180 rows
+        """
+        try:
+            request_url = f"{self.base_uri}/data-stream/get/{self.key}?skip={0}&limit={180}"
+            r = requests.get(request_url, headers={"x-api-key": self.auth["api_key"]})        
+            size = math.ceil(self.__get_memory_size(r.json().get("data"))/len(r.json().get("data")))
+            return size
+        except Exception as e:
+            print(e)
+            return 0
 
     async def persistent_session(self):
         self.aiohttp_session = session = aiohttp.ClientSession(
@@ -530,7 +588,7 @@ class DataStream:
                 }
         else:
             print(
-                f"[blink bold red underline]YOU ARE ABOUT TO REPLACE DATA STREAM '{self.label}'  -- God bless you and good luck."
+                f"[blink bold red underline]YOU ARE ABOUT TO REPLACE DATA STREAM '{self.label}' ({self.key})  -- God bless you and good luck."
             )
 
         if not chunk:
@@ -661,6 +719,14 @@ class DataStream:
         :param storage_path: Path where the data is stored, only for valid result types *_FILES
         :return: The data as a list of dictionaries
         """
+        
+        # Check limit parameter boundaries
+        if isinstance(limit, int) and (limit < -1 or limit == 0):
+            raise ValueError("limit parameter must be > 0 or -1")
+
+        # Check limit parameter boundaries
+        if isinstance(skip, int) and skip < 0:
+            raise ValueError("skip parameter must be >= 0")
 
         # Add Fusionbase columns by default to fields
         if isinstance(fields, list) and len(fields) > 0:
@@ -697,25 +763,32 @@ class DataStream:
 
             storage_path = storage_path.joinpath(self.key).joinpath("data")
             storage_path.mkdir(parents=True, exist_ok=True)
+            
+            
+        # Get 150 rows to estimate average row size of dataset, factor 1.2 is safety margin
+        # TODO Get actual data through fusionbase api
+        ONE_AND_A_HALF_GB = 1610612736
+        average_row_size_in_bytes = self._estimate_average_row_size()
+        max_allowed_limit = math.ceil(ONE_AND_A_HALF_GB/(average_row_size_in_bytes*1.2))
 
-        if isinstance(limit, int) and limit > 5000:
+        if isinstance(limit, int) and limit > max_allowed_limit:
             self._log(
-                "[red]Limit can't exceed 5.000. Use multiple requests in batches instead![/red]",
+                f"[red]Limit can't exceed {max_allowed_limit}. Use multiple requests in batches instead![/red]",
                 force=True,
             )
-            self._log("[red]Limit is forcefully set to 5.000[/red]", force=True)
+            self._log(f"[red]Limit is forcefully set to {max_allowed_limit}[/red]", force=True)
             self._log(
                 "[yellow]Tip: If you want to get the whole dataset, leave skip and limit empty.[/yellow]",
                 force=True,
             )
             self._log("")
-            limit = 5000
+            limit = max_allowed_limit
 
         # Currently a bit hacked, since we have no option to count query results before query execution
         # Result will be incorrect if the query matches more than 5000 entries.
         # TODO: Find a way to efficiently estimate results
         if isinstance(query, dict):
-            limit = 5000
+            limit = max_allowed_limit
 
         self._log(f"[bold blue]Meta Data", rule=True)
         self._log(f"Loading Datastream with key {self.key}")
@@ -757,6 +830,9 @@ class DataStream:
         self._log(
             f'The Datastream [bold underline cyan]{meta_data["name"]["en"]}[/bold underline cyan] has {"{:,}".format(meta_data["meta"]["entry_count"])} rows and {"{:,}".format(meta_data["meta"]["main_property_count"])} columns\n'
         )
+        
+        if meta_data["meta"]["entry_count"] > 10_000_000 and result_type != ResultType.JSON_FILES:
+            self._log(f'⚠️⚠️⚠️\n The Datastream contains a large number of rows. \n [bold red]Consider downloading it as JSON files first[/bold red] ([italic]stream.as_json_files(...)[/italic]) \n Any in-memory data structure will require a lot of RAM. \n⚠️⚠️⚠️\n')
 
         # meta_data["meta"]["entry_count"] is calculate on each /get request and should be safe to use
         if (
@@ -765,11 +841,25 @@ class DataStream:
             and limit is not None
             and int(limit) > -1
         ):
-            skip_limit_batches = [(skip, limit)]
+            #skip_limit_batches = [(skip, limit)]
+            skip_limit_batches = self._calc_skip_limit_tuples(
+                limit=limit,
+                max_batches=max_batches,
+                initial_skip=skip,
+                average_row_size_bytes=average_row_size_in_bytes,
+                stream_rows=meta_data["meta"]["entry_count"]
+            )
 
         # Only limit is set without skip
-        elif skip is None and limit is not None:
-            skip_limit_batches = [(0, limit)]
+        elif skip is None and limit is not None and limit > -1:
+            #skip_limit_batches = [(0, limit)]
+            skip_limit_batches = self._calc_skip_limit_tuples(
+                limit=limit,
+                max_batches=max_batches,
+                initial_skip=0,
+                average_row_size_bytes=average_row_size_in_bytes,
+                stream_rows=meta_data["meta"]["entry_count"]
+            )
 
         # Only skip is set without limit
         elif skip is not None and (limit is None or limit == -1):
@@ -788,6 +878,8 @@ class DataStream:
                     limit=int(meta_data["meta"]["entry_count"]),
                     max_batches=max_batches,
                     initial_skip=skip,
+                    average_row_size_bytes=average_row_size_in_bytes,
+                    stream_rows=meta_data["meta"]["entry_count"]
                 )
 
         else:
@@ -796,22 +888,15 @@ class DataStream:
                 and "meta" in meta_data
                 and "entry_count" in meta_data["meta"]
             ):
-                if int(meta_data["meta"]["entry_count"]) / max_batches < 500000:
-                    skip_limit_batches = self._calc_skip_limit_tuples(
-                        limit=int(meta_data["meta"]["entry_count"]),
-                        max_batches=max_batches,
-                    )
-                else:
-                    skip_limit_batches = self._calc_skip_limit_tuples(
-                        limit=int(meta_data["meta"]["entry_count"]),
-                        max_batches=math.ceil(
-                            (int(meta_data["meta"]["entry_count"]) * max_batches)
-                            / 8000000
-                        ),
-                    )
+                skip_limit_batches = self._calc_skip_limit_tuples(
+                    limit=int(meta_data["meta"]["entry_count"]),
+                    max_batches=max_batches,
+                    average_row_size_bytes=average_row_size_in_bytes,
+                    stream_rows=meta_data["meta"]["entry_count"]
+                )
             else:
                 # Entry count metadata is missing
-                raise Exception(f"DATA STREAM WITH KEY {self.key} HAS NO ENTRY COUNTY.")
+                raise Exception(f"DATA STREAM WITH KEY {self.key} HAS NO ENTRY COUNTY.")           
 
         self._log(f"[bold blue]Data", rule=True)
 
@@ -819,7 +904,7 @@ class DataStream:
         # Initialize data result list
         result_datastream_data = list()
 
-        request_semaphore = asyncio.BoundedSemaphore(max_batches)
+        request_semaphore = asyncio.BoundedSemaphore(max_batches) # TODO: check
 
         async def __get_data_from_fusionbase(skip_limit, add_to_tmp_path_set=True):
 
@@ -863,67 +948,82 @@ class DataStream:
                 query_parameters = query_parameters.strip().strip(",")
                 query_parameters = "query={" + query_parameters + "}"
                 request_url = f"{request_url}&{query_parameters}"
+                
+            try:
+                async with request_semaphore, aiohttp.ClientSession(
+                    timeout=aiohttp.ClientTimeout(total=60*60), # 60*60 => 60 minute timeout
+                    headers={"x-api-key": self.auth["api_key"]}
+                ) as session:
+                    async with session.get(request_url) as resp:
+                        assert resp.status == 200
+                        data = await resp.read()
 
-            async with request_semaphore, aiohttp.ClientSession(
-                headers={"x-api-key": self.auth["api_key"]}
-            ) as session:
-                async with session.get(request_url) as resp:
-                    assert resp.status == 200
-                    data = await resp.read()
+                    # Close session after successful download
+                    await session.close()
 
-                # Close session after successful download
-                await session.close()
+                async with aiofiles.open(f"{_tmp_fpath}.gz", "wb") as outfile:
+                    await outfile.write(data)
 
-            async with aiofiles.open(f"{_tmp_fpath}.gz", "wb") as outfile:
-                await outfile.write(data)
-
-            return _tmp_fpath
+                return _tmp_fpath
+            except Exception as e:
+                request_url = f"{self.base_uri}/data-stream/get/{self.key}?skip={skip_limit[0]}&limit={skip_limit[1]}&compressed_file=true"
+                self._log(f"Error during download - partition {request_url} failed")
 
         # Get event loop
         loop = asyncio.get_event_loop()
-
-        # Check if user has access to more than 10 rows (default)
-        tasks = [
-            loop.create_task(
-                __get_data_from_fusionbase(skip_limit, add_to_tmp_path_set=False)
-            )
-            for skip_limit in [(0, 12)]
-        ]
-        # Check through the files and assert that these contain more than the default number of entries, otherwise user has no access
-        for _tmp_file_path in loop.run_until_complete(asyncio.gather(*tasks)):
-            try:
-                with gzip.open(f"{_tmp_file_path}.gz", "r") as fin:
-                    data = json.loads(fin.read().decode("utf-8"))["data"]
-                    if len(data) == 10:
-                        # Adjust skip limit if user anyhow has no access to the DataStream
-                        skip_limit_batches = [(0, 10)]
-                    fin.close()
-
-            except gzip.BadGzipFile as e:
-                continue
-            finally:
-                # Remove file
-                Path(f"{_tmp_file_path}.gz").unlink()
-
-        # Get the actual data
-        tasks = [
-            loop.create_task(__get_data_from_fusionbase(skip_limit))
-            for skip_limit in skip_limit_batches
-        ]
-
-        if self.log:
-            with Progress(
-                SpinnerColumn(),
-                *Progress.get_default_columns(),
-                TimeRemainingColumn(elapsed_when_finished=True),
-                MofNCompleteColumn(),
-            ) as progress:
-
-                downloading_task = progress.add_task(
-                    "[bold reverse green] Downloading DataStream ",
-                    total=len(tasks),
+        
+        try:
+            # Check if user has access to more than 10 rows (default)
+            tasks = [
+                loop.create_task(
+                    __get_data_from_fusionbase(skip_limit, add_to_tmp_path_set=False)
                 )
+                for skip_limit in [(0, 12)]
+            ]
+            # Check through the files and assert that these contain more than the default number of entries, otherwise user has no access
+            for _tmp_file_path in loop.run_until_complete(asyncio.gather(*tasks)):
+                try:
+                    with gzip.open(f"{_tmp_file_path}.gz", "r") as fin:
+                        data = json.loads(fin.read().decode("utf-8"))["data"]
+                        if len(data) == 10:
+                            # Adjust skip limit if user anyhow has no access to the DataStream
+                            skip_limit_batches = [(0, 10)]
+                        fin.close()
 
+                except gzip.BadGzipFile as e:
+                    continue
+                finally:
+                    # Remove file
+                    Path(f"{_tmp_file_path}.gz").unlink()
+
+            # Get the actual data
+            tasks = [
+                loop.create_task(__get_data_from_fusionbase(skip_limit))
+                for skip_limit in skip_limit_batches
+            ]
+
+            if self.log:
+                with Progress(
+                    SpinnerColumn(),
+                    *Progress.get_default_columns(),
+                    TimeRemainingColumn(elapsed_when_finished=True),
+                    MofNCompleteColumn(),
+                ) as progress:
+
+                    downloading_task = progress.add_task(
+                        "[bold reverse green] Downloading DataStream ",
+                        total=len(tasks),
+                    )
+
+                    # A bit hacky
+                    # But didn't come up with another method to update the progress in sync method
+                    for task_results in tasks:
+                        for task_result in loop.run_until_complete(
+                            asyncio.gather(*[task_results])
+                        ):
+                            _tmp_path_set.add(task_result)
+                            progress.update(downloading_task, advance=1)
+            else:
                 # A bit hacky
                 # But didn't come up with another method to update the progress in sync method
                 for task_results in tasks:
@@ -931,15 +1031,8 @@ class DataStream:
                         asyncio.gather(*[task_results])
                     ):
                         _tmp_path_set.add(task_result)
-                        progress.update(downloading_task, advance=1)
-        else:
-            # A bit hacky
-            # But didn't come up with another method to update the progress in sync method
-            for task_results in tasks:
-                for task_result in loop.run_until_complete(
-                    asyncio.gather(*[task_results])
-                ):
-                    _tmp_path_set.add(task_result)
+        except Exception as e:
+            self._log("Error during download - final dataset might be inclomplete.")
 
         # Generator for downloaded data
         def __load__tmp_files():
@@ -951,7 +1044,7 @@ class DataStream:
                         data = json.loads(fin.read().decode("utf-8"))["data"]
                         yield data
                 except gzip.BadGzipFile:
-                    continue
+                    continue                
 
         # Process downloaded files
         def __process_tmp_files(tmp_path_file):
@@ -1024,13 +1117,14 @@ class DataStream:
                     return None
             except gzip.BadGzipFile:
                 return None
+            
 
         # Use a single process for Python list and DataFrame
         # Performance gain was not really present, specifically for smaller datasets
         seen_ids = set()
         if (
             result_type == ResultType.PYTHON_LIST
-            or result_type == ResultType.PD_DATAFRAME
+            or result_type == ResultType.PD_DATAFRAME and True
         ):
             if self.log == False:
                 for i, data in enumerate(__load__tmp_files()):
@@ -1050,19 +1144,19 @@ class DataStream:
                         "[bold reverse green] Processing DataStream  ",
                         total=len(_tmp_path_set),
                         visible=self.log,
-                    )
+                    )     
 
                     for i, data in enumerate(__load__tmp_files()):
                         if result_type == ResultType.PYTHON_LIST:
-                            result_datastream_data.extend(data)
+                            result_datastream_data += data 
                         elif result_type == ResultType.PD_DATAFRAME:
-                            result_datastream_data.extend(data)
-
+                            result_datastream_data += data 
                         progress.update(processing_task, advance=1)
+                        
 
         # Use multiprocessing for file generation
         else:
-            with ProcessPool(nodes=max_batches) as pool:
+            with PPool(nodes=max_batches) as pool:
                 process_file_results = pool.imap(__process_tmp_files, _tmp_path_set)
 
                 if self.log:
