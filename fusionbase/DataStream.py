@@ -18,7 +18,7 @@ import tempfile
 import urllib.parse
 from itertools import islice
 from pathlib import Path, PurePath
-from typing import IO, Union, final
+from typing import IO, Union
 import warnings
 
 import requests
@@ -37,8 +37,6 @@ from rich.progress import (
     MofNCompleteColumn,
 )
 
-from functools import partial
-from multiprocessing import Manager
 from pathos.pools import ProcessPool as PPool
 import asyncio
 import aiohttp
