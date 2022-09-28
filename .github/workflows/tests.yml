@@ -33,7 +33,7 @@ jobs:
             pip install -e .
 
         - name: Run unit tests
-          run: python -m pytest --import-mode=append tests/
+          run: python -m pytest -s --import-mode=append tests/
           env:
             FUSIONBASE_API_KEY: ${{ secrets.FUSIONBASE_API_KEY }}
             FUSIONBASE_API_URI: ${{ secrets.FUSIONBASE_API_URI }}
