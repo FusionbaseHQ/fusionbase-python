@@ -210,6 +210,9 @@ print(result)
 
 ## Changelog
 
+### Version 0.2.6 (2022.10.11)
+- Some improvements
+
 ### Version 0.2.5 (2022.09.28)
 - Performance improvements
 - More flexible `limit` parameter

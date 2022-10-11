@@ -186,43 +186,47 @@ class DataStream:
                 return False
 
     @staticmethod
-    def _calc_skip_limit_tuples(limit: int, max_batches: int = 20, initial_skip: int = 0, average_row_size_bytes: int = -1, stream_rows: int = 0):
+    def _calc_skip_limit_tuples(
+        limit: int,
+        max_batches: int = 20,
+        initial_skip: int = 0,
+        average_row_size_bytes: int = -1,
+        stream_rows: int = 0,
+    ):
         def chunks(it, size):
             it = iter(it)
             return iter(lambda: tuple(islice(it, size)), ())
 
-        
         # Calculate hard batch size limits based on internal memory and the maximum that the fusionbase api accepts
         # f(x) = -14.5 * m + 2.000.000 with a maximum of 10.000.000
         ONE_AND_A_HALF_GB = 1610612736
-        if average_row_size_bytes >= 0:           
+        if average_row_size_bytes >= 0:
             # The factor 1.2 is a safety margin, since the fusionbase api also implies a hard limit. The hardlimit here is currently just estimated based on the first 150 rows
             # TODO Retrieve actual hard limit from fusionbase api
-            hard_limit = math.floor( ONE_AND_A_HALF_GB / (average_row_size_bytes * 1.2))   
+            hard_limit = math.floor(ONE_AND_A_HALF_GB / (average_row_size_bytes * 1.2))
         else:
             hard_limit = 5_000
-       
-        if limit/hard_limit < max_batches:
-            hard_limit = math.ceil(limit/max_batches)            
+
+        if limit / hard_limit < max_batches:
+            hard_limit = math.ceil(limit / max_batches)
             if hard_limit == 1:
                 hard_limit = 2
-       
-            
+
         # Chunks are bigger than 5k entries, i.e. they exceed the hard limit
         # Make chunks into smaller batches of 4357 each
-        #if skip_limits[0][1] <= hard_limit or True:
+        # if skip_limits[0][1] <= hard_limit or True:
         # 4357 is just a random prime number, could by any number < 5k
-        skip_limit_chunks = list(chunks(range(0, limit + 0), hard_limit-1))
+        skip_limit_chunks = list(chunks(range(0, limit + 0), hard_limit - 1))
         skip_limits = [
             (chunk[0] + initial_skip, chunk[-1] + 1 - chunk[0])
             for i, chunk in enumerate(skip_limit_chunks)
         ]
-        
+
         # Remove tuples that contain higher starting numbers the the actual data stream size
         # It is indended to filter it twice
         skip_limits = list(filter(lambda x: x[0] <= stream_rows, skip_limits))
         return skip_limits
-    
+
     def __get_memory_size(self, o, handlers={}, verbose=False):
         """ Returns the approximate memory footprint an object and all of its contents.
         See: https://code.activestate.com/recipes/577504/
@@ -236,19 +240,20 @@ class DataStream:
 
         """
         dict_handler = lambda d: chain.from_iterable(d.items())
-        all_handlers = {tuple: iter,
-                        list: iter,
-                        deque: iter,
-                        dict: dict_handler,
-                        set: iter,
-                        frozenset: iter,
-                    }
-        all_handlers.update(handlers)     # user handlers take precedence
-        seen = set()                      # track which object id's have already been seen
-        default_size = getsizeof(0)       # estimate sizeof object without __sizeof__
+        all_handlers = {
+            tuple: iter,
+            list: iter,
+            deque: iter,
+            dict: dict_handler,
+            set: iter,
+            frozenset: iter,
+        }
+        all_handlers.update(handlers)  # user handlers take precedence
+        seen = set()  # track which object id's have already been seen
+        default_size = getsizeof(0)  # estimate sizeof object without __sizeof__
 
         def sizeof(o):
-            if id(o) in seen:       # do not double count the same object
+            if id(o) in seen:  # do not double count the same object
                 return 0
             seen.add(id(o))
             s = getsizeof(o, default_size)
@@ -264,7 +269,6 @@ class DataStream:
 
         return sizeof(o)
 
-    
     def _estimate_average_row_size(self):
         """
         Returns the average row size in bytes based on the first 180 rows
@@ -273,9 +277,13 @@ class DataStream:
             float: Average row size in bytes based on the first 180 rows
         """
         try:
-            request_url = f"{self.base_uri}/data-stream/get/{self.key}?skip={0}&limit={180}"
-            r = requests.get(request_url, headers={"x-api-key": self.auth["api_key"]})        
-            size = math.ceil(self.__get_memory_size(r.json().get("data"))/len(r.json().get("data")))
+            request_url = (
+                f"{self.base_uri}/data-stream/get/{self.key}?skip={0}&limit={180}"
+            )
+            r = requests.get(request_url, headers={"x-api-key": self.auth["api_key"]})
+            size = math.ceil(
+                self.__get_memory_size(r.json().get("data")) / len(r.json().get("data"))
+            )
             return size
         except Exception as e:
             print(e)
@@ -451,7 +459,6 @@ class DataStream:
 
     def update(
         self,
-        unique_label: str = None,
         data: list[dict] = None,
         data_file_path: IO = None,
         chunk: bool = False,
@@ -464,7 +471,7 @@ class DataStream:
         :param data_file_path: You can also provide the data as a gzipped file
         """
         assert (
-            unique_label is None and self.key is None
+            self.label is None and self.key is None
         ) == False, "NO_KEY_OR_UNIQUE_LABEL_GIVEN"
 
         if pd is None:
@@ -472,7 +479,7 @@ class DataStream:
 
         stream_meta = dict()
         if self.key is None:
-            stream_meta = self._get_meta_data_by_label(unique_label)
+            stream_meta = self._get_meta_data_by_label(self.label)
         else:
             stream_meta["_key"] = self.key
 
@@ -503,15 +510,15 @@ class DataStream:
                 data_chunk_file_paths = self.data_chunker.chunk_file(
                     data_file_path=data_file_path,
                     chunk_size=chunk_size,
-                    common_file_key=str(unique_label),
+                    common_file_key=str(self.label),
                 )
             elif isinstance(data, pd.core.frame.DataFrame):
                 data_chunk_file_paths = self.data_chunker.chunk_dataframe(
-                    df=data, chunk_size=chunk_size, common_file_key=str(unique_label)
+                    df=data, chunk_size=chunk_size, common_file_key=str(self.label)
                 )
             elif isinstance(data, list):
                 data_chunk_file_paths = self.data_chunker.chunk_list(
-                    data=data, chunk_size=chunk_size, common_file_key=str(unique_label)
+                    data=data, chunk_size=chunk_size, common_file_key=str(self.label)
                 )
             else:
                 raise Exception(
@@ -547,11 +554,12 @@ class DataStream:
     ) -> dict:
         """
         Used to replace the data of a datastream
-        :param unique_label: The unique label of the datastream
         :param cascade: If you want to cascade the data (Default is True)
         :param inplace: If the replacing should happen inplace (Default is False)
         :param data: The data provided as a json or a list of dictionaries
         :param data_file_path: You can also provide the data as a gzipped file
+        :param chunk: Flag whether the data should send in chunks to Fusionbase
+        :param chunk_size: Size of the data chunks in number of rows
         :param sanity_check:
         :return: The Success dictionary response returned by the Fusionbase API
         """
@@ -563,19 +571,18 @@ class DataStream:
         # Sanity check, this method can be destructive
         if sanity_check:
             print(" " * 80)
-            print("[blink bold red underline]YOU ARE ABOUT TO REPLACE A DATA STREAM.")
+            print("[bold red underline]YOU ARE ABOUT TO REPLACE A DATA STREAM.")
             print(
-                "[blink bold red underline]IF CASCADE == TRUE AND OR INPLACE == TRUE THERE IS NO WAY BACK!"
+                "[bold red underline]IF CASCADE == TRUE AND OR INPLACE == TRUE THERE IS NO WAY BACK!"
             )
             print(
-                "[blink bold red underline]EVEN IN CASE BOTH ARE FALSE THERE IS NO IMPLEMENTED WAY BACK"
+                "[bold red underline]EVEN IN CASE BOTH ARE FALSE THERE IS NO IMPLEMENTED WAY BACK"
             )
-            print("[blink bold red underline]DO YOU KNOW WHAT YOU ARE DOING?")
+            print("[blink bold red on white underline]DO YOU KNOW WHAT YOU ARE DOING?")
             print("\n")
             sanity_check = Prompt.ask(
                 "Do you want to proceed? Enter [italic]yes[/italic]", default="no"
             )
-            print(" " * 80, style="red on white")
 
             if sanity_check != "yes":
                 print("Replace aborted.")
@@ -717,7 +724,7 @@ class DataStream:
         :param storage_path: Path where the data is stored, only for valid result types *_FILES
         :return: The data as a list of dictionaries
         """
-        
+
         # Check limit parameter boundaries
         if isinstance(limit, int) and (limit < -1 or limit == 0):
             raise ValueError("limit parameter must be > 0 or -1")
@@ -761,20 +768,23 @@ class DataStream:
 
             storage_path = storage_path.joinpath(self.key).joinpath("data")
             storage_path.mkdir(parents=True, exist_ok=True)
-            
-            
+
         # Get 150 rows to estimate average row size of dataset, factor 1.2 is safety margin
         # TODO Get actual data through fusionbase api
         ONE_AND_A_HALF_GB = 1610612736
         average_row_size_in_bytes = self._estimate_average_row_size()
-        max_allowed_limit = math.ceil(ONE_AND_A_HALF_GB/(average_row_size_in_bytes*1.2))
+        max_allowed_limit = math.ceil(
+            ONE_AND_A_HALF_GB / (average_row_size_in_bytes * 1.2)
+        )
 
         if isinstance(limit, int) and limit > max_allowed_limit:
             self._log(
                 f"[red]Limit can't exceed {max_allowed_limit}. Use multiple requests in batches instead![/red]",
                 force=True,
             )
-            self._log(f"[red]Limit is forcefully set to {max_allowed_limit}[/red]", force=True)
+            self._log(
+                f"[red]Limit is forcefully set to {max_allowed_limit}[/red]", force=True
+            )
             self._log(
                 "[yellow]Tip: If you want to get the whole dataset, leave skip and limit empty.[/yellow]",
                 force=True,
@@ -828,9 +838,14 @@ class DataStream:
         self._log(
             f'The Datastream [bold underline cyan]{meta_data["name"]["en"]}[/bold underline cyan] has {"{:,}".format(meta_data["meta"]["entry_count"])} rows and {"{:,}".format(meta_data["meta"]["main_property_count"])} columns\n'
         )
-        
-        if meta_data["meta"]["entry_count"] > 10_000_000 and result_type != ResultType.JSON_FILES:
-            self._log(f'⚠️⚠️⚠️\n The Datastream contains a large number of rows. \n [bold red]Consider downloading it as JSON files first[/bold red] ([italic]stream.as_json_files(...)[/italic]) \n Any in-memory data structure will require a lot of RAM. \n⚠️⚠️⚠️\n')
+
+        if (
+            meta_data["meta"]["entry_count"] > 10_000_000
+            and result_type != ResultType.JSON_FILES
+        ):
+            self._log(
+                f"⚠️⚠️⚠️\n The Datastream contains a large number of rows. \n [bold red]Consider downloading it as JSON files first[/bold red] ([italic]stream.as_json_files(...)[/italic]) \n Any in-memory data structure will require a lot of RAM. \n⚠️⚠️⚠️\n"
+            )
 
         # meta_data["meta"]["entry_count"] is calculate on each /get request and should be safe to use
         if (
@@ -839,24 +854,24 @@ class DataStream:
             and limit is not None
             and int(limit) > -1
         ):
-            #skip_limit_batches = [(skip, limit)]
+            # skip_limit_batches = [(skip, limit)]
             skip_limit_batches = self._calc_skip_limit_tuples(
                 limit=limit,
                 max_batches=max_batches,
                 initial_skip=skip,
                 average_row_size_bytes=average_row_size_in_bytes,
-                stream_rows=meta_data["meta"]["entry_count"]
+                stream_rows=meta_data["meta"]["entry_count"],
             )
 
         # Only limit is set without skip
         elif skip is None and limit is not None and limit > -1:
-            #skip_limit_batches = [(0, limit)]
+            # skip_limit_batches = [(0, limit)]
             skip_limit_batches = self._calc_skip_limit_tuples(
                 limit=limit,
                 max_batches=max_batches,
                 initial_skip=0,
                 average_row_size_bytes=average_row_size_in_bytes,
-                stream_rows=meta_data["meta"]["entry_count"]
+                stream_rows=meta_data["meta"]["entry_count"],
             )
 
         # Only skip is set without limit
@@ -877,7 +892,7 @@ class DataStream:
                     max_batches=max_batches,
                     initial_skip=skip,
                     average_row_size_bytes=average_row_size_in_bytes,
-                    stream_rows=meta_data["meta"]["entry_count"]
+                    stream_rows=meta_data["meta"]["entry_count"],
                 )
 
         else:
@@ -890,11 +905,11 @@ class DataStream:
                     limit=int(meta_data["meta"]["entry_count"]),
                     max_batches=max_batches,
                     average_row_size_bytes=average_row_size_in_bytes,
-                    stream_rows=meta_data["meta"]["entry_count"]
+                    stream_rows=meta_data["meta"]["entry_count"],
                 )
             else:
                 # Entry count metadata is missing
-                raise Exception(f"DATA STREAM WITH KEY {self.key} HAS NO ENTRY COUNTY.")           
+                raise Exception(f"DATA STREAM WITH KEY {self.key} HAS NO ENTRY COUNTY.")
 
         self._log(f"[bold blue]Data", rule=True)
 
@@ -902,7 +917,7 @@ class DataStream:
         # Initialize data result list
         result_datastream_data = list()
 
-        request_semaphore = asyncio.BoundedSemaphore(max_batches) # TODO: check
+        request_semaphore = asyncio.BoundedSemaphore(max_batches)  # TODO: check
 
         async def __get_data_from_fusionbase(skip_limit, add_to_tmp_path_set=True):
 
@@ -946,11 +961,13 @@ class DataStream:
                 query_parameters = query_parameters.strip().strip(",")
                 query_parameters = "query={" + query_parameters + "}"
                 request_url = f"{request_url}&{query_parameters}"
-                
+
             try:
                 async with request_semaphore, aiohttp.ClientSession(
-                    timeout=aiohttp.ClientTimeout(total=60*60), # 60*60 => 60 minute timeout
-                    headers={"x-api-key": self.auth["api_key"]}
+                    timeout=aiohttp.ClientTimeout(
+                        total=60 * 60
+                    ),  # 60*60 => 60 minute timeout
+                    headers={"x-api-key": self.auth["api_key"]},
                 ) as session:
                     async with session.get(request_url) as resp:
                         assert resp.status == 200
@@ -969,7 +986,7 @@ class DataStream:
 
         # Get event loop
         loop = asyncio.get_event_loop()
-        
+
         try:
             # Check if user has access to more than 10 rows (default)
             tasks = [
@@ -1042,7 +1059,7 @@ class DataStream:
                         data = json.loads(fin.read().decode("utf-8"))["data"]
                         yield data
                 except gzip.BadGzipFile:
-                    continue                
+                    continue
 
         # Process downloaded files
         def __process_tmp_files(tmp_path_file):
@@ -1115,14 +1132,14 @@ class DataStream:
                     return None
             except gzip.BadGzipFile:
                 return None
-            
 
         # Use a single process for Python list and DataFrame
         # Performance gain was not really present, specifically for smaller datasets
         seen_ids = set()
         if (
             result_type == ResultType.PYTHON_LIST
-            or result_type == ResultType.PD_DATAFRAME and True
+            or result_type == ResultType.PD_DATAFRAME
+            and True
         ):
             if self.log == False:
                 for i, data in enumerate(__load__tmp_files()):
@@ -1142,15 +1159,14 @@ class DataStream:
                         "[bold reverse green] Processing DataStream  ",
                         total=len(_tmp_path_set),
                         visible=self.log,
-                    )     
+                    )
 
                     for i, data in enumerate(__load__tmp_files()):
                         if result_type == ResultType.PYTHON_LIST:
-                            result_datastream_data += data 
+                            result_datastream_data += data
                         elif result_type == ResultType.PD_DATAFRAME:
-                            result_datastream_data += data 
+                            result_datastream_data += data
                         progress.update(processing_task, advance=1)
-                        
 
         # Use multiprocessing for file generation
         else:
@@ -1260,6 +1276,17 @@ class DataStream:
 
         # First get only the meta data
         meta_data = self.get_meta_data()
+
+        # Check if user is trying to get from the latest version
+        if version == meta_data.get("data_version"):
+            self._log(f"[green bold]\n✅ You are already on the latest version. ✅")
+            if result_type == ResultType.PYTHON_LIST:
+                return list()
+            if result_type == ResultType.PD_DATAFRAME:
+                return pd.DataFrame([])
+
+            return None
+
         assert isinstance(
             meta_data, dict
         ), "ERROR COULD NOT RETRIEVE META DATA, TRY LATER"
@@ -1454,13 +1481,13 @@ class DataStream:
         ]:
             result = None
 
+        self._log("[bold blue] Summary", rule=True)
+
         if new_entry_count == 0:
-            self.console.print(
-                f"NO NEW ENTRIES FOUND. EITHER YOUR VERSION IS UP TO DATE OR YOUR SPECIFIED VERSION: {version} DOESN'T EXIST. \n PLEASE RECHECK! \n (note the datastream was last updated at: { meta_data['updated_at']})",
-                style="bold yellow",
+            self._log(
+                f"No new entries found, you seem to have the latest version {version}\nThe datastream was last updated at: { meta_data['updated_at']})"
             )
 
-        self._log("[bold blue] Summary", rule=True)
         self._log(f"\n\n [green bold] Datastream successfully retrieved")
 
         return result

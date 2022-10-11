@@ -258,6 +258,8 @@ class Fusionbase:
         :param data: The data provided as a json or a list of dictionaries
         :param data_file: You can also provide the data as a gzipped file
         :param provision: ["MARKETPLACE", "PRIVATE"]
+        :param chunk: Flag whether the data should send in chunks to Fusionbase
+        :param chunk_size: Size of the data chunks in number of rows
         :return: The result dict returned by the Fusionbase API
         """
 
@@ -332,7 +334,6 @@ class Fusionbase:
                 data_stream = self.get_datastream(label=unique_label)
 
                 data_stream.update(
-                    unique_label=unique_label,
                     data=data,
                     data_file_path=data_chunk_file_path,
                 )
@@ -396,7 +397,6 @@ class Fusionbase:
         try:
             data_stream = self.get_datastream(label=unique_label)
             data_stream.update(
-                unique_label=unique_label,
                 data=data,
                 data_file_path=data_file_path,
                 chunk=chunk,
