@@ -460,15 +460,16 @@ class DataStream:
     def update(
         self,
         data: list[dict] = None,
-        data_file_path: IO = None,
+        data_file_path: str = None,
         chunk: bool = False,
         chunk_size: int = 1,
-    ) -> dict:
+    ) -> DataStream:
         """
         Used to update a Datastream
-        :param unique_label: The unique label of the datastream
         :param data: The data provided as a json or a list of dictionaries
         :param data_file_path: You can also provide the data as a gzipped file
+        :param chunk: Flag whether the data should send in chunks to Fusionbase
+        :param chunk_size: Size of the data chunks in number of rows
         """
         assert (
             self.label is None and self.key is None
@@ -479,7 +480,7 @@ class DataStream:
 
         stream_meta = dict()
         if self.key is None:
-            stream_meta = self._get_meta_data_by_label(self.label)
+            stream_meta = self._get_meta_data_by_label()
         else:
             stream_meta["_key"] = self.key
 
@@ -497,7 +498,7 @@ class DataStream:
             if isinstance(data, pd.core.frame.DataFrame):
                 data = data.to_dict("records")
 
-            result = self._update(data, data_file)
+            data_stream = self._update(data, data_file)
 
             # Close file
             if data_file is not None:
@@ -529,9 +530,7 @@ class DataStream:
                 data_chunk_file_paths
             ):
                 data_file = open(data_chunk_file_path, "rb")
-                result = self._update(None, data_file)
-
-                assert result.get("success") == True, "UPDATE_ERROR"
+                data_stream = self._update(None, data_file)
 
                 # Close file
                 if data_file is not None:
@@ -540,7 +539,7 @@ class DataStream:
                     except AttributeError:
                         pass
 
-        return result
+        return data_stream
 
     def replace(
         self,

@@ -123,11 +123,9 @@ class Fusionbase:
     ) -> DataStream:
         """Factory Method used to create a DataStream object
 
-        Args:
-            key (Union[str, int]): the key of the datastream
-
-        Returns:
-            DataStream: Returns an instance of the requested datastream by key
+        :param key: The key of the datastream
+        :param label: The label of the datastream
+        :return: Returns an instance of the requested datastream by key
         """
         return DataStream(
             key=key,
@@ -141,12 +139,9 @@ class Fusionbase:
     def get_dataservice(self, key: Union[str, int], cache: bool = False) -> DataService:
         """Factory Method used to create a DataService object
 
-        Args:
-            key (Union[str, int]): the key of the dataservice
-            cache (bool): whether caching should be enabled or not
-
-        Returns:
-            DataService: Returns an instance of the requested dataservice by key
+        :param key: The key of the dataservice
+        :param cache: Whether caching should be enabled or not
+        :return: Instance of the requested dataservice by key
         """
         return DataService(
             key=key,
@@ -243,7 +238,7 @@ class Fusionbase:
         scope,
         source,
         data: list[dict] = None,
-        data_file_path: IO = None,
+        data_file_path: str = None,
         provision: str = "MARKETPLACE",
         chunk: bool = False,
         chunk_size: int = None,
@@ -256,11 +251,11 @@ class Fusionbase:
         :param scope: The Scope of the stream either "PUBLIC" or "PRIVATE"
         :param source: The Datastream source
         :param data: The data provided as a json or a list of dictionaries
-        :param data_file: You can also provide the data as a gzipped file
+        :param data_file_path: You can also provide the data as a gzipped file
         :param provision: ["MARKETPLACE", "PRIVATE"]
         :param chunk: Flag whether the data should send in chunks to Fusionbase
         :param chunk_size: Size of the data chunks in number of rows
-        :return: The result dict returned by the Fusionbase API
+        :return: DataStream which has been created
         """
 
         if pd is None:
@@ -368,11 +363,11 @@ class Fusionbase:
         scope,
         source,
         data: list[dict] = None,
-        data_file_path: IO = None,
+        data_file_path: str = None,
         provision: str = "MARKETPLACE",
         chunk: bool = False,
         chunk_size: int = None,
-    ) -> dict:
+    ) -> DataStream:
         """
         Main method to invoke the update or creation of a new Datastream
         :param unique_label: The unique label of the datastream
@@ -385,7 +380,7 @@ class Fusionbase:
         :param provision: ["MARKETPLACE", "PRIVATE"]
         :param chunk: Whether you want to upload the data in junks or not default is False
         :param chunk_size: The size of the chunks during the upload
-        :return:
+        :return: DataStream which has been updated or created
         """
 
         if pd is None:
