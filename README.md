@@ -210,6 +210,9 @@ print(result)
 
 ## Changelog
 
+### Version 0.2.7 (2023.02.12)
+- Added an option to leave the 'Auth' parameter None when creating a Fusionbase object if a corresponding environment variable (`FUSIONBASE_API_KEY`) is present
+
 ### Version 0.2.6 (2022.10.11)
 - Some improvements
 

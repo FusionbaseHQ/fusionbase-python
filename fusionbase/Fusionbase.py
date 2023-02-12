@@ -9,6 +9,8 @@ from typing import IO, Union
 import requests
 from requests_toolbelt import MultipartEncoder
 from rich.console import Console
+import os
+from dotenv import load_dotenv
 
 try:
     import numpy as np
@@ -35,11 +37,10 @@ from fusionbase.DataStream import DataStream
 from fusionbase.exceptions.DataStreamNotExistsError import DataStreamNotExistsError
 from fusionbase.exceptions.ResponseEvaluator import ResponseEvaluator
 
-
 class Fusionbase:
     def __init__(
         self,
-        auth: dict,
+        auth: dict = None,
         connection: dict = {"base_uri": "https://api.fusionbase.com/api/v1"},
         log: bool = False,
         config: dict = None,
@@ -50,6 +51,8 @@ class Fusionbase:
         :param auth: the standard authentication object to authenticate yourself towards the fusionbase API
         Example:
         auth = {"api_key": " ***** Hidden credentials *****"}
+        
+        If no authentication dict is provided the class will try to load the environment variable 'FUSIONBASE_API_KEY'
 
         :param connection: the standard authentication object used to verify e.g which uri should be used
         Example:
@@ -60,6 +63,14 @@ class Fusionbase:
 
         if config is None:
             config = {}
+
+        if auth is None: 
+            load_dotenv() 
+            if os.getenv('FUSIONBASE_API_KEY'): 
+                self._log('No Credentials provided, but found appropriate key in environment') 
+                auth = {"api_key": os.getenv('FUSIONBASE_API_KEY')} 
+            else: 
+                raise ValueError('No argument "auth" provided and no Credentials found in Environment')
 
         self.auth = auth
         self.config = config
