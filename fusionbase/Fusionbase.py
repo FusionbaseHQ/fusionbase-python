@@ -67,7 +67,6 @@ class Fusionbase:
         if auth is None: 
             load_dotenv() 
             if os.getenv('FUSIONBASE_API_KEY'): 
-                self._log('No Credentials provided, but found appropriate key in environment') 
                 auth = {"api_key": os.getenv('FUSIONBASE_API_KEY')} 
             else: 
                 raise ValueError('No argument "auth" provided and no Credentials found in Environment')
