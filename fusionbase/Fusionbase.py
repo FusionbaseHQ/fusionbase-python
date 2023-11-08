@@ -6,7 +6,7 @@ import tempfile
 import time
 from pathlib import Path, PurePath
 from typing import IO, Union
-import requests
+import httpx
 from requests_toolbelt import MultipartEncoder
 from rich.console import Console
 import os
@@ -30,12 +30,16 @@ except ImportError as e:
     import json
 
 
+from fusionbase.utils.strings import is_id
+
 from fusionbase.utils.DataChunker import DataChunker
 
 from fusionbase.DataService import DataService
 from fusionbase.DataStream import DataStream
 from fusionbase.exceptions.DataStreamNotExistsError import DataStreamNotExistsError
 from fusionbase.exceptions.ResponseEvaluator import ResponseEvaluator
+
+from fusionbase.entities.Location import Location
 
 class Fusionbase:
     def __init__(
@@ -76,8 +80,8 @@ class Fusionbase:
         self.connection = connection
         self.base_uri = self.connection["base_uri"]
         self.__log = log
-        self.requests = requests.Session()
-        self.requests.headers.update({"x-api-key": self.auth["api_key"]})
+        self.client = httpx.Client(follow_redirects=True, base_url=self.base_uri)
+        self.client.headers.update({"x-api-key": auth["api_key"]})
         self.__log = log
         self.console = Console()
         self.evaluator = ResponseEvaluator()
@@ -127,6 +131,39 @@ class Fusionbase:
                 self.console.print(message)
             if rule:
                 self.console.rule(message)
+                
+                
+    def search(self, query: str, limit: int = 10) -> list[dict]:
+        """
+        Used to search for datastreams
+        :param query: The query string
+        :param limit: The limit of results
+        :return: A list of datastreams
+        """
+        result = self.requests.get(
+            f"{self.base_uri}/search/fusion?q={query}"
+        )
+        self.evaluator.evaluate(response=result)
+        return result.json()
+    
+    
+    
+    def get_location(self, query: str) -> Location:
+        
+        if not is_id(query):
+            result = self.client.get(
+                f"/search/entities/location?q={query}&limit=1"
+            )
+            return Location.model_validate({**result.json()[0].get("entity"), "client": self.client})
+        else:
+            result = self.client.get(
+                f"/entities/location/get/{query}"
+            )
+            return Location.model_validate({**result.json(), "client": self.client})
+    
+    
+    
+                
 
     def get_datastream(
         self, key: Union[str, int] = None, label: str = None
