@@ -5,7 +5,7 @@ import platform
 import tempfile
 import time
 from pathlib import Path, PurePath
-from typing import IO, Union
+from typing import IO, Union, Optional
 import httpx
 from requests_toolbelt import MultipartEncoder
 from rich.console import Console
@@ -40,6 +40,13 @@ from fusionbase.exceptions.DataStreamNotExistsError import DataStreamNotExistsEr
 from fusionbase.exceptions.ResponseEvaluator import ResponseEvaluator
 
 from fusionbase.entities.Location import Location
+from fusionbase.entities.Organization import Organization
+from fusionbase.entities.Person import Person
+
+from fusionbase.models.service.Service import Service
+from fusionbase.models.stream.Stream import Stream
+
+from fusionbase.models.relation.Relation import Relation
 
 class Fusionbase:
     def __init__(
@@ -82,6 +89,11 @@ class Fusionbase:
         self.__log = log
         self.client = httpx.Client(follow_redirects=True, base_url=self.base_uri)
         self.client.headers.update({"x-api-key": auth["api_key"]})
+        
+        self.aclient = httpx.AsyncClient(follow_redirects=True, base_url=self.base_uri)
+        self.aclient.headers.update({"x-api-key": auth["api_key"]})
+        
+        
         self.__log = log
         self.console = Console()
         self.evaluator = ResponseEvaluator()
@@ -148,21 +160,171 @@ class Fusionbase:
     
     
     
-    def get_location(self, query: str) -> Location:
+    def get_relation(self, relation_id: str) -> Optional[dict]:
+        relation_result = self.client.get(f"relation/get/{relation_id}")    
+        relation_result = relation_result.json()
         
-        if not is_id(query):
-            result = self.client.get(
-                f"/search/entities/location?q={query}&limit=1"
-            )
-            return Location.model_validate({**result.json()[0].get("entity"), "client": self.client})
-        else:
-            result = self.client.get(
-                f"/entities/location/get/{query}"
-            )
-            return Location.model_validate({**result.json(), "client": self.client})
+        parameter_definition = relation_result.get('resolve', {}).get('parameter_definition', {})
+        del relation_result["resolve"]
+        
+        relation_result["parameter_definition"] = parameter_definition
+        
+
+            
+        relation = Relation.model_validate({**relation_result, "client": self.client})
+        return relation
     
     
     
+    def get_location(self, query: str) -> Optional[Location]:
+        try:
+            if not is_id(query):
+                # Search for the location using the query
+                search_result = self.client.get(f"/search/entities/location?q={query}&limit=1")
+                search_result.raise_for_status()  # Check for HTTP request errors
+
+                search_json = search_result.json()
+                results = search_json.get('results', [])
+
+                # Check if any results are returned
+                if not results:
+                    return None
+
+                # We assume that if there's a result, it will always have an 'entity' key.
+                # However, it's safer to use .get() with a default empty dictionary.
+                location_data = results[0].get('entity', {})
+                if not location_data:
+                    return None
+            else:
+                # If it's an ID, get the location directly
+                result = self.client.get(f"/entities/location/get/{query}")
+                result.raise_for_status()  # Check for HTTP request errors
+                location_data = result.json()
+
+            # Validate and return the location data
+            # It's assumed model_validate is a class method that returns an instance of Location
+            return Location.model_validate({**location_data, "client": self.client})
+
+        except Exception as e:
+            # Handle any exceptions that occurred during the process
+            print(f"An error occurred: {e}")
+            return None        
+        
+
+
+    def get_organization(self, query: str) -> Optional[Organization]:
+        try:
+            if not is_id(query):
+                # Search for the organization using the query
+                search_result = self.client.get(f"/search/entities/organization?q={query}&limit=1")
+                search_result.raise_for_status()  # Check for HTTP request errors
+
+                search_json = search_result.json()
+                results = search_json.get('results', [])
+
+                # Check if any results are returned
+                if not results:
+                    return None
+
+                org_id = results[0].get('entity', {}).get('fb_entity_id')
+                # If org_id is not found, return None
+                if not org_id:
+                    return None
+
+                # Fetch the organization by ID
+                result = self.client.get(f"/entities/organization/get/{org_id}")
+                result.raise_for_status()  # Check for HTTP request errors
+            else:
+                # If it's an ID, get the organization directly
+                result = self.client.get(f"/entities/organization/get/{query}")
+                result.raise_for_status()  # Check for HTTP request errors
+
+            # Validate and return the organization data
+            organization_data = result.json()
+            # It's assumed model_validate is a class method that returns an instance of Organization
+            return Organization.model_validate({**organization_data, "client": self.client})
+
+        except Exception as e:
+            # Handle any exceptions that occurred during the process
+            print(f"An error occurred: {e}")
+            return None
+
+          
+    
+    def get_person(self, query: str) -> Optional[Person]:
+        try:
+            if not is_id(query):
+                # Try to search for the person using the query
+                search_result = self.client.get(f"/search/entities/person?q={query}&limit=1")
+                search_result.raise_for_status()  # Raise an exception for HTTP errors
+
+                search_json = search_result.json()
+                results = search_json.get('results', [])
+
+                # If there are no results, return None or raise an error
+                if not results:
+                    return None
+
+                person_id = results[0].get('entity', {}).get('fb_entity_id')
+                # Check if the person ID is found, if not return None
+                if not person_id:
+                    return None
+
+                # Fetch the person by ID
+                result = self.client.get(f"/entities/person/get/{person_id}")
+                result.raise_for_status()  # Raise an exception for HTTP errors
+            else:
+                # Fetch the person directly by ID if the query is an ID
+                result = self.client.get(f"/entities/person/get/{query}")
+                result.raise_for_status()  # Raise an exception for HTTP errors
+
+            # Validate the result with the Person model
+            person_data = result.json()
+            # It's assumed model_validate is a class method that returns an instance of Person
+            return Person.model_validate({**person_data, "client": self.client})
+
+        except Exception as e:
+            # Handle exceptions such as connection errors, timeouts, and HTTP errors
+            # You could also be more specific with the exception types if desired
+            print(f"An error occurred: {e}")
+            return None   
+        
+    
+    def get_service(self, query: str) -> Optional[Service]:
+        try:
+            if True:
+                result = self.client.get(f"/service/get/{query}")
+                result.raise_for_status()  # Raise an exception for HTTP errors
+            
+            
+            service_data = result.json()
+            return Service.model_validate({**service_data, "client": self.client})    
+            
+        except Exception as e:
+            # Handle exceptions such as connection errors, timeouts, and HTTP errors
+            # You could also be more specific with the exception types if desired
+            print(f"An error occurred: {e}")
+            return None
+     
+
+
+    def get_stream(self, query: str) -> Optional[Service]:
+        try:
+            if True:
+                result = self.client.get(f"/stream/base/{query}")
+                result.raise_for_status()  # Raise an exception for HTTP errors
+            
+            
+            stream_data = result.json()
+            return Stream.model_validate({**stream_data, "client": self.client, "aclient": self.aclient})    
+            
+        except Exception as e:
+            # Handle exceptions such as connection errors, timeouts, and HTTP errors
+            # You could also be more specific with the exception types if desired
+            print(f"An error occurred: {e}")
+            return None
+
+
                 
 
     def get_datastream(
