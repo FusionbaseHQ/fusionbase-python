@@ -7,6 +7,7 @@ from .DataSource import DataSource
 from .DataStream import DataStream
 from .DataStreamCollection import DataStreamCollection
 from .Fusionbase import Fusionbase
+from .Authorization import Authorization
 
 try:
     _dist = get_distribution("fusionbase")
