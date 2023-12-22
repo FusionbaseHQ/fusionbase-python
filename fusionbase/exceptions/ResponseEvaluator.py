@@ -1,6 +1,7 @@
 import requests
 
 from fusionbase.exceptions.DataStreamNotExistsError import DataStreamNotExistsError
+from fusionbase.exceptions.DataServiceNotExistsError import DataServiceNotExistsError
 from fusionbase.exceptions.DataStreamUnsupportedInputError import (
     DataStreamUnsupportedInputError,
 )
@@ -46,6 +47,8 @@ class ResponseEvaluator:
 
         if content == "DATA_STREAM_NOT_FOUND":
             raise DataStreamNotExistsError
+        elif content == "DATA_SERVICE_NOT_EXISTS":
+            raise DataServiceNotExistsError
         else:
             content = content[0]
 
