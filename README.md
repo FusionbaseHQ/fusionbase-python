@@ -209,6 +209,8 @@ print(result)
 
 
 ## Changelog
+### Version 0.2.9 (2024.01.13)
+- orjson is now installed as dependeny
 
 ### Version 0.2.8 (2023.02.14)
 - Minor bug fixes and improvements

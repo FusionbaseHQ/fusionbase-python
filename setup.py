@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name                          = "fusionbase",
-    version                       = "0.2.8",
+    version                       = "0.2.9",
     author                        = "Fusionbase",
     author_email                  = "info@fusionbase.com",
     description                   = "This is the main Fusionbase python package to make handling and interacting with data a piece of cake.",
@@ -29,6 +29,7 @@ setup(
           'rich',
           'pathos',
           'aiohttp',
-          'aiofiles'
+          'aiofiles',
+          'orjson'
     ],
 )
