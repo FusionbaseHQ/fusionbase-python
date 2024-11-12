@@ -49,6 +49,13 @@ class ResponseEvaluator:
         else:
             content = content[0]
 
+        if isinstance(content, str):
+            content = {'type': 'uncaught_str_error', 'msg': content}
+            print(f'Uncaught string error: {content}')
+        elif not isinstance(content, dict):
+            content = {'type': 'uncaught_error', 'msg': str(content)}
+            print(f'Uncaught error: {content}')
+
         message = content["msg"]
         error_type = content["type"]
 
