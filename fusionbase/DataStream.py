@@ -70,18 +70,18 @@ class DataStream:
         log: bool = False,
     ) -> None:
         """
-        Used to initialise a new DataStream Object
+        Used to initialize a new DataStream Object
         :param key: The key of the datastream provided as an integer or string
-        :param auth: the standard authentication object to authenticate yourself towards the fusionbase, API
+        :param auth: The standard authentication object to authenticate yourself towards the Fusionbase API
         Example:
         auth = {"api_key": " ***** Hidden credentials *****"}
 
-        :param connection: the standard authentication object used to verify e.g which uri should be used
+        :param connection: the standard authentication object used to verify e.g. which uri should be used
         Example:
         connection={"base_uri": "https://api.fusionbase.com/api/v1"}
 
-        :param config: Let the user specify e.g a specific caching directory
-        :param log: Whether the the output of any given operation should be logged to console
+        :param config: Let the user specify e.g. a specific caching directory
+        :param log: Whether the output of any given operation should be logged to console
         """
         if config is None:
             config = {}
@@ -222,7 +222,7 @@ class DataStream:
             for i, chunk in enumerate(skip_limit_chunks)
         ]
 
-        # Remove tuples that contain higher starting numbers the the actual data stream size
+        # Remove tuples that contain higher starting numbers the actual data stream size
         # It is indended to filter it twice
         skip_limits = list(filter(lambda x: x[0] <= stream_rows, skip_limits))
         return skip_limits
@@ -298,7 +298,7 @@ class DataStream:
 
     def pretty_meta_data(self) -> None:
         """
-        Retrieves the metadata from a Stream by giving a Service specific key and prints it nicely to console
+        Retrieves the metadata and prints it nicely to console
         """
         meta_data = self.get_meta_data()
         table = Table(title=meta_data["name"]["en"])
@@ -327,8 +327,8 @@ class DataStream:
 
     def get_meta_data(self) -> Union[None, dict]:
         """
-        Retrieves the metadata from a Stream by giving a Stream specific key
-        :return: The metadata for the given service as a python dictionary
+        Retrieves the metadata as a dictionary
+        :return: The metadata as a python dictionary
         """
 
         r = self.requests.get(f"{self.base_uri}/data-stream/get/{self.key}/meta")
@@ -364,7 +364,6 @@ class DataStream:
         for i, dic in enumerate(dics):
             # Add to 'key' for making it update compatible
             k = dic["_key"]
-            dic["_key"]
             dic = {**{"key": k}, **dic}
             dics[i] = dic
         return dics
@@ -392,9 +391,8 @@ class DataStream:
     def set_source(self, source_key: Union[int, str], stream_specific: dict) -> bool:
         """
         Used to set the source of a provided Datastream
-        :param stream_specific:
-        :param data_stream_key: The key of the Datastream
         :param source_key: The key of the Datasource
+        :param stream_specific: The dictionary which contains a ´uri´ key for the URI of this source
         :return:
         """
         assert "uri" in stream_specific, "STREAM_SPECIFIC_URI_IS_REQUIRED"
@@ -446,7 +444,7 @@ class DataStream:
         self.evaluator.evaluate(response=result)
         result = result.json()
 
-        # Check if update was successfull
+        # Check if update was successful
         if "detail" in result:
             for d in result["detail"]:
                 # Currently only check if data stream key exists
@@ -471,9 +469,9 @@ class DataStream:
         :param chunk: Flag whether the data should send in chunks to Fusionbase
         :param chunk_size: Size of the data chunks in number of rows
         """
-        assert (
+        assert not (
             self.label is None and self.key is None
-        ) == False, "NO_KEY_OR_UNIQUE_LABEL_GIVEN"
+        ), "NO_KEY_OR_UNIQUE_LABEL_GIVEN"
 
         if pd is None:
             raise ModuleNotFoundError("You must install pandas to use this feature.")
@@ -801,7 +799,7 @@ class DataStream:
         self._log(f"Loading Datastream with key {self.key}")
         self._log(f"{Path(self.tmp_dir)} will be used to cache data partitions")
 
-        if live == False:
+        if not live:
             self._log(
                 f"[italic bold]live[/italic bold] is [italic bright_red]FALSE[/italic bright_red] - Partitions will be loaded from local cache if possible"
             )
@@ -1046,7 +1044,7 @@ class DataStream:
                     ):
                         _tmp_path_set.add(task_result)
         except Exception as e:
-            self._log("Error during download - final dataset might be inclomplete.")
+            self._log("Error during download - final dataset might be incomplete.")
 
         # Generator for downloaded data
         def __load__tmp_files():
@@ -1140,7 +1138,7 @@ class DataStream:
             or result_type == ResultType.PD_DATAFRAME
             and True
         ):
-            if self.log == False:
+            if not self.log:
                 for i, data in enumerate(__load__tmp_files()):
                     if result_type == ResultType.PYTHON_LIST:
                         result_datastream_data.extend(data)
@@ -1219,7 +1217,7 @@ class DataStream:
         """
         Retrieve data from the Fusionbase API since a specified fb_data_version
         :param fields: The fields or columns of the data you want to retrieve (Projection)
-        :param version: The  fb_data_version starting from from which new data should be downloaded
+        :param version: The fb_data_version starting from which new data should be downloaded
         :return: The data as a list of dictionaries
         """
         if fields is not None and len(fields) > 0:
@@ -1317,7 +1315,7 @@ class DataStream:
         # Initialize data result list
         result_datastream_data = list()
 
-        if Path(f"{_tmp_fpath}.gz").is_file() and live == False:
+        if Path(f"{_tmp_fpath}.gz").is_file() and not live:
             # self._log(f"Cache hit! Skip downloading ... ")
             pass
 
@@ -1495,7 +1493,7 @@ class DataStream:
         """
         Retrieve data from the Fusionbase API since a specified fb_data_version and return it as a valid pandas Dataframe
         :param fields: The fields or columns of the data you want to retrieve (Projection)
-        :param version: The  fb_data_version starting from from which new data should be downloaded
+        :param version: The  fb_data_version starting from which new data should be downloaded
         :return: The data as a pandas Dataframe
         """
         if pd is None:
