@@ -1,3 +1,64 @@
+[tool.poetry]
+name = "fusionbase"
+version = "0.3.0"
+description = "This is the main Fusionbase python package to make handling and interacting with data a piece of cake."
+authors = ["Fusionbase <info@fusionbase.com>"]
+readme = "README.md"
+license = "GPL-3.0-only"
+repository = "https://github.com/FusionbaseHQ/fusionbase-python"
+documentation = "https://developer.fusionbase.com/docs/developer-sdk/python"
+homepage = "https://fusionbase.com"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "Operating System :: OS Independent",
+]
+
+[tool.poetry.dependencies]
+python = "^3.9"
+requests-toolbelt = "^1.0.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.4.0"
+pytest-cov = "^4.1.0"
+yapf = "^0.40.0"
+isort = "^5.12.0"
+mypy = "^1.5.1"
+pylint = "^2.17.5"
+pre-commit = "^3.3.3"
+
 [build-system]
-requires = ["setuptools>=42"]
-build-backend = "setuptools.build_meta"
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.isort]
+profile = "google"
+line_length = 88
+
+[tool.mypy]
+python_version = "3.9"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+
+[tool.yapf]
+based_on_style = "google"
+indent_width = 4
+column_limit = 88
+
+[tool.pylint]
+max-line-length = 88
+disable = [
+    "C0111", # missing docstring
+    "R0903", # too few public methods
+    "C0103", # invalid name
+    "R0913", # too many arguments
+    "R0914", # too many local variables
+]
+extension-pkg-whitelist = "pydantic"
+good-names = ["i", "j", "k", "ex", "Run", "_", "id"]

@@ -1,0 +1,53 @@
+repos:
+-   repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+    -   id: trailing-whitespace
+    -   id: end-of-file-fixer
+    -   id: check-yaml
+    -   id: check-added-large-files
+    -   id: check-merge-conflict
+
+-   repo: https://github.com/pycqa/isort
+    rev: 6.0.1
+    hooks:
+    -   id: isort
+        args: ["--profile", "google"]
+
+-   repo: https://github.com/google/yapf
+    rev: v0.43.0
+    hooks:
+    -   id: yapf
+        args: ["--style", "google", "--recursive", "--in-place"]
+
+-   repo: local
+    hooks:
+    -   id: pylint
+        name: pylint
+        entry: poetry run pylint
+        language: system
+        types: [python]
+        args: ["--disable=C0111,R0903,C0103,R0913,R0914"]
+        pass_filenames: true
+        exclude: ^tests/
+
+    -   id: mypy
+        name: mypy
+        entry: poetry run mypy
+        language: system
+        types: [python]
+        args: ["--ignore-missing-imports"]
+        require_serial: true
+        pass_filenames: true
+        exclude: ^tests/
+
+    -   id: pytest
+        name: pytest
+        entry: poetry run pytest
+        language: system
+        pass_filenames: false
+        args: ["--no-header", "--no-summary", "-xvs"]
+        stages: [pre-push]
+        verbose: true
+        always_run: true
+        fail_fast: false
