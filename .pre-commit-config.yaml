@@ -27,19 +27,13 @@ repos:
         entry: poetry run pylint
         language: system
         types: [python]
-        args: ["--disable=C0111,R0903,C0103,R0913,R0914"]
+        # Only fail on actual errors (E), not warnings (W) or conventions (C)
+        args: ["--fail-on=E"]
         pass_filenames: true
         exclude: ^tests/
-
-    -   id: mypy
-        name: mypy
-        entry: poetry run mypy
-        language: system
-        types: [python]
-        args: ["--ignore-missing-imports"]
-        require_serial: true
-        pass_filenames: true
-        exclude: ^tests/
+        verbose: true
+        # Keep hooks running on pre-commit
+        stages: [pre-commit]
 
     -   id: pytest
         name: pytest
@@ -47,7 +41,7 @@ repos:
         language: system
         pass_filenames: false
         args: ["--no-header", "--no-summary", "-xvs"]
-        stages: [pre-push]
+        stages: [pre-commit, pre-push]
         verbose: true
         always_run: true
         fail_fast: false

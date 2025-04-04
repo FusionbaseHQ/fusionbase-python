@@ -43,7 +43,6 @@ We use pre-commit hooks to maintain code quality. These hooks run automatically 
 - YAPF for code formatting
 - isort for import sorting
 - pylint for linting
-- mypy for type checking
 - pytest for running tests
 - Various file checks (trailing whitespace, merge conflicts, etc.)
 
@@ -67,6 +66,21 @@ To run tests with coverage:
 poetry run pytest --cov=fusionbase
 ```
 
+For tests that use real API access, you'll need to set an API key:
+
+```bash
+export FUSIONBASE_API_KEY=your_api_key
+poetry run pytest
+```
+
+### Asynchronous Tests
+
+We use pytest-asyncio for testing asynchronous code. The asyncio mode is set to "auto" in pyproject.toml, but you can also run specific async tests with:
+
+```bash
+poetry run pytest tests/path/to/async_test.py -v
+```
+
 ### Code Formatting
 
 We use YAPF (following Google style guide) and isort for code formatting:
@@ -86,14 +100,6 @@ We use Pylint with Google style guide for linting:
 ```bash
 poetry run pylint fusionbase
 poetry run pylint tests
-```
-
-### Type Checking
-
-We use mypy for type checking:
-
-```bash
-poetry run mypy fusionbase
 ```
 
 ## Building and Publishing

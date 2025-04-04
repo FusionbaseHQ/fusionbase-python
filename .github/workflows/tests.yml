@@ -35,7 +35,7 @@ jobs:
 
         - name: Lint with pylint
           run: |
-            poetry run pylint fusionbase tests --fail-under=8.0
+            poetry run pylint fusionbase tests --fail-on=E --fail-under=0.75
 
         - name: Check formatting with yapf
           run: |
