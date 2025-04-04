@@ -1,5 +1,7 @@
 """Async client for interacting with the Fusionbase API."""
 
+import json
+import time
 from typing import Any, Dict, Optional
 
 import httpx
@@ -84,6 +86,35 @@ class AsyncFusionbaseClient:
             "User-Agent": f"fusionbase-python-async/{version}",
         }
 
+    async def _cached_request(self, cache_key, method_func, method, url,
+                              **kwargs):
+        """Handle cached requests for async methods."""
+        # Check cache if enabled
+        if self._cache and self._cache.enabled:
+            start = time.time()
+            cached_result = self._cache.get(cache_key)
+            get_time = time.time() - start
+
+            if cached_result is not None:
+                if get_time > 0.01:  # Only log if it took more than 10ms
+                    logger.info(
+                        f"Async cache hit for {method} {url} (took {get_time:.3f}s)"
+                    )
+                return cached_result
+
+        # Perform the request if not in cache
+        start = time.time()
+        result = await method_func(method, url, **kwargs)
+        exec_time = time.time() - start
+
+        # Cache the result if enabled
+        if self._cache and self._cache.enabled:
+            self._cache.set(cache_key, result)
+            logger.debug(
+                f"Async cache miss for {method} {url} (took {exec_time:.3f}s)")
+
+        return result
+
     async def request(
         self,
         method: str,
@@ -103,17 +134,14 @@ class AsyncFusionbaseClient:
         Raises:
             APIError: If the API returns an error
         """
-        if not self.config.retry.enabled:
-            # Direct request without retry
-            return await self._perform_request(method, url, **kwargs)
+        # Generate cache key
+        cache_key = f"{method}:{url}:{json.dumps(kwargs.get('params', {}), sort_keys=True)}"
 
-        # Check cache first if enabled
-        cache_key = f"{method}:{url}"
-        if self._cache and self._cache.enabled:
-            cached_result = self._cache.get(cache_key)
-            if cached_result is not None:
-                logger.debug(f"Cache hit for {method} {url}")
-                return cached_result
+        if not self.config.retry.enabled:
+            # Direct request without retry, but with caching
+            return await self._cached_request(cache_key,
+                                              self._perform_request_and_process,
+                                              method, url, **kwargs)
 
         # Setup retry parameters
         retry_config = {
@@ -133,22 +161,11 @@ class AsyncFusionbaseClient:
         try:
             async for attempt in AsyncRetrying(**retry_config):
                 with attempt:
-                    response = await self._perform_request(
-                        method, url, **kwargs)
-                    # Check if response code indicates retry is needed
-                    if response.status_code in self.config.retry.retry_statuses:
-                        raise RuntimeError(
-                            f"Retrying for status code {response.status_code}")
-
-                    # Process successful response
-                    result = await self._process_response(response)
-
-                    # Cache the result if enabled
-                    if self._cache and self._cache.enabled:
-                        self._cache.set(cache_key, result)
-
-                    return result
-        except Exception as e:  # pylint: disable=no-member, broad-except
+                    # Use cached request helper inside the retry loop
+                    return await self._cached_request(
+                        cache_key, self._perform_request_and_process, method,
+                        url, **kwargs)
+        except Exception as e:  # pylint: disable=broad-except
             if hasattr(e, "response"):
                 logger.debug(f"Request failed with response: {e.response}")
                 await self._process_response(e.response)
@@ -158,7 +175,13 @@ class AsyncFusionbaseClient:
                     f"Async request failed after {self.config.retry.max_attempts} attempts: {method} {url}",
                     500) from e
 
-    async def _perform_request(self, method: str, url: str, **kwargs: Any) -> httpx.Response:  # pylint: disable=line-too-long
+    async def _perform_request_and_process(self, method, url, **kwargs):
+        """Perform request and process response in one step."""
+        response = await self._perform_request(method, url, **kwargs)
+        return await self._process_response(response)
+
+    async def _perform_request(self, method: str, url: str,
+                               **kwargs: Any) -> httpx.Response:
         """Perform the actual async HTTP request.
 
         Args:
@@ -207,7 +230,7 @@ class AsyncFusionbaseClient:
             return response.json()
         except httpx.HTTPStatusError as exc:
             raise parse_error_response(response) from exc
-        except Exception as exc:  # pylint: disable=no-member, broad-except
+        except Exception as exc:  # pylint: disable=broad-except
             if hasattr(exc, "response"):
                 logger.debug(
                     f"Failed to process response with response: {exc.response}")

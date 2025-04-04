@@ -20,6 +20,16 @@ def print_separator(title):
     print(f"\n=== {title} ===")
 
 
+def format_time(seconds):
+    """Format time for display."""
+    if seconds < 0.001:
+        return f"{seconds * 1000000:.2f} μs"
+    if seconds < 1:
+        return f"{seconds * 1000:.2f} ms"
+
+    return f"{seconds:.2f} s"
+
+
 def demonstrate_basic_caching(client):
     """Demonstrate basic caching behavior."""
     print_separator("Basic Caching")
@@ -30,17 +40,35 @@ def demonstrate_basic_caching(client):
     start = time.time()
     location1 = client.entities.locations.from_id(location_id)
     duration1 = time.time() - start
-    print(f"Retrieved {location1.formatted_address} in {duration1:.4f} seconds")
+    print(
+        f"Retrieved {location1.formatted_address} in {format_time(duration1)}")
 
-    print("\nSecond request (cache hit expected)...")
+    print("\nSecond request (disk cache hit expected)...")
     start = time.time()
     location2 = client.entities.locations.from_id(location_id)
     duration2 = time.time() - start
-    print(f"Retrieved {location2.formatted_address} in {duration2:.4f} seconds")
+    print(
+        f"Retrieved {location2.formatted_address} in {format_time(duration2)}")
 
-    if duration1 > duration2:
-        speedup = duration1 / duration2
-        print(f"✓ Cache is working! {speedup:.1f}x faster with cache")
+    print("\nThird request (memory cache hit expected - should be fastest)...")
+    start = time.time()
+    location3 = client.entities.locations.from_id(location_id)
+    duration3 = time.time() - start
+    print(
+        f"Retrieved {location3.formatted_address} in {format_time(duration3)}")
+
+    if duration1 > duration2 > duration3:
+        print("✓ Cache is working optimally!")
+        print(f"  - First request (network): {format_time(duration1)}")
+        print(
+            f"  - Second request (disk cache): {format_time(duration2)} ({duration1/duration2:.1f}x faster)"
+        )
+        print(
+            f"  - Third request (memory cache): {format_time(duration3)} ({duration1/duration3:.1f}x faster)"
+        )
+    elif duration1 > duration2:
+        print(
+            f"✓ Cache is working! {duration1/duration2:.1f}x faster with cache")
     else:
         print(
             "⚠️ Cache might not be working as expected (second request wasn't faster)"
