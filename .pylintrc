@@ -1,0 +1,13 @@
+[MASTER]
+# ...existing code...
+
+[MESSAGES CONTROL]
+# Set to match the pre-commit hook configuration
+fail-on = E
+fail-under = 7.5
+
+# The following matches the disable list from pyproject.toml
+disable = C0111,R0903,C0103,R0913,R0914,R0917,R0911,C0301,C0415,W0212,E1101,W0718,R0902,W0707
+
+[FORMAT]
+max-line-length = 88

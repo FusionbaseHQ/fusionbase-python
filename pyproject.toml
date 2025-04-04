@@ -42,6 +42,7 @@ profile = "google"
 line_length = 88
 
 [tool.pytest.ini_options]
+addopts = "--no-header --no-summary -xvs"
 testpaths = ["tests"]
 python_files = "test_*.py"
 asyncio_mode = "auto"  # Added for pytest-asyncio
@@ -56,9 +57,9 @@ column_limit = 99
 
 [tool.pylint]
 max-line-length = 88
-# Set fail-under to a more reasonable value (e.g. 7.0) to allow commits with minor issues
-fail-under = 7.0
-# Disable more rules that cause common annoyances
+fail-under = 7.5  # Allow commits with minor issues, but maintain quality standards
+fail-on = "E"  # Only fail on errors, not warnings or conventions
+ignore = []
 disable = [
     "C0111", # missing docstring
     "R0903", # too few public methods

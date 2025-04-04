@@ -81,26 +81,51 @@ We use pytest-asyncio for testing asynchronous code. The asyncio mode is set to 
 poetry run pytest tests/path/to/async_test.py -v
 ```
 
+## Code Style and Linting
+
+We follow a consistent code style across the project enforced by various tools:
+
 ### Code Formatting
 
-We use YAPF (following Google style guide) and isort for code formatting:
+- **yapf**: Based on Google style with 4-space indentation and 99 character line limit
+- **isort**: Uses Google profile with 88 character line limit
 
-```bash
-# Format with YAPF
-poetry run yapf -i -r fusionbase/ tests/
+### Linting
 
-# Sort imports
-poetry run isort .
-```
+- **pylint**: We maintain a minimum score of 7.5 out of 10
+  - Only fails on errors (E), not warnings (W) or conventions (C)
+  - Configured identically in both pyproject.toml and .pylintrc
 
-### Code Linting
+### Testing
 
-We use Pylint with Google style guide for linting:
+- **pytest**: Run with no header/summary, verbosely and with fail on first error
 
-```bash
-poetry run pylint fusionbase
-poetry run pylint tests
-```
+### Pre-commit Hooks
+
+All these tools are configured as pre-commit hooks to ensure consistency. The same configurations are used whether running via pre-commit or directly through Poetry.
+
+## Tool Configuration Reference
+
+### pylint
+
+- **fail-under**: 7.5 (allows commits with minor issues while maintaining quality)
+- **fail-on**: E (only errors, not warnings or conventions)
+- **line length**: 88 characters
+
+### yapf
+
+- **style**: Google
+- **indent**: 4 spaces
+- **line length**: 99 characters
+
+### isort
+
+- **profile**: Google
+- **line length**: 88 characters
+
+### pytest
+
+- **options**: --no-header --no-summary -xvs
 
 ## Building and Publishing
 
