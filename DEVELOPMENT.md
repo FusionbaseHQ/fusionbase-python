@@ -87,7 +87,7 @@ We follow a consistent code style across the project enforced by various tools:
 
 ### Code Formatting
 
-- **yapf**: Based on Google style with 4-space indentation and 99 character line limit
+- **yapf**: Based on Google style with 4-space indentation and 88 character line limit
 - **isort**: Uses Google profile with 88 character line limit
 
 ### Linting
@@ -116,7 +116,7 @@ All these tools are configured as pre-commit hooks to ensure consistency. The sa
 
 - **style**: Google
 - **indent**: 4 spaces
-- **line length**: 99 characters
+- **line length**: 88 characters
 
 ### isort
 

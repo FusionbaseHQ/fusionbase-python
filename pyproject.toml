@@ -53,7 +53,7 @@ markers = [
 [tool.yapf]
 based_on_style = "google"
 indent_width = 4
-column_limit = 99
+column_limit = 88  # Changed to match pylint and isort for consistency
 
 [tool.pylint]
 max-line-length = 88
