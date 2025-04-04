@@ -182,6 +182,19 @@ class EntityManager:
         return self._locations
 
     @property
+    def organizations(self):
+        """Get the organizations manager.
+
+        Returns:
+            A manager for organization entities
+        """
+        if self._organizations is None:
+            # Import here to avoid circular imports
+            from fusionbase.entities.organization import Organization
+            self._organizations = BaseEntityManager(self.client, Organization)
+        return self._organizations
+
+    @property
     def persons(self):
         """Get the persons manager.
 

@@ -19,6 +19,46 @@ class PersonSubtype(str, Enum):
     ANY = "ANY"
 
 
+class OrganizationSubtype(str, Enum):
+    """Subtypes of organization entities."""
+
+    CORPORATION = "CORPORATION"
+    ANY = "ANY"
+
+
+class OrganizationStatus(str, Enum):
+    """Status of an organization."""
+
+    UNKNOWN = "UNKNOWN"
+    INACTIVE = "INACTIVE"
+    ACTIVE = "ACTIVE"
+    LIQUIDATED = "LIQUIDATED"
+    DISSOLVED = "DISSOLVED"
+    LIQUIDATION = "LIQUIDATION"
+    RECEIVER_ACTION = "RECEIVER_ACTION"
+    CONVERTED_CLOSED = "CONVERTED_CLOSED"
+    VOLUNTARY_ARRANGEMENT = "VOLUNTARY_ARRANGEMENT"
+    INSOLVENCY_PROCEEDINGS = "INSOLVENCY_PROCEEDINGS"
+    IN_ADMINISTRATION = "IN_ADMINISTRATION"
+    CLOSED = "CLOSED"
+    OPEN = "OPEN"
+    REGISTERED = "REGISTERED"
+    OPERATIONAL = "OPERATIONAL"
+    CLOSED_TEMPORARILY = "CLOSED_TEMPORARILY"
+    CLOSED_PERMANENTLY = "CLOSED_PERMANENTLY"
+
+
+class OrganizationStatusDetail(str, Enum):
+    """Detailed status information for organizations."""
+
+    ACTIVE_PROPOSAL_TO_STRIKE_OFF = "ACTIVE_PROPOSAL_TO_STRIKE_OFF"
+    CONVERTED_TO_PLC = "CONVERTED_TO_PLC"
+    CONVERTED_TO_UK_SOCIETAS = "CONVERTED_TO_UK_SOCIETAS"
+    CONVERTED_TO_UKEIG = "CONVERTED_TO_UKEIG"
+    TRANSFER_FROM_UK = "TRANSFER_FROM_UK"
+    TRANSFORMED_TO_SE = "TRANSFORMED_TO_SE"
+
+
 class LocationSubtype(str, Enum):
     """Subtypes of location entities."""
 

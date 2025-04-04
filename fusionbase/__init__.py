@@ -4,6 +4,8 @@ from fusionbase.client import Fusionbase
 from fusionbase.config import FusionbaseConfig
 from fusionbase.entities import Entity
 from fusionbase.entities import Location
+from fusionbase.entities import Organization
+from fusionbase.entities import Person
 from fusionbase.exceptions import APIError
 from fusionbase.exceptions import AuthenticationError
 from fusionbase.exceptions import FusionbaseError
@@ -30,6 +32,8 @@ __all__ = [
     # Entities
     "Entity",
     "Location",
+    "Organization",
+    "Person",
 
     # Search
     "SearchParams",
