@@ -1,10 +1,12 @@
 """Location entity module."""
 
 import asyncio
+import inspect  # Added missing import
 from typing import ClassVar, List, Optional
 
 import httpx
 from pydantic import BaseModel
+from pydantic import model_validator
 
 from fusionbase.entities.base import Entity
 from fusionbase.entities.types import AddressComponentType
@@ -53,6 +55,40 @@ class Location(Entity):
     # Entity type information
     entity_type: ClassVar[EntityType] = EntityType.LOCATION
     entity_subtype: LocationSubtype = LocationSubtype.ANY
+
+    @model_validator(mode='before')
+    @classmethod
+    def process_location_data(cls, data):
+        """Set default values and process fields for locations."""
+        if isinstance(data, dict):
+            # Set default fb_entity_version if missing
+            if 'fb_entity_version' not in data or data[
+                    'fb_entity_version'] is None:
+                data['fb_entity_version'] = ""
+
+            # Make sure address_components is a list
+            if 'address_components' not in data or data[
+                    'address_components'] is None:
+                data['address_components'] = []
+
+            # Make sure alternative_names is a list
+            if 'alternative_names' not in data or data[
+                    'alternative_names'] is None:
+                data['alternative_names'] = []
+
+            # Handle coordinate validation issues
+            if 'coordinate' in data and data['coordinate'] is not None:
+                if not isinstance(data['coordinate'], dict) or \
+                   'latitude' not in data['coordinate'] or \
+                   'longitude' not in data['coordinate']:
+                    # Invalid coordinate data
+                    data['coordinate'] = None
+
+            # Fix invalid locations serialization issues - fix name field if missing
+            if 'name' not in data or data['name'] is None:
+                data['name'] = data.get('formatted_address', '')
+
+        return data
 
     @property
     def address(self) -> Optional[str]:
@@ -214,6 +250,7 @@ class Location(Entity):
     async def _afrom_id(cls, client, entity_id: str) -> "Location":
         """Create Location instance by async fetching."""
         try:
+            data = None
             # Use async client if available
             if hasattr(client, "async_client") and client.async_client:
                 # Get async client
@@ -229,15 +266,30 @@ class Location(Entity):
                 data = await client.amake_request(
                     f"entities/location/get/{entity_id}")
             # Use async HTTP client directly
-            elif hasattr(client, "async_client") and client.async_client:
-                response = await client.async_client.get(
+            elif hasattr(client, "_async_http_client"):
+                response = await client._async_http_client.get(
                     f"entities/location/get/{entity_id}")
                 response.raise_for_status()
                 data = response.json()
             else:
-                # Fall back to sync method through asyncio.to_thread if no async methods available
-                data = await asyncio.to_thread(cls._from_id, client, entity_id)
-                return data  # Return early as we already have a Location instance
+                # Fall back to sync method through asyncio.to_thread
+                # BUT only if the client's request method is not async
+                if hasattr(client,
+                           "request") and not inspect.iscoroutinefunction(
+                               client.request):
+                    data = await asyncio.to_thread(cls._from_id, client,
+                                                   entity_id)
+                    return data  # Return early as we already have a Location instance
+
+                raise APIError(
+                    f"No suitable async method found to fetch location (ID: {entity_id})",
+                    status_code=500)
+
+            # Make sure we have data
+            if not data:
+                raise APIError(
+                    f"Failed to retrieve location data (ID: {entity_id})",
+                    status_code=500)
 
             # Convert the API response to match our entity model (same as sync version)
             location_data = {

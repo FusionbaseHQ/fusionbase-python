@@ -136,9 +136,11 @@ class Fusionbase:
         """Register all entity types with the entity manager."""
         # Import here to avoid circular imports
         from fusionbase.entities import Location
+        from fusionbase.entities.person import Person
         from fusionbase.entities.types import EntityType
 
         self.entities.register_entity_class(EntityType.LOCATION.value, Location)
+        self.entities.register_entity_class(EntityType.PERSON.value, Person)
 
     def _get_headers(self) -> Dict[str, str]:
         """Get headers for API requests including authentication.

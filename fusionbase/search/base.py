@@ -1,105 +1,78 @@
-"""Base search module for Fusionbase SDK."""
+"""Base classes for search functionality."""
 
-from typing import Any, Dict, Generic, List, Optional, Type, TypeVar
+from abc import ABC
+from typing import Generic, List, Optional, TypeVar  # Removed unused Any import
 
 from pydantic import BaseModel
+from pydantic import ConfigDict
 
-from fusionbase.entities.base import Entity
-
-T = TypeVar('T', bound=Entity)
+T = TypeVar('T')
 
 
 class SearchParams(BaseModel):
     """Base class for search parameters."""
 
-    query: Optional[str] = None
-    limit: int = 10
-    offset: int = 0
-    filters: Dict[str, Any] = {}
-    sort: Optional[Dict[str, str]] = None
+    model_config = ConfigDict(extra="ignore")
 
 
 class SearchResult(Generic[T]):
-    """Base class for search results.
+    """Search result container.
 
     Attributes:
-        items: List of found items
-        total: Total number of results found
-        limit: Limit used for the search
-        offset: Offset used for the search
-        params: Parameters used for the search
+        items: List of result items
+        total: Total number of results available on the server
+        limit: Maximum number of results per page
+        skip: Number of results to skip (for pagination)
+        params: Search parameters used for this search
     """
-
-    # To silence line-too-long (C0301) on line 39:
-    # pylint: disable=C0301
 
     def __init__(self,
                  items: List[T],
                  total: int,
                  limit: int,
-                 offset: int,
+                 skip: int,
                  params: Optional[SearchParams] = None):
-        # Fixed too many positional arguments by making params optional with default None
+        """Initialize a search result.
+
+        Args:
+            items: List of result items
+            total: Total number of results available
+            limit: Maximum number of results per page
+            skip: Number of results to skip (for pagination)
+            params: Search parameters used for this search
+        """
         self.items = items
         self.total = total
         self.limit = limit
-        self.offset = offset
+        self.skip = skip
         self.params = params
 
-    def __str__(self) -> str:
-        """Return string representation."""
-        return f"SearchResult(total={self.total}, items={len(self.items)})"
+    def __len__(self) -> int:
+        """Get the number of items in the result."""
+        return len(self.items)
 
-    def __repr__(self) -> str:
-        """Return representation string."""
-        return self.__str__()
+    def __getitem__(self, idx) -> T:
+        """Get an item by index."""
+        return self.items[idx]
+
+    def __iter__(self):
+        """Iterate through items."""
+        return iter(self.items)
 
 
-class BaseSearch(Generic[T]):
-    """Base class for all search operations.
+class BaseSearch(Generic[T], ABC):
+    """Base class for search operations.
 
-    Attributes:
-        client: Fusionbase client
-        result_class: Entity class for search results
+    This is used as a base class for all entity search implementations.
+    Search results now return LazyReference objects that are only loaded when accessed.
     """
 
-    def __init__(self, client, result_class: Type[T]):
-        """Initialize a search instance.
+    def __init__(self, client, entity_class):
+        """Initialize a base search instance.
 
         Args:
-            client: Fusionbase client
-            result_class: Entity class for search results
+            client: The client to use for API requests
+            entity_class: The class of entity being searched
         """
         self.client = client
-        self.result_class = result_class
-
-    def search(self, params: Optional[SearchParams] = None) -> SearchResult[T]:
-        """Perform a search operation.
-
-        Args:
-            params: Search parameters
-
-        Returns:
-            Search results
-
-        Raises:
-            APIError: If the search operation fails
-        """
-        # Implementation will be filled in by subclasses
-        raise NotImplementedError("search not implemented in base class")
-
-    async def asearch(self,
-                      params: Optional[SearchParams] = None) -> SearchResult[T]:
-        """Perform an async search operation.
-
-        Args:
-            params: Search parameters
-
-        Returns:
-            Search results
-
-        Raises:
-            APIError: If the search operation fails
-        """
-        # Implementation will be filled in by subclasses
-        raise NotImplementedError("asearch not implemented in base class")
+        self.entity_class = entity_class

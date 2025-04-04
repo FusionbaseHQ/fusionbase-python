@@ -1,6 +1,8 @@
 """Shared fixtures and configuration for tests."""
 
 import os
+import sys
+import traceback
 from unittest.mock import MagicMock
 
 import pytest
@@ -69,3 +71,19 @@ def test_location_data():
         "created_at": "2023-01-01T00:00:00.000000",
         "fb_datetime": "2023-01-01T00:00:00.000000"
     }
+
+
+def pytest_configure(config):
+    """Register custom markers."""
+    config.addinivalue_line("markers",
+                            "asyncio: mark a test as an asyncio coroutine")
+
+
+def pytest_exception_interact(node, call, report):
+    """Provide more details when tests fail."""
+    if report.failed:
+        print(f"\n=== DETAILED ERROR FOR: {node.nodeid} ===")
+        print(f"EXCEPTION: {call.excinfo.type.__name__}: {call.excinfo.value}")
+        print("\nTRACEBACK:")
+        traceback.print_tb(call.excinfo.tb)
+        print("\n")

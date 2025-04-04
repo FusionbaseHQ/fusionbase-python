@@ -12,6 +12,13 @@ class EntityType(str, Enum):
     EVENT = "event"
 
 
+class PersonSubtype(str, Enum):
+    """Subtypes of person entities."""
+
+    INDIVIDUAL = "INDIVIDUAL"
+    ANY = "ANY"
+
+
 class LocationSubtype(str, Enum):
     """Subtypes of location entities."""
 

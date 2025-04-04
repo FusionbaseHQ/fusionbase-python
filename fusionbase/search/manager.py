@@ -3,6 +3,8 @@
 from typing import Type
 
 from fusionbase.search.base import BaseSearch
+from fusionbase.search.location_search import LocationSearch
+from fusionbase.search.person_search import PersonSearch
 
 # For import outside toplevel:
 # pylint: disable=import-outside-toplevel
@@ -46,6 +48,16 @@ class SearchManager:
             A search manager for location entities
         """
         if self._locations is None:
-            from fusionbase.search.location_search import LocationSearch
             self._locations = LocationSearch(self._client)
         return self._locations
+
+    @property
+    def persons(self):
+        """Get the persons search.
+
+        Returns:
+            A search manager for person entities
+        """
+        if self._persons is None:
+            self._persons = PersonSearch(self._client)
+        return self._persons

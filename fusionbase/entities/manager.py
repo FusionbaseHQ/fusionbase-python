@@ -180,3 +180,16 @@ class EntityManager:
             from fusionbase.entities.location import Location
             self._locations = BaseEntityManager(self.client, Location)
         return self._locations
+
+    @property
+    def persons(self):
+        """Get the persons manager.
+
+        Returns:
+            A manager for person entities
+        """
+        if self._persons is None:
+            # Import here to avoid circular imports
+            from fusionbase.entities.person import Person
+            self._persons = BaseEntityManager(self.client, Person)
+        return self._persons
