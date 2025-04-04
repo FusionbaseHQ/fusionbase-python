@@ -35,15 +35,19 @@ jobs:
 
         - name: Lint with pylint
           run: |
-            poetry run pylint fusionbase tests --fail-on=E --fail-under=0.75
+            poetry run pylint fusionbase tests --fail-on=E --fail-under=7.5
+
+        - name: Check import sorting with isort
+          run: |
+            poetry run isort --check --profile google fusionbase/ tests/
 
         - name: Check formatting with yapf
           run: |
-            poetry run yapf -d -r fusionbase/ tests/
+            poetry run yapf --style google --diff --recursive fusionbase/ tests/
 
         - name: Run unit tests
           run: |
-            poetry run pytest -s --import-mode=append tests/
+            poetry run pytest --no-header --no-summary -xvs tests/
           env:
             FUSIONBASE_API_KEY: ${{ secrets.FUSIONBASE_API_KEY }}
             FUSIONBASE_API_URI: ${{ secrets.FUSIONBASE_API_URI }}
