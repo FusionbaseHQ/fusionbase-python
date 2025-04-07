@@ -108,14 +108,9 @@ class Person(Entity):
                                 "name":
                                     loc_data.get("formatted_address"),
                                 "metadata": {
-                                    "created_at":
-                                        loc_data.get("created_at"),
-                                    "updated_at":
-                                        loc_data.get("updated_at"),
-                                    "fb_datetime":
-                                        loc_data.get("fb_datetime"),
-                                    "fb_semantic_id":
-                                        loc_data.get("fb_semantic_id"),
+                                    "created_at": loc_data.get("created_at"),
+                                    "updated_at": loc_data.get("updated_at"),
+                                    "fb_datetime": loc_data.get("fb_datetime"),
                                 },
                                 "external_ids":
                                     loc_data.get("external_ids", {}),
@@ -127,8 +122,6 @@ class Person(Entity):
                                     loc_data.get("address_components", []),
                                 "alternative_names":
                                     loc_data.get("alternative_names", []),
-                                "fb_semantic_id":
-                                    loc_data.get("fb_semantic_id"),
                                 "formatted_address":
                                     loc_data.get("formatted_address"),
                             }

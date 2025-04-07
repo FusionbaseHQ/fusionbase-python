@@ -39,7 +39,6 @@ class Location(Entity):
         location_level: Hierarchical level of the location
         address_components: Detailed address components
         alternative_names: Alternative names for the location
-        fb_semantic_id: Semantic identifier for the location
         formatted_address: Human-readable address format
         entity_subtype: Type of location (e.g., CITY, STREET, etc.)
     """
@@ -49,7 +48,6 @@ class Location(Entity):
     location_level: Optional[str] = None
     address_components: List[AddressComponent] = []
     alternative_names: List[str] = []
-    fb_semantic_id: Optional[str] = None
     formatted_address: Optional[str] = None
 
     # Entity type information
@@ -231,14 +229,13 @@ class Location(Entity):
                 "created_at": data.get("created_at"),
                 "updated_at": data.get("updated_at"),
                 "fb_datetime": data.get("fb_datetime"),
-                "fb_semantic_id": data.get("fb_semantic_id"),
             },
             "external_ids": data.get("external_ids", {}),
             "coordinate": data.get("coordinate"),
             "location_level": data.get("location_level"),
             "address_components": data.get("address_components", []),
             "alternative_names": data.get("alternative_names", []),
-            "fb_semantic_id": data.get("fb_semantic_id"),
+            "": data.get(""),
             "formatted_address": data.get("formatted_address"),
             # Parse entity subtype as enum
             "entity_subtype": data.get("entity_subtype", LocationSubtype.ANY),
@@ -303,7 +300,6 @@ class Location(Entity):
                     "created_at": data.get("created_at"),
                     "updated_at": data.get("updated_at"),
                     "fb_datetime": data.get("fb_datetime"),
-                    "fb_semantic_id": data.get("fb_semantic_id"),
                 },
                 "external_ids":
                     data.get("external_ids", {}),
@@ -315,8 +311,6 @@ class Location(Entity):
                     data.get("address_components", []),
                 "alternative_names":
                     data.get("alternative_names", []),
-                "fb_semantic_id":
-                    data.get("fb_semantic_id"),
                 "formatted_address":
                     data.get("formatted_address"),
                 "entity_subtype":
