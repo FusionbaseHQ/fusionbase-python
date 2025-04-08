@@ -1,6 +1,11 @@
 """Base entity module for Fusionbase entities."""
 
-from typing import Any, ClassVar, Dict, List, Optional
+from __future__ import annotations
+
+from typing import Any, ClassVar, Dict, List, Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from fusionbase.entities.relation import Relation
 
 from pydantic import BaseModel
 from pydantic import ConfigDict
