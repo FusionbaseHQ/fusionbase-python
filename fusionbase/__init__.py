@@ -18,11 +18,13 @@ from fusionbase.search import OrganizationSearch
 from fusionbase.search import OrganizationSearchParams
 from fusionbase.search import PersonSearch
 from fusionbase.search import PersonSearchParams
+from fusionbase.search import RelationSearch
+from fusionbase.search import RelationSearchParams
 
 __all__ = [
     'Fusionbase', 'FusionbaseConfig', 'APIError', 'AuthenticationError',
     'AuthorizationError', 'FusionbaseError', 'ResourceNotFoundError',
     'ValidationError', 'LocationSearch', 'LocationSearchParams',
     'OrganizationSearch', 'OrganizationSearchParams', 'PersonSearch',
-    'PersonSearchParams'
+    'PersonSearchParams', 'RelationSearch', 'RelationSearchParams'
 ]

@@ -4,6 +4,7 @@ from fusionbase.entities.event import Event
 from fusionbase.entities.location import Location
 from fusionbase.entities.organization import Organization
 from fusionbase.entities.person import Person
+from fusionbase.entities.relation import Relation
 from fusionbase.managers.base_entity_manager import BaseEntityManager
 
 
@@ -73,6 +74,24 @@ class EventManager(BaseEntityManager[Event]):
 
     async def afrom_id(self, entity_id: str) -> Event:
         """Get an event asynchronously by its ID.
+
+        This overridden method provides better type hints for IDEs.
+        """
+        return await super().afrom_id(entity_id)
+
+
+class RelationManager(BaseEntityManager[Relation]):
+    """Manager for Relation entities with improved type hinting."""
+
+    def from_id(self, entity_id: str) -> Relation:
+        """Get a relation by its ID.
+
+        This overridden method provides better type hints for IDEs.
+        """
+        return super().from_id(entity_id)
+
+    async def afrom_id(self, entity_id: str) -> Relation:
+        """Get a relation asynchronously by its ID.
 
         This overridden method provides better type hints for IDEs.
         """

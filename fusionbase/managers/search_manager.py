@@ -5,6 +5,7 @@ from typing import Type, TypeVar
 from fusionbase.managers.search_wrappers import LocationSearch
 from fusionbase.managers.search_wrappers import OrganizationSearch
 from fusionbase.managers.search_wrappers import PersonSearch
+from fusionbase.managers.search_wrappers import RelationSearch
 from fusionbase.search.base import BaseSearch
 
 # Type parameter for better IDE support
@@ -31,14 +32,17 @@ class SearchManager:
         self._organizations = None
         self._persons = None
         self._events = None
+        self._relations = None
 
         # Initialize async search instances to None
         self._person_search = None
         self._org_search = None
         self._loc_search = None
+        self._rel_search = None
         self._async_person_search = None
         self._async_org_search = None
         self._async_loc_search = None
+        self._async_rel_search = None
 
     def register_search_class(self, search_type: str,
                               cls: Type[BaseSearch]) -> None:
@@ -83,6 +87,17 @@ class SearchManager:
             self._organizations = OrganizationSearch(self._client)
         return self._organizations
 
+    @property
+    def relations(self):
+        """Get the relations search.
+
+        Returns:
+            A search manager for relation entities
+        """
+        if self._relations is None:
+            self._relations = RelationSearch(self._client)
+        return self._relations
+
     # Add async methods directly on the SearchManager
     async def asearch_persons(self, params=None, **kwargs):
         """Search for persons asynchronously."""
@@ -101,3 +116,9 @@ class SearchManager:
         if self._async_loc_search is None:
             self._async_loc_search = LocationSearch(self._client)
         return await self._async_loc_search.asearch(params, **kwargs)
+
+    async def asearch_relations(self, params=None, **kwargs):
+        """Search for relations asynchronously."""
+        if self._async_rel_search is None:
+            self._async_rel_search = RelationSearch(self._client)
+        return await self._async_rel_search.asearch(params, **kwargs)

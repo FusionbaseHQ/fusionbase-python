@@ -4,6 +4,7 @@ from fusionbase.search.location_search import LocationSearch as BaseLocationSear
 from fusionbase.search.organization_search import \
     OrganizationSearch as BaseOrganizationSearch
 from fusionbase.search.person_search import PersonSearch as BasePersonSearch
+from fusionbase.search.relation_search import RelationSearch as BaseRelationSearch
 
 
 class LocationSearch(BaseLocationSearch):
@@ -16,3 +17,7 @@ class OrganizationSearch(BaseOrganizationSearch):
 
 class PersonSearch(BasePersonSearch):
     """Search manager for Person entities with improved type hinting."""
+
+
+class RelationSearch(BaseRelationSearch):
+    """Search manager for Relation entities with improved type hinting."""

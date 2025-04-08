@@ -31,6 +31,7 @@ class EntityManager:
         self._organizations = None
         self._persons = None
         self._events = None
+        self._relations = None
 
     def register_entity_class(self, entity_type: str, cls: Type[T]) -> None:
         """Register an entity class with the manager.
@@ -96,6 +97,20 @@ class EntityManager:
             from fusionbase.managers.entity_managers import EventManager
             self._events = EventManager(self.client, Event)
         return self._events
+
+    @property
+    def relations(self):
+        """Get the relations manager.
+
+        Returns:
+            A manager for relation entities
+        """
+        if self._relations is None:
+            # Import here to avoid circular imports
+            from fusionbase.entities.relation import Relation
+            from fusionbase.managers.entity_managers import RelationManager
+            self._relations = RelationManager(self.client, Relation)
+        return self._relations
 
     async def afrom_id(self, entity_type: str, entity_id: str) -> Entity:
         """Asynchronously get an entity by its type and ID.

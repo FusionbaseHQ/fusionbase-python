@@ -15,7 +15,7 @@ class TestPerson(unittest.TestCase):
 
     def setUp(self):
         """Set up test fixtures."""
-        self.valid_person_id = "e6ce61d930d72a0659c066fa37ca42c7"  # Sample person ID
+        self.valid_person_id = "2fde1bea7758bd19ddf4f00d8dc65497"  # Sample person ID
         self.invalid_person_id = "non_existing_id"
 
         # Use API key from environment or skip tests if not available
@@ -40,13 +40,13 @@ class TestPerson(unittest.TestCase):
             self.assertEqual(person.entity_subtype, PersonSubtype.INDIVIDUAL)
 
             # Test name components
-            self.assertEqual(person.name.given, "Patrick")
-            self.assertEqual(person.name.family, "Holl")
+            self.assertEqual(person.name.given, "Kevin")
+            self.assertEqual(person.name.family, "Goßling")
             self.assertIsNone(person.name.maiden)
 
             # Test property accessors
-            self.assertEqual(person.given_name, "Patrick")
-            self.assertEqual(person.family_name, "Holl")
+            self.assertEqual(person.given_name, "Kevin")
+            self.assertEqual(person.family_name, "Goßling")
 
             # Test home location if exists
             if person.home_location:
@@ -91,7 +91,7 @@ async def test_person_async_real_api():
     if not api_key:
         pytest.skip("FUSIONBASE_API_KEY environment variable not set")
 
-    valid_person_id = "e6ce61d930d72a0659c066fa37ca42c7"  # Sample person ID
+    valid_person_id = "2fde1bea7758bd19ddf4f00d8dc65497"  # Sample person ID
 
     # Create client with real API key
     client = Fusionbase(api_key=api_key)
@@ -102,8 +102,9 @@ async def test_person_async_real_api():
 
         # Verify key fields but not dynamic ones
         assert person.fb_entity_id == valid_person_id
-        assert person.given_name == "Patrick"
-        assert person.family_name == "Holl"
+        assert person.given_name == "Kevin"
+        assert person.family_name == "Goßling"
+        assert person.entity_subtype == PersonSubtype.INDIVIDUAL
 
     finally:
         # Close client

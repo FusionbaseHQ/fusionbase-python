@@ -70,9 +70,6 @@ class TestEvent(unittest.TestCase):
     def test_not_found_error_real_api(self):
         """Test real API error handling for non-existent event."""
 
-        # todo skip test as api is broken
-        self.skipTest("API is broken")
-
         if not self.api_key:
             self.skipTest("FUSIONBASE_API_KEY environment variable not set")
 

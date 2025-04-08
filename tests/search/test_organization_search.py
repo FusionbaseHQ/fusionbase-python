@@ -55,14 +55,6 @@ class TestOrganizationSearch(unittest.TestCase):
         self.assertIsInstance(organization, Organization)
         self.assertIsNotNone(organization.name)
 
-    def test_organization_search_with_filters(self):
-        """Test searching for organizations with filters."""
-        if not self.api_key:
-            self.skipTest("FUSIONBASE_API_KEY environment variable not set")
-
-        # not implemented yet
-        self.skipTest("Filters not implemented yet")
-
     def test_organization_search_with_postal_code(self):
         """Test searching for organizations with postal code."""
         if not self.api_key:
@@ -154,14 +146,28 @@ async def test_organization_search_async():
 
 
 @pytest.mark.asyncio
-async def test_organization_search_async_with_filters():
-    """Test async organization searching with filters."""
+async def test_organization_search_async_with_postal_code():
+    """Test async organization searching with postal code."""
     api_key = os.environ.get("FUSIONBASE_API_KEY")
     if not api_key:
         pytest.skip("FUSIONBASE_API_KEY environment variable not set")
 
-    # skip as not implemented yet
-    pytest.skip("Filters not implemented yet")
+    # Create client with real API key - no need for separate async client
+    client = Fusionbase(api_key=api_key)
+
+    try:
+        # Search with postal code filter
+        params = OrganizationSearchParams(
+            q="GmbH", filters={FilterKey.POSTAL_CODE: "80992"})
+        results = await client.search.organizations.asearch(params)
+
+        # We don't assert on result count as it depends on the data
+        assert results is not None
+
+    finally:
+        # Close client
+        await client.aclose()
+        client.close()
 
 
 @pytest.mark.asyncio

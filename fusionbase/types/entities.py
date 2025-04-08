@@ -10,6 +10,8 @@ class EntityType(str, Enum):
     PERSON = "person"
     LOCATION = "location"
     EVENT = "event"
+    RELATION = "relation"
+    FEATURE = "feature"  # Added Feature entity type
 
 
 class PersonSubtype(str, Enum):

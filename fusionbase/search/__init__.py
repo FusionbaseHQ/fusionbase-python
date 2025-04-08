@@ -8,12 +8,16 @@ from fusionbase.search.organization_search import OrganizationSearch
 from fusionbase.search.organization_search import OrganizationSearchParams
 from fusionbase.search.person_search import PersonSearch
 from fusionbase.search.person_search import PersonSearchParams
+from fusionbase.search.relation_search import RelationSearch
+from fusionbase.search.relation_search import RelationSearchParams
 
 __all__ = [
     'LocationSearch',
     'OrganizationSearch',
     'PersonSearch',
+    'RelationSearch',
     'LocationSearchParams',
     'OrganizationSearchParams',
     'PersonSearchParams',
+    'RelationSearchParams',
 ]
