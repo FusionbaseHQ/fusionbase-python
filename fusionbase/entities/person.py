@@ -41,15 +41,9 @@ class Source(BaseModel):
 
     Attributes:
         id: Source identifier
-
-    Known source IDs:
-        data_sources/1051122944: German Business Registry
-        data_sources/1784627846: UK Business Registry
     """
 
     id: Optional[str] = None
-    GERMAN_BUSINESS_REGISTRY: ClassVar[str] = "data_sources/1051122944"
-    UK_BUSINESS_REGISTRY: ClassVar[str] = "data_sources/1784627846"
 
 
 class Person(Entity):

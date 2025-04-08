@@ -3,7 +3,7 @@
 import asyncio
 from datetime import datetime
 import inspect
-from typing import Any, ClassVar, List, Optional, Type
+from typing import Any, ClassVar, Dict, List, Optional, Type, Union
 
 import httpx
 from pydantic import BaseModel
@@ -14,6 +14,7 @@ from fusionbase.entities.base import Entity
 from fusionbase.exceptions import APIError
 from fusionbase.exceptions import parse_error_response
 from fusionbase.exceptions import ResourceNotFoundError
+from fusionbase.exceptions import ValidationError
 from fusionbase.types.entities import EntityType
 
 
@@ -34,11 +35,103 @@ class ParameterDefinition(BaseModel):
     required: bool = False
     default: Optional[Any] = None
 
+    def validate_value(self, value: Any) -> Any:
+        """Validate a parameter value against this definition.
+
+        Args:
+            value: The value to validate
+
+        Returns:
+            The validated value (possibly converted to the correct type)
+
+        Raises:
+            ValidationError: If validation fails
+        """
+        if self.name is None:
+            return value  # Can't validate without a name
+
+        # Check if required parameter is missing
+        if self.required and value is None:
+            raise ValidationError(f"Parameter '{self.name}' is required")
+
+        # If value is None but parameter has default, use default
+        if value is None and self.default is not None:
+            return self.default
+
+        # If value is None and not required, it's valid
+        if value is None and not self.required:
+            return None
+
+        # Validate type based on the 'type' field (if provided)
+        if self.type is not None and value is not None:
+            try:
+                # Map string types to Python types
+                # TODO: verify if these are the correct types in the api or not !!
+                type_map = {
+                    "string": str,
+                    "str": str,
+                    "integer": int,
+                    "int": int,
+                    "float": float,
+                    "boolean": bool,
+                    "bool": bool,
+                    "array": list,
+                    "list": list,
+                    "object": dict,
+                    "dict": dict
+                }
+
+                # Get the expected Python type
+                expected_type = type_map.get(self.type.lower())
+                if expected_type and not isinstance(value, expected_type):
+                    # Try to convert value to expected type
+                    return expected_type(value)
+            except (ValueError, TypeError) as e:
+                raise ValidationError(
+                    f"Parameter '{self.name}' has invalid type. Expected {self.type}, got {type(value).__name__}"
+                ) from e
+
+        return value
+
 
 class RelationResolveConfig(BaseModel):
     """Configuration for resolving relations."""
 
     parameter_definition: List[ParameterDefinition] = []
+
+    def validate_parameters(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+        """Validate parameters against the parameter definitions.
+
+        Args:
+            parameters: Parameters to validate
+
+        Returns:
+            Validated parameters
+
+        Raises:
+            ValidationError: If validation fails
+        """
+        if not self.parameter_definition:
+            return parameters  # No definitions to validate against
+
+        validated_params = {}
+
+        # First check all required parameters are present
+        for param_def in self.parameter_definition:
+            if param_def.name is None:
+                continue
+
+            param_name = param_def.name
+            param_value = parameters.get(param_name)
+
+            # Validate the parameter value
+            validated_value = param_def.validate_value(param_value)
+
+            # Only add non-None values to keep the request payload clean
+            if validated_value is not None:
+                validated_params[param_name] = validated_value
+
+        return validated_params
 
 
 class RelationMeta(BaseModel):
@@ -60,7 +153,7 @@ class Relation(Entity):
         model_from: The entity type where the relation starts
         model_to: The entity type where the relation ends
         meta: Additional metadata about the relation
-        resolve: Configuration for resolving the relation
+        resolve_config: Configuration for resolving the relation
     """
 
     # Direct API response fields
@@ -70,13 +163,17 @@ class Relation(Entity):
     model_from: Optional[EntityType] = None
     model_to: Optional[EntityType] = None
     meta: Optional[RelationMeta] = None
-    resolve: Optional[RelationResolveConfig] = None
+    resolve_config: Optional[
+        RelationResolveConfig] = None  # Renamed from resolve to resolve_config
 
     # Entity type information
     entity_type: ClassVar[EntityType] = EntityType.RELATION
 
     # Default for fb_entity_version to handle search results
     fb_entity_version: str = ""
+
+    # Store client reference for resolving relations
+    _client: Any = None
 
     @model_validator(mode='before')
     @classmethod
@@ -111,6 +208,10 @@ class Relation(Entity):
                     # If conversion fails, keep as is - will be validated by Pydantic
                     pass
 
+            # Handle the renamed attribute in the incoming data
+            if 'resolve' in data:
+                data['resolve_config'] = data.pop('resolve')
+
         return data
 
     @property
@@ -143,11 +244,7 @@ class Relation(Entity):
         return self.fb_entity_id
 
     def get_from_entity_class(self) -> Optional[Type[Entity]]:
-        """Get the entity class for the model_from type.
-
-        Returns:
-            The entity class corresponding to model_from, or None if unavailable
-        """
+        """Get the entity class for the model_from type."""
         if not self.model_from:
             return None
 
@@ -170,11 +267,7 @@ class Relation(Entity):
         return entity_map.get(self.model_from)
 
     def get_to_entity_class(self) -> Optional[Type[Entity]]:
-        """Get the entity class for the model_to type.
-
-        Returns:
-            The entity class corresponding to model_to, or None if unavailable
-        """
+        """Get the entity class for the model_to type."""
         if not self.model_to:
             return None
 
@@ -198,21 +291,7 @@ class Relation(Entity):
 
     @classmethod
     def _from_id(cls, client, entity_id: str) -> "Relation":
-        """Internal method to create a Relation instance by fetching it from the API.
-
-        Args:
-            client: The Fusionbase client
-            entity_id: ID of the relation to fetch
-
-        Returns:
-            A Relation instance
-
-        Raises:
-            ResourceNotFoundError: If the relation doesn't exist
-            AuthenticationError: If authentication fails
-            AuthorizationError: If the user is not authorized
-            APIError: For other API errors
-        """
+        """Internal method to create a Relation instance by fetching it from the API."""
         # Use the request method with retry if available
         if hasattr(client, "request"):
             try:
@@ -276,14 +355,19 @@ class Relation(Entity):
             "model_from": data.get("model_from"),
             "model_to": data.get("model_to"),
             "meta": data.get("meta"),
-            "resolve": data.get("resolve"),
+            "resolve_config":
+                data.get("resolve"),  # Renamed from resolve to resolve_config
             "metadata": {
                 "created_at": data.get("created_at"),
                 "updated_at": data.get("updated_at"),
             },
         }
 
-        return cls.model_validate(relation_data)
+        # Create the relation instance
+        relation = cls.model_validate(relation_data)
+        # Store the client for later use with resolve methods
+        relation._client = client
+        return relation
 
     @classmethod
     async def _afrom_id(cls, client, entity_id: str) -> "Relation":
@@ -343,15 +427,20 @@ class Relation(Entity):
                     data.get("model_to"),
                 "meta":
                     data.get("meta"),
-                "resolve":
-                    data.get("resolve"),
+                "resolve_config":
+                    data.get("resolve"
+                            ),  # Renamed from resolve to resolve_config
                 "metadata": {
                     "created_at": data.get("created_at"),
                     "updated_at": data.get("updated_at"),
                 },
             }
 
-            return cls.model_validate(relation_data)
+            # Create the relation instance
+            relation = cls.model_validate(relation_data)
+            # Store the client for later use with resolve methods
+            relation._client = client
+            return relation
 
         except ResourceNotFoundError as e:
             # Make the error more specific to relations
@@ -365,3 +454,155 @@ class Relation(Entity):
                 raise parse_error_response(e.response) from e
             raise APIError(("Failed to retrieve relation "
                             f"(ID: {entity_id}): {e}"), 500) from e
+
+    def resolve(self,
+                entity: Union[Entity, str],
+                parameters: Optional[Dict[str, Any]] = None,
+                **kwargs) -> Any:
+        """Resolve this relation with the given entity.
+
+        Args:
+            entity: An entity instance or entity ID to resolve the relation with
+            parameters: Optional parameters required by the relation as a dictionary
+            **kwargs: Additional parameters as keyword arguments
+
+        Returns:
+            The resolved relation data
+
+        Raises:
+            ValidationError: If parameter validation fails
+            ResourceNotFoundError: If the entity or relation doesn't exist
+            APIError: For other API errors
+        """
+        # Extract entity ID from object or use string directly
+        if isinstance(entity, Entity):
+            entity_id = entity.fb_entity_id
+        else:
+            entity_id = str(entity)
+
+        # Get relation ID
+        relation_id = self.relation_id
+
+        # Merge parameters from dict and kwargs
+        all_params = {}
+        if parameters:
+            all_params.update(parameters)
+        if kwargs:
+            all_params.update(kwargs)
+
+        # Validate parameters if we have parameter definitions
+        validated_params = {}
+        if all_params and self.resolve_config and self.resolve_config.parameter_definition:
+            validated_params = self.resolve_config.validate_parameters(
+                all_params)
+
+        # Use the appropriate client method based on what's available
+        if hasattr(self, "_client") and self._client:
+            client = self._client
+        elif hasattr(Entity, "_current_client") and Entity._current_client:
+            client = Entity._current_client
+        else:
+            from fusionbase.core.context import get_current_client
+            client = get_current_client()
+            if client is None:
+                raise APIError(
+                    "No client available. Please provide a client or use with statement."
+                )
+
+        # Always use POST, not GET - even for empty params
+        data = client.request(
+            "POST",
+            f"relation/resolve/{relation_id}/{entity_id}",
+            json=validated_params or {}  # Send empty dict if no parameters
+        )
+
+        return data
+
+    async def aresolve(self,
+                       entity: Union[Entity, str],
+                       parameters: Optional[Dict[str, Any]] = None,
+                       **kwargs) -> Any:
+        """Asynchronously resolve this relation with the given entity.
+
+        Args:
+            entity: An entity instance or entity ID to resolve the relation with
+            parameters: Optional parameters required by the relation as a dictionary
+            **kwargs: Additional parameters as keyword arguments
+
+        Returns:
+            The resolved relation data
+
+        Raises:
+            ValidationError: If parameter validation fails
+            ResourceNotFoundError: If the entity or relation doesn't exist
+            APIError: For other API errors
+        """
+        # Extract entity ID from object or use string directly
+        if isinstance(entity, Entity):
+            entity_id = entity.fb_entity_id
+        else:
+            entity_id = str(entity)
+
+        # Get relation ID
+        relation_id = self.relation_id
+
+        # Merge parameters from dict and kwargs
+        all_params = {}
+        if parameters:
+            all_params.update(parameters)
+        if kwargs:
+            all_params.update(kwargs)
+
+        # Validate parameters if we have parameter definitions
+        validated_params = {}
+        if all_params and self.resolve_config and self.resolve_config.parameter_definition:
+            validated_params = self.resolve_config.validate_parameters(
+                all_params)
+
+        # Use the appropriate client method based on what's available
+        client = None
+        if hasattr(self, "_client") and self._client:
+            client = self._client
+        elif hasattr(Entity, "_current_client") and Entity._current_client:
+            client = Entity._current_client
+        else:
+            from fusionbase.core.context import get_current_client
+            client = get_current_client()
+            if client is None:
+                raise APIError(
+                    "No client available. Please provide a client or use with statement."
+                )
+
+        # Try different async methods depending on client capabilities
+        if hasattr(client, "arequest"):
+            # Always use POST, not GET - even for empty params
+            data = await client.arequest(
+                "POST",
+                f"relation/resolve/{relation_id}/{entity_id}",
+                json=validated_params or {}  # Send empty dict if no parameters
+            )
+        elif hasattr(client, "aget"):
+            # Use apost with the correct method
+            data = await client.apost(
+                f"relation/resolve/{relation_id}/{entity_id}",
+                json=validated_params or {})
+        elif hasattr(client, "_async_http_client"):
+            # Direct use of async HTTP client
+            response = await client._async_http_client.post(
+                f"relation/resolve/{relation_id}/{entity_id}",
+                json=validated_params or {})
+            response.raise_for_status()
+            data = response.json()
+        else:
+            # Fall back to sync method through asyncio.to_thread
+            if hasattr(client, "request") and not inspect.iscoroutinefunction(
+                    client.request):
+                return await asyncio.to_thread(self.resolve, entity, parameters,
+                                               **kwargs)
+
+            # No suitable async method found, raise an error
+            raise APIError(
+                f"No suitable async method found to resolve relation (ID: {relation_id})",
+                status_code=500)
+
+        return data

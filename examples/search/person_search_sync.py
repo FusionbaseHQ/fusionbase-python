@@ -78,8 +78,8 @@ def main():  # pylint: disable=too-many-statements
         print("\n2. Search for persons from German Business Registry...")
         params = PersonSearchParams(
             q="Müller",
-            source_key=Source.GERMAN_BUSINESS_REGISTRY.rsplit(
-                '/', maxsplit=1)[-1])  # Fixed rsplit
+            source_key='1051122944',
+        )
         results = client.search.persons.search(params)
         print(
             f"Found {len(results.items)} results from German Business Registry")

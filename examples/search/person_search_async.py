@@ -62,16 +62,12 @@ async def run_person_search():
         print("\n2. Parallel searches across different business registries...")
 
         # Create search tasks for different registries
-        german_params = PersonSearchParams(
-            q="Müller",
-            source_key=Source.GERMAN_BUSINESS_REGISTRY.rsplit(
-                '/', maxsplit=1)[-1],  # Fixed rsplit
-            limit=10)
-        uk_params = PersonSearchParams(
-            q="Smith",
-            source_key=Source.UK_BUSINESS_REGISTRY.rsplit(
-                '/', maxsplit=1)[-1],  # Fixed rsplit
-            limit=10)
+        german_params = PersonSearchParams(q="Müller",
+                                           source_key="1051122944",
+                                           limit=10)
+        uk_params = PersonSearchParams(q="Smith",
+                                       source_key='1784627846',
+                                       limit=10)
 
         # Execute both searches in parallel
         german_task = client.search.persons.asearch(german_params)

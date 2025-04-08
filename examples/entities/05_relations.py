@@ -12,7 +12,6 @@ import sys
 import traceback
 
 from fusionbase import Fusionbase
-from fusionbase.types.entities import EntityType
 
 
 def main():
@@ -66,14 +65,6 @@ def main():
                     print(f"    - {param.name} (Required: {param.required})")
             else:
                 print("  No parameters required for resolution")
-
-            # Example of how to use resolve if there were a from_entity
-            print("\n  Example of how to resolve (pseudocode):")
-            print("  result = relation.resolve(from_entity)")
-            print("  # For async:")
-            print("  result = await relation.aresolve(from_entity)")
-        else:
-            print("  Can be resolved: No")
 
         # Example 4: Inspect metadata
         print("\n4. Relation metadata:")

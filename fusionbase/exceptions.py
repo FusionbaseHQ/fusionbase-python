@@ -5,6 +5,17 @@
 class FusionbaseError(Exception):
     """Base exception for Fusionbase SDK."""
 
+    def __init__(self, message, status_code=None, **kwargs):
+        """Initialize with a message and optional status code.
+
+        Args:
+            message: The error message
+            status_code: Optional HTTP status code
+        """
+        self.message = message
+        self.status_code = status_code
+        super().__init__(message)
+
 
 class InvalidArgumentError(FusionbaseError):
     """Exception raised for invalid arguments."""
@@ -29,7 +40,6 @@ class ResourceNotFoundError(FusionbaseError):
         self.resource_type = resource_type
         self.resource_id = resource_id
         self.response = response
-        self.status_code = 404
 
         if message:
             self.message = message
@@ -38,7 +48,8 @@ class ResourceNotFoundError(FusionbaseError):
         else:
             self.message = "Resource not found"
 
-        super().__init__(self.message)
+        # Pass status_code=404 to parent constructor to ensure it's properly set
+        super().__init__(self.message, status_code=404)
 
 
 class AuthenticationError(FusionbaseError):
@@ -81,11 +92,18 @@ class APIError(FusionbaseError):
             operation_id: The operation ID
             response: The raw response
         """
-        self.status_code = status_code
         self.request_id = request_id
         self.operation_id = operation_id
         self.response = response
-        super().__init__(message)
+        super().__init__(message, status_code=status_code)
+
+
+class ValidationError(FusionbaseError):
+    """Exception raised when validation fails."""
+
+    def __init__(self, message: str):
+        """Initialize with a message."""
+        super().__init__(message, status_code=400)
 
 
 def handle_http_error(error):
