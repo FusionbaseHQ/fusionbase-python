@@ -103,9 +103,14 @@ class LocationSearch(BaseSearch[Location]):
 
     async def _fetch_async_data(self, params, query_params):
         """Helper to reduce branches for asearch."""
-        if hasattr(self.client, "async_client"):
-            return await self.client.async_client.request(
-                "GET", "search/entities/location", params=query_params)
+        # Use appropriate async client method
+        if hasattr(self.client, "arequest"):
+            return await self.client.arequest("GET",
+                                              "search/entities/location",
+                                              params=query_params)
+        if hasattr(self.client, "aget"):
+            return await self.client.aget("search/entities/location",
+                                          params=query_params)
         if hasattr(self.client, "amake_request"):
             return await self.client.amake_request("search/entities/location",
                                                    params=query_params)

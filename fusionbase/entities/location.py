@@ -9,12 +9,12 @@ from pydantic import BaseModel
 from pydantic import model_validator
 
 from fusionbase.entities.base import Entity
-from fusionbase.entities.types import AddressComponentType
-from fusionbase.entities.types import EntityType
-from fusionbase.entities.types import LocationSubtype
 from fusionbase.exceptions import APIError
 from fusionbase.exceptions import parse_error_response
 from fusionbase.exceptions import ResourceNotFoundError
+from fusionbase.types.entities import AddressComponentType
+from fusionbase.types.entities import EntityType
+from fusionbase.types.entities import LocationSubtype
 
 
 class Coordinate(BaseModel):
@@ -248,12 +248,9 @@ class Location(Entity):
         """Create Location instance by async fetching."""
         try:
             data = None
-            # Use async client if available
-            if hasattr(client, "async_client") and client.async_client:
-                # Get async client
-                async_client = client.async_client
-                data = await async_client.request(
-                    "GET", f"entities/location/get/{entity_id}")
+            # Try direct async methods on the client
+            if hasattr(client, "aget"):
+                data = await client.aget(f"entities/location/get/{entity_id}")
             # Use arequest method if available
             elif hasattr(client, "arequest"):
                 data = await client.arequest(
@@ -270,7 +267,6 @@ class Location(Entity):
                 data = response.json()
             else:
                 # Fall back to sync method through asyncio.to_thread
-                # BUT only if the client's request method is not async
                 if hasattr(client,
                            "request") and not inspect.iscoroutinefunction(
                                client.request):
@@ -278,6 +274,7 @@ class Location(Entity):
                                                    entity_id)
                     return data  # Return early as we already have a Location instance
 
+                # No suitable async method found, raise an error
                 raise APIError(
                     f"No suitable async method found to fetch location (ID: {entity_id})",
                     status_code=500)

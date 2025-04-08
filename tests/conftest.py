@@ -8,7 +8,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from fusionbase import Fusionbase
-from fusionbase.config import FusionbaseConfig
+from fusionbase.core.config import FusionbaseConfig
 
 
 @pytest.fixture

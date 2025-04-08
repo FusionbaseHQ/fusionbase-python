@@ -1,0 +1,202 @@
+"""Type definitions for Fusionbase entities."""
+
+from enum import Enum
+
+
+class EntityType(str, Enum):
+    """Types of entities in the Fusionbase system."""
+
+    ORGANIZATION = "organization"
+    PERSON = "person"
+    LOCATION = "location"
+    EVENT = "event"
+
+
+class PersonSubtype(str, Enum):
+    """Subtypes of person entities."""
+
+    INDIVIDUAL = "INDIVIDUAL"
+    ANY = "ANY"
+
+
+class OrganizationSubtype(str, Enum):
+    """Subtypes of organization entities."""
+
+    CORPORATION = "CORPORATION"
+    ANY = "ANY"
+
+
+class OrganizationStatus(str, Enum):
+    """Status of an organization."""
+
+    UNKNOWN = "UNKNOWN"
+    INACTIVE = "INACTIVE"
+    ACTIVE = "ACTIVE"
+    LIQUIDATED = "LIQUIDATED"
+    DISSOLVED = "DISSOLVED"
+    LIQUIDATION = "LIQUIDATION"
+    RECEIVER_ACTION = "RECEIVER_ACTION"
+    CONVERTED_CLOSED = "CONVERTED_CLOSED"
+    VOLUNTARY_ARRANGEMENT = "VOLUNTARY_ARRANGEMENT"
+    INSOLVENCY_PROCEEDINGS = "INSOLVENCY_PROCEEDINGS"
+    IN_ADMINISTRATION = "IN_ADMINISTRATION"
+    CLOSED = "CLOSED"
+    OPEN = "OPEN"
+    REGISTERED = "REGISTERED"
+    OPERATIONAL = "OPERATIONAL"
+    CLOSED_TEMPORARILY = "CLOSED_TEMPORARILY"
+    CLOSED_PERMANENTLY = "CLOSED_PERMANENTLY"
+
+
+class OrganizationStatusDetail(str, Enum):
+    """Detailed status information for organizations."""
+
+    ACTIVE_PROPOSAL_TO_STRIKE_OFF = "ACTIVE_PROPOSAL_TO_STRIKE_OFF"
+    CONVERTED_TO_PLC = "CONVERTED_TO_PLC"
+    CONVERTED_TO_UK_SOCIETAS = "CONVERTED_TO_UK_SOCIETAS"
+    CONVERTED_TO_UKEIG = "CONVERTED_TO_UKEIG"
+    TRANSFER_FROM_UK = "TRANSFER_FROM_UK"
+    TRANSFORMED_TO_SE = "TRANSFORMED_TO_SE"
+
+
+class LocationSubtype(str, Enum):
+    """Subtypes of location entities."""
+
+    POINT_OF_INTEREST = "POINT_OF_INTEREST"
+    LOCALITY = "LOCALITY"
+    STREET = "STREET"
+    POSTAL_CODE = "POSTAL_CODE"
+    CITY_POSTAL_CODE = "CITY_POSTAL_CODE"
+    CITY_NO_POSTAL_CODE = "CITY_NO_POSTAL_CODE"
+    ADMINISTRATIVE_AREA = "ADMINISTRATIVE_AREA"
+    COUNTY = "COUNTY"
+    STATE = "STATE"
+    COUNTRY = "COUNTRY"
+    ANY = "ANY"
+
+
+class AddressComponentType(str, Enum):
+    """Types of address components."""
+
+    COUNTRY = "country"
+    POSTAL_CODE = "postal_code"
+    CITY = "city"
+    STREET = "street"
+    STATE = "state"
+    HOUSE_NUMBER = "house_number"
+    COUNTY = "county"
+
+
+class EventSubtype(str, Enum):
+    """Subtypes of event entities."""
+
+    NATURAL = "NATURAL"
+    CYBER_SECURITY = "CYBER_SECURITY"
+    CONFLICT = "CONFLICT"
+    PUBLICATION = "PUBLICATION"
+    ANY = "ANY"
+
+
+class EventStatus(str, Enum):
+    """Status of an event."""
+
+    ISSUED = "ISSUED"
+    ONGOING = "ONGOING"
+    CANCELLED = "CANCELLED"
+    FINISHED = "FINISHED"
+    UNKNOWN = "UNKNOWN"
+
+
+class PublicationEventCategory(str, Enum):
+    """Categories for publication events."""
+
+    NAME_CHANGE = "NAME_CHANGE"
+    LEGAL_FORM_CHANGE = "LEGAL_FORM_CHANGE"
+    PURPOSE_CHANGE = "PURPOSE_CHANGE"
+    COURT_CHANGE = "COURT_CHANGE"
+    SEAT_CHANGE = "SEAT_CHANGE"
+    ADDRESS_CHANGE = "ADDRESS_CHANGE"
+    STATUS_CHANGE = "STATUS_CHANGE"
+    CAPITAL_CHANGE = "CAPITAL_CHANGE"
+    REPRESENTATION_SCHEME_CHANGE = "REPRESENTATION_SCHEME_CHANGE"
+
+    ACCOUNTS_CHANGE = "OTHER_ACCOUNTS_CHANGE"
+    ANNUAL_RETURN_CHANGE = "OTHER_ANNUAL_RETURN_CHANGE"
+    FILING_STATUS_CHANGE = "OTHER_CAN_FILE_CHANGE"
+    CESSATION_DATE_CHANGE = "OTHER_CESSATION_DATE_CHANGE"
+    CONFIRMATION_STATEMENT_CHANGE = "OTHER_CONFIRMATION_STATEMENT_CHANGE"
+    FOREIGN_COMPANY_DETAILS_CHANGE = "OTHER_FOREIGN_COMPANY_DETAILS_CHANGE"
+    CHARGES_STATUS_CHANGE = "OTHER_HAS_CHARGES_CHANGE"
+    INSOLVENCY_HISTORY_CHANGE = "OTHER_HAS_INSOLVENCY_HISTORY_CHANGE"
+    INDUSTRY_CODES_CHANGE = "OTHER_INDUSTRY_CODES_CHANGE"
+    LAST_FULL_MEMBERS_LIST_DATE_CHANGE = "OTHER_LAST_FULL_MEMBERS_LIST_DATE_CHANGE"
+    PREVIOUS_NAMES_WITH_DATES_CHANGE = "OTHER_PREVIOUS_NAMES_WITH_DATES_CHANGE"
+    OFFICE_IN_DISPUTE_CHANGE = "OTHER_REGISTERED_OFFICE_IS_IN_DISPUTE_CHANGE"
+    SERVICE_ADDRESS_CHANGE = "OTHER_SERVICE_ADDRESS_CHANGE"
+    STATUS_DETAIL_CHANGE = "OTHER_STATUS_DETAIL_CHANGE"
+    DELIVERABILITY_STATUS_CHANGE = "OTHER_UNDELIVERABLE_REGISTERED_OFFICE_ADDRESS_CHANGE"
+
+    # Member events
+    MEMBER_ENTRY = "MEMBER_ENTRY"
+    MEMBER_EXIT_POSITION = "MEMBER_EXIT_POSITION"
+    MEMBER_ENTRY_EXIT = "MEMBER_ENTRY_EXIT"
+    MEMBER_NEW_POSITION = "MEMBER_NEW_POSITION"
+    MEMBER_RETURN = "MEMBER_RETURN"
+    MEMBER_CHANGE = "MEMBER_CHANGE"
+    MEMBER_EXIT_UNKNOWN = "MEMBER_EXIT_UNKNOWN"
+
+
+class NaturalEventCategory(str, Enum):
+    """Categories for natural events."""
+
+    FLOODING = "FLOODING"
+    EARTHQUAKE = "EARTHQUAKE"
+    WILDFIRE = "WILDFIRE"
+    TORNADO = "TORNADO"
+    HURRICANE = "HURRICANE"
+    TSUNAMI = "TSUNAMI"
+    DROUGHT = "DROUGHT"
+    LANDSLIDE = "LANDSLIDE"
+    AVALANCHE = "AVALANCHE"
+    VOLCANIC_ERUPTION = "VOLCANIC_ERUPTION"
+
+
+class CyberSecurityEventCategory(str, Enum):
+    """Categories for cybersecurity events."""
+
+    PHISHING = "PHISHING"
+    MALWARE = "MALWARE"
+    DDOS = "DDOS"
+    RANSOMWARE = "RANSOMWARE"
+    INSIDER_THREAT = "INSIDER_THREAT"
+    SOCIAL_ENGINEERING = "SOCIAL_ENGINEERING"
+    ADVANCED_PERSISTENT_THREAT = "ADVANCED_PERSISTENT_THREAT"
+    NETWORK_DENIAL_OF_SERVICE = "NETWORK_DENIAL_OF_SERVICE"
+
+
+class ConflictEventCategory(str, Enum):
+    """Categories for conflict events."""
+
+    POLITICAL_VIOLENCE = "POLITICAL_VIOLENCE"
+    ARMED = "ARMED"
+    CIVIL_UNREST = "CIVIL_UNREST"
+    TERRORISM = "TERRORISM"
+
+
+class FilterKey(str, Enum):
+    """Valid filter keys for entity searches."""
+
+    ACTIVE = "active"
+    STATUS = "status"
+    REGISTRATION_AUTHORITY_ENTITY_NAME = "registration_authority_entity_name"
+    REGISTRATION_AUTHORITY_ID = "registration_authority_id"
+    SOURCE_ID = "source_id"
+    REGISTRATION_TYPE = "registration_type"
+    REGISTRATION_NUMBER = "registration_number"
+    COUNTRY = "country"
+    STATE = "state"
+    COUNTY = "county"
+    CITY = "city"
+    POSTAL_CODE = "postal_code"
+    STREET = "street"
+    HOUSE_NUMBER = "house_number"

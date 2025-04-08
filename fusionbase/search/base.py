@@ -1,12 +1,15 @@
 """Base classes for search functionality."""
 
 from abc import ABC
-from typing import Generic, List, Optional, TypeVar  # Removed unused Any import
+from typing import Any, Generic, List, Optional, Type, TypeVar
 
 from pydantic import BaseModel
 from pydantic import ConfigDict
 
-T = TypeVar('T')
+# Make the type parameter have a more restrictive bound for better typing
+from fusionbase.entities.base import Entity
+
+T = TypeVar('T', bound=Entity)
 
 
 class SearchParams(BaseModel):
@@ -27,7 +30,7 @@ class SearchResult(Generic[T]):
     """
 
     def __init__(self,
-                 items: List[T],
+                 items: List[Any],
                  total: int,
                  limit: int,
                  skip: int,
@@ -51,7 +54,7 @@ class SearchResult(Generic[T]):
         """Get the number of items in the result."""
         return len(self.items)
 
-    def __getitem__(self, idx) -> T:
+    def __getitem__(self, idx) -> Any:
         """Get an item by index."""
         return self.items[idx]
 
@@ -67,7 +70,7 @@ class BaseSearch(Generic[T], ABC):
     Search results now return LazyReference objects that are only loaded when accessed.
     """
 
-    def __init__(self, client, entity_class):
+    def __init__(self, client: Any, entity_class: Type[T]):
         """Initialize a base search instance.
 
         Args:

@@ -63,16 +63,14 @@ async def test_person_search_async():
 
     # Create client with real API key
     client = Fusionbase(api_key=api_key)
-    # Get the async client explicitly
-    async_client = client.async_client
 
     try:
         # Search for a person asynchronously
         params = PersonSearchParams(q="Patrick")
 
         try:
-            # Use async client's search manager
-            results = await async_client.search.persons.asearch(params)
+            # Use async methods directly on the client
+            results = await client.search.persons.asearch(params)
 
             # Verify we have results
             assert len(results.items) > 0
@@ -89,5 +87,6 @@ async def test_person_search_async():
             pytest.fail(f"Async search failed with error: {e}")
 
     finally:
-        # Close client
+        # Close client (close both sync and async resources)
+        await client.aclose()
         client.close()

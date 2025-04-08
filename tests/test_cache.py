@@ -8,9 +8,9 @@ import unittest
 import pytest
 
 from fusionbase import Fusionbase
-from fusionbase.cache import FusionbaseCache
-from fusionbase.config import CacheConfig
-from fusionbase.config import FusionbaseConfig
+from fusionbase.core.cache import FusionbaseCache
+from fusionbase.core.config import CacheConfig
+from fusionbase.core.config import FusionbaseConfig
 
 
 class TestFusionbaseCache(unittest.TestCase):
@@ -126,22 +126,19 @@ async def test_client_caching():
         # Results should be identical
         assert result1 == result2
 
-        # Check if the async client also uses cache
-        async_client = client.async_client
-
         # Make the same request asynchronously, should use cache
-        result3 = await async_client.request("GET",
-                                             "search/entities/person",
-                                             params={
-                                                 "q": "test",
-                                                 "limit": 1
-                                             })
+        result3 = await client.aget("search/entities/person",
+                                    params={
+                                        "q": "test",
+                                        "limit": 1
+                                    })
 
         # Result should be identical to previous
         assert result1 == result3
 
     finally:
         # Clean up
+        await client.aclose()
         client.close()
 
 

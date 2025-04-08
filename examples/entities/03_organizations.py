@@ -7,9 +7,9 @@ This example demonstrates how to fetch and use organization data.
 import os
 
 from fusionbase import Fusionbase
+from fusionbase.core.logging import configure_logging
 from fusionbase.exceptions import FusionbaseError
 from fusionbase.exceptions import ResourceNotFoundError
-from fusionbase.logging import configure_logging
 
 # Configure logging
 configure_logging(level="INFO")

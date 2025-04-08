@@ -8,10 +8,8 @@ from unittest.mock import patch
 import pytest
 
 from fusionbase import Fusionbase
-from fusionbase.entities.location import Location
-from fusionbase.entities.types import AddressComponentType
-from fusionbase.entities.types import LocationSubtype
 from fusionbase.exceptions import ResourceNotFoundError
+from fusionbase.types.entities import LocationSubtype
 
 
 class TestLocation(unittest.TestCase):

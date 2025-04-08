@@ -25,17 +25,16 @@ from tenacity import RetryError
 from tenacity import stop_after_attempt
 from tenacity import wait_exponential
 
-from fusionbase.async_client import AsyncFusionbaseClient
-from fusionbase.cache import cached
-from fusionbase.cache import FusionbaseCache
-from fusionbase.config import FusionbaseConfig
-from fusionbase.context import set_current_client
-from fusionbase.context import set_current_entity_manager
-from fusionbase.entities.manager import EntityManager
+from fusionbase.core.cache import cached
+from fusionbase.core.cache import FusionbaseCache
+from fusionbase.core.config import FusionbaseConfig
+from fusionbase.core.context import set_current_client
+from fusionbase.core.context import set_current_entity_manager
+from fusionbase.core.logging import configure_logging
 from fusionbase.exceptions import APIError
 from fusionbase.exceptions import parse_error_response
-from fusionbase.logging import configure_logging
-from fusionbase.search.manager import SearchManager
+from fusionbase.managers.entity_manager import EntityManager
+from fusionbase.managers.search_manager import SearchManager
 
 T = TypeVar('T')
 
@@ -115,8 +114,18 @@ class Fusionbase:
             limits=limits,
         )
 
-        # For async client
-        self._async_http_client = None
+        # Configure async HTTP client
+        limits_async = httpx.Limits(
+            max_connections=self.config.max_connections,
+            max_keepalive_connections=self.config.max_connections,
+        )
+
+        self._async_http_client = httpx.AsyncClient(
+            base_url=self.base_url,
+            headers=self._get_headers(),
+            timeout=self.config.timeout,
+            limits=limits_async,
+        )
 
         # Create and register entity manager
         self.entities = EntityManager(self)
@@ -135,15 +144,17 @@ class Fusionbase:
     def _register_entity_types(self):
         """Register all entity types with the entity manager."""
         # Import here to avoid circular imports
+        from fusionbase.entities import Event
         from fusionbase.entities import Location
         from fusionbase.entities import Organization
         from fusionbase.entities.person import Person
-        from fusionbase.entities.types import EntityType
+        from fusionbase.types.entities import EntityType
 
         self.entities.register_entity_class(EntityType.LOCATION.value, Location)
         self.entities.register_entity_class(EntityType.ORGANIZATION.value,
                                             Organization)
         self.entities.register_entity_class(EntityType.PERSON.value, Person)
+        self.entities.register_entity_class(EntityType.EVENT.value, Event)
 
     def _get_headers(self) -> Dict[str, str]:
         """Get headers for API requests including authentication.
@@ -155,7 +166,9 @@ class Fusionbase:
             "X-API-KEY": self.api_key,
             "Content-Type": "application/json",
             "Accept": "application/json",
-            "User-Agent": f"fusionbase-python/{self.get_version()}",
+            "User-Agent":
+                f"fusionbase-python/{self.get_version()} "
+                f"(Python {'.'.join(map(str, os.sys.version_info[:3]))})",
         }
 
     def get_version(self) -> str:
@@ -316,14 +329,184 @@ class Fusionbase:
         except httpx.HTTPStatusError:
             raise parse_error_response(response)
         except Exception as exc:
-            response = getattr(exc, "response", None)
-            if response:
-                raise parse_error_response(response) from exc
+            # Use a different variable name to avoid overwriting the response parameter
+            exc_response = getattr(exc, "response", None)
+            if exc_response:
+                raise parse_error_response(exc_response) from exc
+
+            # Handle case where response might not be a proper response object
+            content_str = ""
+            if hasattr(response, "content"):
+                content_str = str(response.content)
+            elif hasattr(response, "__call__"):  # Check if it's a function
+                content_str = f"[Function: {response.__name__ if hasattr(response, '__name__') else 'unknown'}]"
+            else:
+                content_str = str(response)
+
             raise APIError(
                 f"Failed to process response: {exc}",
                 500,
-                str(response.content if hasattr(response, "content") else ""),
+                content_str,
             ) from exc
+
+    async def arequest(self, method: str, url: str, **kwargs: Any) -> Any:
+        """Send an async HTTP request with retry logic.
+
+        Args:
+            method: HTTP method (GET, POST, etc.)
+            url: URL to request
+            **kwargs: Additional arguments to pass to httpx
+
+        Returns:
+            API response data
+
+        Raises:
+            APIError: If the API returns an error
+        """
+        if not self.config.retry.enabled:
+            # Direct request without retry
+            response = await self._perform_async_request(method, url, **kwargs)
+            return await self._process_async_response(response)
+
+        # Setup retry parameters similar to synchronous request method
+        retry_config = {
+            "stop":
+                stop_after_attempt(self.config.retry.max_attempts),
+            "wait":
+                wait_exponential(
+                    multiplier=1,
+                    min=self.config.retry.min_wait_seconds,
+                    max=self.config.retry.max_wait_seconds,
+                ),
+            "retry":
+                retry_if_exception_type(
+                    tuple(exc for exc_name in self.config.retry.retry_exceptions
+                          for exc in [globals().get(exc_name, Exception)]
+                          if exc is not None)),
+        }
+
+        from tenacity import AsyncRetrying
+
+        # Try the request with retries
+        try:
+            async for attempt in AsyncRetrying(**retry_config):
+                with attempt:
+                    response = await self._perform_async_request(
+                        method, url, **kwargs)
+                    return await self._process_async_response(response)
+        except Exception as e:
+            if hasattr(e, "response"):
+                logger.debug(f"Request failed with response: {e.response}")
+                await self._process_async_response(e.response)
+
+            # If no suitable error was raised by processing the response, raise a generic one
+            logger.debug(f"Request failed without response: {str(e)}")
+            raise APIError(
+                f"Async request failed after {self.config.retry.max_attempts} attempts: {method} {url}",
+                500) from e
+
+    async def _perform_async_request(self, method: str, url: str,
+                                     **kwargs: Any) -> httpx.Response:
+        """Perform the actual async HTTP request.
+
+        Args:
+            method: HTTP method
+            url: URL to request
+            **kwargs: Additional arguments to pass to httpx
+
+        Returns:
+            HTTP response
+
+        Raises:
+            Exception: If the request fails
+        """
+        logger.debug(f"Sending async {method} request to {url}")
+
+        if method.upper() == "GET":
+            response = await self._async_http_client.get(url, **kwargs)
+        elif method.upper() == "POST":
+            response = await self._async_http_client.post(url, **kwargs)
+        elif method.upper() == "PUT":
+            response = await self._async_http_client.put(url, **kwargs)
+        elif method.upper() == "DELETE":
+            response = await self._async_http_client.delete(url, **kwargs)
+        elif method.upper() == "PATCH":
+            response = await self._async_http_client.patch(url, **kwargs)
+        else:
+            raise ValueError(f"Unsupported HTTP method: {method}")
+
+        logger.debug(f"Received async response: {response.status_code}")
+        return response
+
+    async def _process_async_response(self, response: httpx.Response) -> Any:
+        """Process the HTTP response asynchronously.
+
+        Args:
+            response: The HTTP response
+
+        Returns:
+            API response data
+
+        Raises:
+            APIError: If the API returns an error
+        """
+        try:
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError:
+            raise parse_error_response(response)
+        except Exception as exc:
+            # Use a different variable name to avoid overwriting the response parameter
+            exc_response = getattr(exc, "response", None)
+            if exc_response:
+                raise parse_error_response(exc_response) from exc
+
+            # Handle case where response might not be a proper response object
+            content_str = ""
+            if hasattr(response, "content"):
+                content_str = str(response.content)
+            elif hasattr(response, "__call__"):  # Check if it's a function
+                content_str = f"[Function: {response.__name__ if hasattr(response, '__name__') else 'unknown'}]"
+            else:
+                content_str = str(response)
+
+            raise APIError(
+                f"Failed to process async response: {exc}",
+                500,
+                content_str,
+            ) from exc
+
+    async def aget(self, url: str, **kwargs: Any) -> Any:
+        """Send an async GET request."""
+        return await self.arequest("GET", url, **kwargs)
+
+    async def apost(self, url: str, **kwargs: Any) -> Any:
+        """Send an async POST request."""
+        return await self.arequest("POST", url, **kwargs)
+
+    async def aput(self, url: str, **kwargs: Any) -> Any:
+        """Send an async PUT request."""
+        return await self.arequest("PUT", url, **kwargs)
+
+    async def adelete(self, url: str, **kwargs: Any) -> Any:
+        """Send an async DELETE request."""
+        return await self.arequest("DELETE", url, **kwargs)
+
+    async def apatch(self, url: str, **kwargs: Any) -> Any:
+        """Send an async PATCH request."""
+        return await self.arequest("PATCH", url, **kwargs)
+
+    async def __aenter__(self):
+        """Async context manager entry."""
+        self._client_token = set_current_client(self)
+        self._manager_token = set_current_entity_manager(self.entities)
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """Async context manager exit."""
+        self._client_token = None
+        self._manager_token = None
+        await self.aclose()
 
     async def aclose(self):
         """Close the HTTP client asynchronously."""
@@ -335,23 +518,6 @@ class Fusionbase:
         self._http_client.close()
         if self._cache:
             self._cache.close()
-
-    @property
-    def async_client(self) -> 'AsyncFusionbaseClient':
-        """Get an async version of the client.
-
-        Returns:
-            An async client instance
-
-        Note:
-            This lazily initializes the async HTTP client
-        """
-        return AsyncFusionbaseClient(
-            api_key=self.api_key,
-            base_url=self.base_url,
-            config=self.config,
-            parent_client=self,
-        )
 
     def __enter__(self):
         """Context manager entry. Sets this client as the current client."""

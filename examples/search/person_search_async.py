@@ -24,14 +24,17 @@ async def run_person_search():
         print("ERROR: FUSIONBASE_API_KEY environment variable not set")
         sys.exit(1)
 
-    # Create Fusionbase client and get the async client
+    # Create Fusionbase client
     client = Fusionbase(api_key=api_key)
 
     try:
         # Example 1: Basic async person search
         print("\n1. Basic async person search for 'Kevin Goßling' (example)...")
         params = PersonSearchParams(q="Kevin Goßling")
+
+        # Use direct async methods on the client
         results = await client.search.persons.asearch(params)
+
         print(f"Found {len(results.items)} results")
 
         # Display the first result
@@ -88,8 +91,7 @@ async def run_person_search():
         traceback.print_exc()
     finally:
         # Close client to clean up resources
-        if hasattr(client, 'async_client'):
-            await client.async_client.aclose()  # Fixed unused expression
+        await client.aclose()
         client.close()
 
 

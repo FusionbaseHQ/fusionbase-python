@@ -8,8 +8,8 @@ import asyncio
 import time
 
 from fusionbase import Fusionbase
+from fusionbase.core.logging import configure_logging
 from fusionbase.exceptions import ResourceNotFoundError
-from fusionbase.logging import configure_logging
 
 # Configure logging
 configure_logging(level="INFO")
@@ -24,7 +24,7 @@ async def fetch_location_async(client, location_id, label=None):
     """Fetch a location asynchronously.
 
     Args:
-        client: Fusionbase async client
+        client: Fusionbase client
         location_id: ID of the location to fetch
         label: Optional label for logging
 
@@ -33,6 +33,7 @@ async def fetch_location_async(client, location_id, label=None):
     """
     try:
         start = time.time()
+        # Using direct async methods on the main client
         location = await client.entities.locations.afrom_id(location_id)
         duration = time.time() - start
 
@@ -128,14 +129,15 @@ async def run_async_demos():
         client = Fusionbase()
 
         try:
-            # Run the async demonstrations
-            await demonstrate_concurrent_requests(client.async_client)
-            await demonstrate_sequential_vs_parallel(client.async_client)
+            # Run the async demonstrations directly with the main client
+            await demonstrate_concurrent_requests(client)
+            await demonstrate_sequential_vs_parallel(client)
 
             print_separator("Async Examples Complete")
 
         finally:
-            # Make sure to close the client
+            # Close both sync and async resources
+            await client.aclose()
             client.close()
 
     except ValueError as e:

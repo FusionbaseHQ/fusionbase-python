@@ -4,7 +4,7 @@ Getting started with the Fusionbase SDK.
 This example demonstrates how to initialize the client and perform basic operations.
 """
 from fusionbase import Fusionbase
-from fusionbase.logging import configure_logging
+from fusionbase.core.logging import configure_logging
 
 # Configure basic logging
 configure_logging(level="INFO")

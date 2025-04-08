@@ -62,18 +62,16 @@ async def test_location_search_async():
     if not api_key:
         pytest.skip("FUSIONBASE_API_KEY environment variable not set")
 
-    # Create client with real API key
+    # Create client with real API key - no need for separate async client
     client = Fusionbase(api_key=api_key)
-    # Get the async client explicitly
-    async_client = client.async_client
 
     try:
         # Search for locations asynchronously
         params = LocationSearchParams(q="Berlin")
 
         try:
-            # Use async client's search manager
-            results = await async_client.search.locations.asearch(params)
+            # Use direct async method on search manager
+            results = await client.search.locations.asearch(params)
 
             # Verify we have results
             assert len(results.items) > 0
@@ -100,5 +98,5 @@ async def test_location_search_async():
 
     finally:
         # Close client
-        await async_client.aclose()
+        await client.aclose()
         client.close()

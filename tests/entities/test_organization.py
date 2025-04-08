@@ -6,10 +6,9 @@ import unittest
 import pytest
 
 from fusionbase import Fusionbase
-from fusionbase.entities.organization import Organization
-from fusionbase.entities.types import OrganizationStatus
-from fusionbase.entities.types import OrganizationSubtype
 from fusionbase.exceptions import ResourceNotFoundError
+from fusionbase.types.entities import OrganizationStatus
+from fusionbase.types.entities import OrganizationSubtype
 
 
 class TestOrganization(unittest.TestCase):

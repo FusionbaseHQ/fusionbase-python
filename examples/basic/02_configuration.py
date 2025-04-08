@@ -6,10 +6,10 @@ This example demonstrates different ways to configure the SDK.
 
 from fusionbase import Fusionbase
 from fusionbase import FusionbaseConfig
-from fusionbase.config import CacheConfig
-from fusionbase.config import LoggingConfig
-from fusionbase.config import RetryConfig
-from fusionbase.logging import configure_logging
+from fusionbase.core.config import CacheConfig
+from fusionbase.core.config import LoggingConfig
+from fusionbase.core.config import RetryConfig
+from fusionbase.core.logging import configure_logging
 
 # Configure basic logging
 configure_logging(level="INFO")

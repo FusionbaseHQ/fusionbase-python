@@ -6,8 +6,8 @@ import unittest
 import pytest
 
 from fusionbase import Fusionbase
-from fusionbase.entities.types import PersonSubtype
 from fusionbase.exceptions import ResourceNotFoundError
+from fusionbase.types.entities import PersonSubtype
 
 
 class TestPerson(unittest.TestCase):

@@ -6,8 +6,8 @@ from unittest.mock import MagicMock
 from unittest.mock import patch
 
 from fusionbase import Fusionbase
-from fusionbase.config import FusionbaseConfig
-from fusionbase.config import RetryConfig
+from fusionbase.core.config import FusionbaseConfig
+from fusionbase.core.config import RetryConfig
 
 
 class TestFusionbaseClient(unittest.TestCase):

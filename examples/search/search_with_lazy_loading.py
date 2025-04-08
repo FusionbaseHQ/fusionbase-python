@@ -7,6 +7,7 @@ from typing import List
 from fusionbase import Fusionbase
 from fusionbase.entities.lazy_reference import LazyReference
 from fusionbase.entities.location import Location
+from fusionbase.entities.organization import Organization
 from fusionbase.entities.person import Person
 
 
@@ -58,6 +59,31 @@ async def search_locations(fb: Fusionbase):
             if location.coordinate else "No coordinates")
 
 
+async def search_organizations(fb: Fusionbase):
+    """Search for organizations with lazy loading."""
+    print("\n--- Organization Search Example ---")
+
+    # Search for an organization with consistent parameter naming
+    results = await fb.search.organizations.asearch(q="OroraTech",
+                                                    skip=0,
+                                                    limit=5)
+    print(f"Found {results.total} organizations")
+    print(
+        f"Results {results.skip+1}-{min(results.skip+len(results.items), results.total)} of {results.total}"
+    )
+
+    organizations: List[LazyReference[Organization]] = results.items
+
+    # Load an organization explicitly
+    if organizations:
+        organization = await organizations[0].aget()
+        print(f"\nOrganization: {organization.name}")
+        print(f"Status: {organization.status}")
+        print(
+            f"Address: {organization.display_address if hasattr(organization, 'display_address') else 'No address'}"
+        )
+
+
 async def main():
     """Run the example."""
     # Initialize Fusionbase client
@@ -65,6 +91,7 @@ async def main():
 
     await search_persons(fb)
     await search_locations(fb)
+    await search_organizations(fb)
 
 
 if __name__ == "__main__":

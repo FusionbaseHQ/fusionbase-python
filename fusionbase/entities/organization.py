@@ -13,13 +13,13 @@ from pydantic import model_validator
 
 from fusionbase.entities.base import Entity
 from fusionbase.entities.location import Location
-from fusionbase.entities.types import EntityType
-from fusionbase.entities.types import OrganizationStatus
-from fusionbase.entities.types import OrganizationStatusDetail
-from fusionbase.entities.types import OrganizationSubtype
 from fusionbase.exceptions import APIError
 from fusionbase.exceptions import parse_error_response
 from fusionbase.exceptions import ResourceNotFoundError
+from fusionbase.types.entities import EntityType
+from fusionbase.types.entities import OrganizationStatus
+from fusionbase.types.entities import OrganizationStatusDetail
+from fusionbase.types.entities import OrganizationSubtype
 
 
 class OrganizationState(BaseModel):
@@ -297,12 +297,10 @@ class Organization(Entity):
         """Create Organization instance by async fetching."""
         try:
             data = None
-            # Use async client if available
-            if hasattr(client, "async_client") and client.async_client:
-                # Get async client
-                async_client = client.async_client
-                data = await async_client.request(
-                    "GET", f"entities/organization/get/{entity_id}")
+            # Try direct async methods on the client
+            if hasattr(client, "aget"):
+                data = await client.aget(
+                    f"entities/organization/get/{entity_id}")
             # Use arequest method if available
             elif hasattr(client, "arequest"):
                 data = await client.arequest(
@@ -319,7 +317,6 @@ class Organization(Entity):
                 data = response.json()
             else:
                 # Fall back to sync method through asyncio.to_thread
-                # BUT only if the client's request method is not async
                 if hasattr(client,
                            "request") and not inspect.iscoroutinefunction(
                                client.request):

@@ -5,8 +5,8 @@ from typing import Any, ClassVar, Dict, Optional
 from pydantic import BaseModel
 from pydantic import ConfigDict
 
-from fusionbase.context import get_current_entity_manager
-from fusionbase.entities.types import EntityType
+from fusionbase.core.context import get_current_entity_manager
+from fusionbase.types.entities import EntityType
 
 
 class Entity(BaseModel):
@@ -59,6 +59,30 @@ class Entity(BaseModel):
                 "No entity manager available in current context. Use with statement: "
                 "with fusionbase.Client() as client: ...")
         return manager.get(cls.entity_type.value, entity_id)
+
+    @classmethod
+    async def aget(cls, entity_id: str) -> "Entity":
+        """Asynchronously get an entity instance by ID using the current entity manager.
+
+        This is a convenience method that leverages the entity manager
+        associated with the current Fusionbase client context.
+
+        Args:
+            entity_id: ID of the entity to fetch
+
+        Returns:
+            An instance of the appropriate entity type
+
+        Raises:
+            RuntimeError: If no entity manager is available in the context
+            APIError: If the entity cannot be retrieved
+        """
+        manager = get_current_entity_manager()
+        if manager is None:
+            raise RuntimeError(
+                "No entity manager available in current context. Use with statement: "
+                "with fusionbase.Client() as client: ...")
+        return await manager.afrom_id(cls.entity_type.value, entity_id)
 
     @classmethod
     def _from_id(cls, client, entity_id: str) -> "Entity":

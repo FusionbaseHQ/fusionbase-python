@@ -8,8 +8,8 @@ import time
 
 from fusionbase import Fusionbase
 from fusionbase import FusionbaseConfig
-from fusionbase.config import CacheConfig
-from fusionbase.logging import configure_logging
+from fusionbase.core.config import CacheConfig
+from fusionbase.core.logging import configure_logging
 
 # Configure verbose logging to see cache operations
 configure_logging(level="INFO")

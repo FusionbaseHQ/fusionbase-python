@@ -1,5 +1,6 @@
 """Person search module."""
 
+import inspect
 import traceback
 from typing import Optional  # Removed unused imports: inspect, Any, Dict, List
 
@@ -112,29 +113,27 @@ class PersonSearch(BaseSearch[Person]):
             raise APIError(f"Person search failed: {str(e)}",
                            status_code=500) from e
 
-    async def _fetch_async_data(self, _,
-                                query_params):  # Fixed unused 'params' arg
+    async def _fetch_async_data(self, params, query_params):
         """Helper to reduce branches for asearch."""
         # Use appropriate async client method
-        if hasattr(self.client, "async_client") and hasattr(
-                self.client.async_client, "request"):
-            return await self.client.async_client.request(
-                "GET", "search/entities/person", params=query_params)
-
-        if hasattr(self.client, "arequest"):  # Changed elif to if after return
+        if hasattr(self.client, "arequest"):
             return await self.client.arequest("GET",
                                               "search/entities/person",
                                               params=query_params)
-
-        if hasattr(self.client, "get"):  # Changed elif to if after return
-            return await self.client.get("search/entities/person",
-                                         params=query_params)
-
-        # Fall back to other methods
-        response = await self.client._async_http_client.get(
-            "search/entities/person", params=query_params)
-        response.raise_for_status()
-        return response.json()
+        if hasattr(self.client, "aget"):
+            return await self.client.aget("search/entities/person",
+                                          params=query_params)
+        if hasattr(self.client, "amake_request"):
+            return await self.client.amake_request("search/entities/person",
+                                                   params=query_params)
+        if (hasattr(self.client, "request") and
+                inspect.iscoroutinefunction(self.client.request)):
+            return await self.client.request("GET",
+                                             "search/entities/person",
+                                             params=query_params)
+        # Changed from elif to if as the previous condition has a return
+        print("WARNING: No async methods found, falling back to sync")
+        return self.search(params)
 
     async def asearch(self,
                       params: Optional[PersonSearchParams] = None,

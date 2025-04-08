@@ -1,13 +1,13 @@
 """
 Example demonstrating asynchronous location search with the Fusionbase SDK.
 
-This example shows how to search for locations using the async client.
+This example shows how to search for locations using async methods.
 """
 
 import asyncio
 import os
 import sys
-import traceback  # Moved import to top level
+import traceback
 
 from fusionbase import Fusionbase
 from fusionbase.search.location_search import LocationSearchParams
@@ -15,7 +15,7 @@ from fusionbase.search.location_search import LocationSearchParams
 
 async def run_location_search():
     """Run asynchronous location searches."""
-    print("=== Asynchronous Location Search Example ===\n")  # Removed f-string
+    print("=== Asynchronous Location Search Example ===")
 
     # Initialize client with API key from environment variable
     api_key = os.environ.get("FUSIONBASE_API_KEY")
@@ -23,16 +23,15 @@ async def run_location_search():
         print("ERROR: FUSIONBASE_API_KEY environment variable not set")
         sys.exit(1)
 
-    # Create Fusionbase client and get the async client
+    # Create Fusionbase client - use async methods directly
     client = Fusionbase(api_key=api_key)
-    async_client = client.async_client
 
     try:
         # Example 1: Basic async location search
         print("\n1. Basic async location search for "
               "'Munich, Germany' (example)...")
         params = LocationSearchParams(q="Munich, Germany")
-        results = await async_client.search.locations.asearch(params)
+        results = await client.search.locations.asearch(params)
         print(f"Found {len(results.items)} results")
 
         # Display the first result
@@ -57,8 +56,7 @@ async def run_location_search():
 
         # Run searches concurrently
         search_tasks = [
-            async_client.search.locations.asearch(params)
-            for params in search_params
+            client.search.locations.asearch(params) for params in search_params
         ]
         search_results = await asyncio.gather(*search_tasks)
 
@@ -71,13 +69,14 @@ async def run_location_search():
             else:
                 print(f"\nNo results found for {city}")
 
-    except OSError as e:  # Narrowed exception
+    except OSError as e:
         print(f"ERROR: {str(e)}")
         traceback.print_exc()
         sys.exit(1)
     finally:
         # Always close the client
-        await async_client.aclose()
+        await client.aclose()
+        client.close()
 
 
 def main():

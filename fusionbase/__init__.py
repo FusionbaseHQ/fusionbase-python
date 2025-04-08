@@ -1,44 +1,28 @@
-"""Fusionbase Python SDK for fast access to the world's data."""
+"""Fusionbase Python client.
 
-from fusionbase.client import Fusionbase
-from fusionbase.config import FusionbaseConfig
-from fusionbase.entities import Entity
-from fusionbase.entities import Location
-from fusionbase.entities import Organization
-from fusionbase.entities import Person
+This package provides a Python interface to the Fusionbase Data Hub.
+"""
+
+from fusionbase.core.client import Fusionbase
+from fusionbase.core.config import FusionbaseConfig
 from fusionbase.exceptions import APIError
 from fusionbase.exceptions import AuthenticationError
+from fusionbase.exceptions import AuthorizationError
 from fusionbase.exceptions import FusionbaseError
-from fusionbase.logging import configure_logging
-from fusionbase.search import BaseSearch
+from fusionbase.exceptions import RequestValidationError as ValidationError
+from fusionbase.exceptions import ResourceNotFoundError
+# Ensure all search types are available for import from the package
 from fusionbase.search import LocationSearch
 from fusionbase.search import LocationSearchParams
-from fusionbase.search import SearchParams
-from fusionbase.search import SearchResult
-
-__version__ = "0.3.0"
+from fusionbase.search import OrganizationSearch
+from fusionbase.search import OrganizationSearchParams
+from fusionbase.search import PersonSearch
+from fusionbase.search import PersonSearchParams
 
 __all__ = [
-    # Client and core functionality
-    "Fusionbase",
-    "FusionbaseConfig",
-    "configure_logging",
-
-    # Exceptions
-    "FusionbaseError",
-    "AuthenticationError",
-    "APIError",
-
-    # Entities
-    "Entity",
-    "Location",
-    "Organization",
-    "Person",
-
-    # Search
-    "SearchParams",
-    "SearchResult",
-    "BaseSearch",
-    "LocationSearch",
-    "LocationSearchParams",
+    'Fusionbase', 'FusionbaseConfig', 'APIError', 'AuthenticationError',
+    'AuthorizationError', 'FusionbaseError', 'ResourceNotFoundError',
+    'ValidationError', 'LocationSearch', 'LocationSearchParams',
+    'OrganizationSearch', 'OrganizationSearchParams', 'PersonSearch',
+    'PersonSearchParams'
 ]
