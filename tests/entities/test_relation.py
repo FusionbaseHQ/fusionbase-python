@@ -8,9 +8,7 @@ from unittest.mock import patch
 import pytest
 
 from fusionbase import Fusionbase
-from fusionbase.entities.base import Entity
 from fusionbase.entities.feature import Feature
-from fusionbase.entities.location import Location
 from fusionbase.entities.organization import Organization
 from fusionbase.exceptions import ResourceNotFoundError
 from fusionbase.exceptions import ValidationError
@@ -229,7 +227,6 @@ class TestRelation(unittest.TestCase):
             relation.resolve_config = test_config
 
             # Replace the resolve method with our mock - use the __dict__ approach
-            from types import MethodType
             relation.__dict__["resolve"] = mock_resolve
 
             # Mock the client's request method to avoid actual API calls
@@ -237,7 +234,7 @@ class TestRelation(unittest.TestCase):
                 mock_request.return_value = [{"test": "data"}]
 
                 # Test with parameters as dictionary
-                result1 = relation.resolve(
+                relation.resolve(
                     "bfcc19ddd9edb12efb9cfea181b0dcd3",  # Munich ID
                     parameters={
                         "indicator_name": "TEST_INDICATOR",
@@ -245,13 +242,13 @@ class TestRelation(unittest.TestCase):
                     })
 
                 # Test with parameters as kwargs
-                result2 = relation.resolve(
+                relation.resolve(
                     "bfcc19ddd9edb12efb9cfea181b0dcd3",  # Munich ID
                     indicator_name="TEST_INDICATOR_2",
                     granularity_level=5)
 
                 # Test with mixed parameters
-                result3 = relation.resolve(
+                relation.resolve(
                     "bfcc19ddd9edb12efb9cfea181b0dcd3",  # Munich ID
                     parameters={"indicator_name": "TEST_INDICATOR_3"},
                     granularity_level=6)
@@ -538,8 +535,7 @@ async def test_relation_async_resolve_with_parameters():
                     all_params.update(kwargs)
 
                 # Validate parameters
-                validated_params = relation.resolve_config.validate_parameters(
-                    all_params)
+                relation.resolve_config.validate_parameters(all_params)
 
                 # Return mock data
                 return [{"test": "async_data"}]
@@ -550,9 +546,9 @@ async def test_relation_async_resolve_with_parameters():
                                                        relation)
 
             # Test with kwargs
-            result = await relation.aresolve(entity_id,
-                                             indicator_name="TEST_ASYNC",
-                                             granularity_level=5)
+            await relation.aresolve(entity_id,
+                                    indicator_name="TEST_ASYNC",
+                                    granularity_level=5)
 
             # Add a separate call to the mock_arequest for verification
             mock_arequest(

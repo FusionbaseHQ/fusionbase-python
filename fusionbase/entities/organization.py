@@ -1,21 +1,15 @@
 """Organization entity module."""
 
-import asyncio
 from datetime import date
 from datetime import datetime
-import inspect
 from typing import ClassVar, Dict, List, Optional, Union
 
-import httpx
 from pydantic import BaseModel
 from pydantic import ConfigDict
 from pydantic import model_validator
 
 from fusionbase.entities.base import Entity
 from fusionbase.entities.location import Location
-from fusionbase.exceptions import APIError
-from fusionbase.exceptions import parse_error_response
-from fusionbase.exceptions import ResourceNotFoundError
 from fusionbase.types.entities import EntityType
 from fusionbase.types.entities import OrganizationStatus
 from fusionbase.types.entities import OrganizationStatusDetail
@@ -218,136 +212,16 @@ class Organization(Entity):
         return self.status.active if self.status else False
 
     @classmethod
-    def _from_id(cls, client, entity_id: str) -> "Organization":  # pylint: disable=too-many-branches
-        """Internal method to create an Organization instance by fetching it from the API.
-
-        Args:
-            client: The Fusionbase client
-            entity_id: ID of the organization to fetch
-
-        Returns:
-            An Organization instance with fully resolved Location objects
-
-        Raises:
-            ResourceNotFoundError: If the organization doesn't exist
-            AuthenticationError: If authentication fails
-            AuthorizationError: If the user is not authorized
-            APIError: For other API errors
-        """
-        # Use the request method with retry if available
-        if hasattr(client, "request"):
-            try:
-                data = client.request("GET",
-                                      f"entities/organization/get/{entity_id}")
-            except ResourceNotFoundError as e:
-                # Make the error more specific to organizations
-                response = getattr(e, "response", None)
-                raise ResourceNotFoundError("organization", entity_id,
-                                            response) from e
-            except httpx.HTTPStatusError as e:
-                if e.response.status_code == 404:
-                    raise ResourceNotFoundError("organization", entity_id,
-                                                e.response) from e
-                raise parse_error_response(e.response) from e
-            except Exception as e:
-                raise e
-        elif hasattr(client, "make_request"):
-            # If client is an EntityManager
-            try:
-                data = client.make_request(
-                    f"entities/organization/get/{entity_id}")
-            except ResourceNotFoundError as e:
-                # Make the error more specific to organizations
-                response = getattr(e, "response", None)
-                raise ResourceNotFoundError("organization", entity_id,
-                                            response) from e
-            except httpx.HTTPStatusError as e:
-                if e.response.status_code == 404:
-                    raise ResourceNotFoundError("organization", entity_id,
-                                                e.response) from e
-                raise parse_error_response(e.response) from e
-            except Exception as e:
-                raise e
-        else:
-            try:
-                response = client.http_client.get(
-                    f"entities/organization/get/{entity_id}")
-                response.raise_for_status()
-                data = response.json()
-            except httpx.HTTPStatusError as e:
-                # Use our error parser to generate appropriate exceptions
-                if e.response.status_code == 404:
-                    raise ResourceNotFoundError("organization", entity_id,
-                                                e.response) from e
-                raise parse_error_response(e.response) from e
-            except Exception as e:  # pylint: disable=broad-except
-                if getattr(e, "response", None) is not None:
-                    raise parse_error_response(getattr(e, "response")) from e
-
-                raise APIError(
-                    f"Failed to retrieve organization (ID: {entity_id}): {e}",
-                    500,
-                ) from e
-
-        # Return the model_validate result directly
+    def _from_id(cls, client, entity_id: str) -> "Organization":
+        """Internal method to create an Organization instance by fetching it from the API."""
+        from fusionbase.utils.api_utils import make_entity_request
+        data = make_entity_request(client, cls.entity_type.value, entity_id)
         return cls.model_validate(data)
 
     @classmethod
     async def _afrom_id(cls, client, entity_id: str) -> "Organization":
-        """Create Organization instance by async fetching."""
-        try:
-            data = None
-            # Try direct async methods on the client
-            if hasattr(client, "aget"):
-                data = await client.aget(
-                    f"entities/organization/get/{entity_id}")
-            # Use arequest method if available
-            elif hasattr(client, "arequest"):
-                data = await client.arequest(
-                    "GET", f"entities/organization/get/{entity_id}")
-            # Use amake_request method if available (for entity managers)
-            elif hasattr(client, "amake_request"):
-                data = await client.amake_request(
-                    f"entities/organization/get/{entity_id}")
-            # Use async HTTP client directly
-            elif hasattr(client, "_async_http_client"):
-                response = await client._async_http_client.get(
-                    f"entities/organization/get/{entity_id}")
-                response.raise_for_status()
-                data = response.json()
-            else:
-                # Fall back to sync method through asyncio.to_thread
-                if hasattr(client,
-                           "request") and not inspect.iscoroutinefunction(
-                               client.request):
-                    data = await asyncio.to_thread(cls._from_id, client,
-                                                   entity_id)
-                    return data  # Return early as we already have an Organization instance
-
-                # No suitable async method found, raise an error
-                raise APIError(
-                    f"No suitable async method found to fetch organization (ID: {entity_id})",
-                    status_code=500)
-
-            # Make sure we have data
-            if not data:
-                raise APIError(
-                    f"Failed to retrieve organization data (ID: {entity_id})",
-                    status_code=500)
-
-            # Return the model_validate result directly
-            return cls.model_validate(data)
-
-        except ResourceNotFoundError as e:
-            # Make the error more specific to organizations
-            response = getattr(e, "response", None)
-            raise ResourceNotFoundError("organization", entity_id,
-                                        response) from e
-        except httpx.HTTPStatusError as e:
-            if getattr(e, "response", None) is not None:
-                if getattr(e.response, "status_code", None) == 404:
-                    raise ResourceNotFoundError("organization", entity_id,
-                                                e.response) from e
-                raise parse_error_response(e.response) from e
-            raise APIError(("Failed to retrieve organization "
-                            f"(ID: {entity_id}): {e}"), 500) from e
+        """Asynchronously create an Organization instance by fetching it from the API."""
+        from fusionbase.utils.api_utils import make_entity_request_async
+        data = await make_entity_request_async(client, cls.entity_type.value,
+                                               entity_id)
+        return cls.model_validate(data)

@@ -120,7 +120,7 @@ async def test_organization_async_real_api():
         assert organization.fb_entity_id == valid_organization_id
         assert organization.name == "OroraTech GmbH"
         assert organization.entity_subtype == OrganizationSubtype.CORPORATION
-        assert organization.is_active == True
+        assert organization.is_active
 
         # Just check dynamic fields exist
         assert organization.fb_entity_version is not None

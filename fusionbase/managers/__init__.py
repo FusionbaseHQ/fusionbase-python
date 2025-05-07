@@ -1,6 +1,7 @@
 """Manager classes for the Fusionbase SDK."""
 
 from fusionbase.managers.base_entity_manager import BaseEntityManager
+from fusionbase.managers.dataservice_manager import DataServiceManager
 from fusionbase.managers.entity_manager import EntityManager
 from fusionbase.managers.entity_managers import EventManager
 from fusionbase.managers.entity_managers import LocationManager
@@ -13,6 +14,7 @@ from fusionbase.managers.search_wrappers import PersonSearch
 
 __all__ = [
     'BaseEntityManager',
+    'DataServiceManager',
     'EntityManager',
     'LocationManager',
     'OrganizationManager',

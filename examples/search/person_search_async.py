@@ -10,7 +10,6 @@ import os
 import sys
 
 from fusionbase import Fusionbase
-from fusionbase.entities.person import Source
 from fusionbase.search.person_search import PersonSearchParams
 
 

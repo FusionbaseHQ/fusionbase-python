@@ -4,14 +4,14 @@ from __future__ import annotations
 
 from typing import Any, ClassVar, Dict, List, Optional, TYPE_CHECKING
 
-if TYPE_CHECKING:
-    from fusionbase.entities.relation import Relation
-
 from pydantic import BaseModel
 from pydantic import ConfigDict
 
 from fusionbase.core.context import get_current_entity_manager
 from fusionbase.types.entities import EntityType
+
+if TYPE_CHECKING:
+    from fusionbase.entities.relation import Relation
 
 
 class Entity(BaseModel):
@@ -93,20 +93,23 @@ class Entity(BaseModel):
     def _from_id(cls, client, entity_id: str) -> "Entity":
         """Internal method to create an entity instance by fetching it from the API.
 
-        This is meant to be implemented by subclasses and not called directly.
-
-        Args:
-            client: The Fusionbase client
-            entity_id: ID of the entity to fetch
-
-        Returns:
-            An instance of the appropriate entity type
-
-        Raises:
-            APIError: If the entity cannot be retrieved
+        This method is designed to be overridden by subclasses that need custom
+        handling, but provides a default implementation that works for most entities.
         """
-        raise NotImplementedError(
-            "The _from_id method must be implemented by subclasses")
+        # Import here to avoid circular import
+        from fusionbase.utils.api_utils import fetch_entity_sync
+        return fetch_entity_sync(cls, client, entity_id)
+
+    @classmethod
+    async def _afrom_id(cls, client, entity_id: str) -> "Entity":
+        """Asynchronously create an entity instance by fetching it from the API.
+
+        This method is designed to be overridden by subclasses that need custom
+        handling, but provides a default implementation that works for most entities.
+        """
+        # Import here to avoid circular import
+        from fusionbase.utils.api_utils import fetch_entity_async
+        return await fetch_entity_async(cls, client, entity_id)
 
     def get_relations(self, client=None) -> List["Relation"]:
         """Get all relations available for this entity type.

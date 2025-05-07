@@ -14,6 +14,7 @@
 
 import importlib.metadata
 import os
+import sys
 from typing import Any, Dict, Optional, TypeVar
 
 import httpx
@@ -219,6 +220,7 @@ class Fusionbase:
         self,
         method: str,
         url: str,
+        response_format: str = None,
         **kwargs: Any,
     ) -> Any:
         """Send an HTTP request with retry logic.
@@ -226,6 +228,7 @@ class Fusionbase:
         Args:
             method: HTTP method (GET, POST, etc.)
             url: URL to request
+            response_format: Expected response format (json, msgpack)
             **kwargs: Additional arguments to pass to httpx
 
         Returns:
@@ -237,7 +240,8 @@ class Fusionbase:
         """
         if not self.config.retry.enabled:
             # Direct request without retry
-            return self._perform_request(method, url, **kwargs)
+            response = self._perform_request(method, url, **kwargs)
+            return self._process_response(response, response_format)
 
         # Create retry decorator with configured parameters
         retry_decorator = retry(
@@ -264,13 +268,14 @@ class Fusionbase:
 
         try:
             response = _retried_request()
-            return self._process_response(response)
+            return self._process_response(response, response_format)
         except RetryError as exc:
             response = getattr(exc.last_attempt, "result", None)
             if response:
                 # If we have a response, process it to get appropriate error
                 self._process_response(
-                    response)  # This will raise the appropriate exception
+                    response, response_format
+                )  # This will raise the appropriate exception
 
             # If we don't have a response, raise generic error
             raise APIError(
@@ -294,7 +299,6 @@ class Fusionbase:
             Exception: If the request fails
         """
         logger.debug(f"Sending {method} request to {url}")
-
         if method.upper() == "GET":
             response = self._http_client.get(url, **kwargs)
         elif method.upper() == "POST":
@@ -311,11 +315,14 @@ class Fusionbase:
         logger.debug(f"Received response: {response.status_code}")
         return response
 
-    def _process_response(self, response: httpx.Response) -> Any:
+    def _process_response(self,
+                          response: httpx.Response,
+                          response_format: str = None) -> Any:
         """Process the HTTP response.
 
         Args:
             response: The HTTP response
+            response_format: Expected response format (json, msgpack)
 
         Returns:
             API response data
@@ -325,7 +332,15 @@ class Fusionbase:
         """
         try:
             response.raise_for_status()
+
+            # Check if response is expected to be in msgpack format
+            if response_format == "msgpack" and 'msgpack' in sys.modules:
+                import msgpack
+                return msgpack.unpackb(response.content, raw=False)
+
+            # Fall back to JSON
             return response.json()
+
         except httpx.HTTPStatusError:
             raise parse_error_response(response)
         except Exception as exc:
@@ -337,7 +352,11 @@ class Fusionbase:
             # Handle case where response might not be a proper response object
             content_str = ""
             if hasattr(response, "content"):
-                content_str = str(response.content)
+                # For binary content like msgpack, show hex representation
+                if response_format == "msgpack":
+                    content_str = f"binary data ({len(response.content)} bytes)"
+                else:
+                    content_str = str(response.content)
             elif hasattr(response, "__call__"):  # Check if it's a function
                 content_str = f"[Function: {response.__name__ if hasattr(response, '__name__') else 'unknown'}]"
             else:
@@ -349,12 +368,17 @@ class Fusionbase:
                 content_str,
             ) from exc
 
-    async def arequest(self, method: str, url: str, **kwargs: Any) -> Any:
+    async def arequest(self,
+                       method: str,
+                       url: str,
+                       response_format: str = None,
+                       **kwargs: Any) -> Any:
         """Send an async HTTP request with retry logic.
 
         Args:
             method: HTTP method (GET, POST, etc.)
             url: URL to request
+            response_format: Expected response format (json, msgpack)
             **kwargs: Additional arguments to pass to httpx
 
         Returns:
@@ -366,7 +390,7 @@ class Fusionbase:
         if not self.config.retry.enabled:
             # Direct request without retry
             response = await self._perform_async_request(method, url, **kwargs)
-            return await self._process_async_response(response)
+            return await self._process_async_response(response, response_format)
 
         # Setup retry parameters similar to synchronous request method
         retry_config = {
@@ -393,11 +417,12 @@ class Fusionbase:
                 with attempt:
                     response = await self._perform_async_request(
                         method, url, **kwargs)
-                    return await self._process_async_response(response)
+                    return await self._process_async_response(
+                        response, response_format)
         except Exception as e:
             if hasattr(e, "response"):
                 logger.debug(f"Request failed with response: {e.response}")
-                await self._process_async_response(e.response)
+                await self._process_async_response(e.response, response_format)
 
             # If no suitable error was raised by processing the response, raise a generic one
             logger.debug(f"Request failed without response: {str(e)}")
@@ -421,7 +446,6 @@ class Fusionbase:
             Exception: If the request fails
         """
         logger.debug(f"Sending async {method} request to {url}")
-
         if method.upper() == "GET":
             response = await self._async_http_client.get(url, **kwargs)
         elif method.upper() == "POST":
@@ -438,11 +462,14 @@ class Fusionbase:
         logger.debug(f"Received async response: {response.status_code}")
         return response
 
-    async def _process_async_response(self, response: httpx.Response) -> Any:
+    async def _process_async_response(self,
+                                      response: httpx.Response,
+                                      response_format: str = None) -> Any:
         """Process the HTTP response asynchronously.
 
         Args:
             response: The HTTP response
+            response_format: Expected response format (json, msgpack)
 
         Returns:
             API response data
@@ -452,7 +479,15 @@ class Fusionbase:
         """
         try:
             response.raise_for_status()
-            return response.json()
+
+            # Check if response is expected to be in msgpack format
+            if response_format == "msgpack" and 'msgpack' in sys.modules:
+                import msgpack
+                return msgpack.unpackb(response.content, raw=False)
+            else:
+                # Fall back to JSON
+                return response.json()
+
         except httpx.HTTPStatusError:
             raise parse_error_response(response)
         except Exception as exc:
@@ -464,7 +499,11 @@ class Fusionbase:
             # Handle case where response might not be a proper response object
             content_str = ""
             if hasattr(response, "content"):
-                content_str = str(response.content)
+                # For binary content like msgpack, show hex representation
+                if response_format == "msgpack":
+                    content_str = f"binary data ({len(response.content)} bytes)"
+                else:
+                    content_str = str(response.content)
             elif hasattr(response, "__call__"):  # Check if it's a function
                 content_str = f"[Function: {response.__name__ if hasattr(response, '__name__') else 'unknown'}]"
             else:

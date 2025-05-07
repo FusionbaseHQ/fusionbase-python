@@ -8,7 +8,6 @@ import pytest
 from fusionbase import Fusionbase
 from fusionbase.entities.location import Location
 from fusionbase.entities.organization import Organization
-from fusionbase.entities.person import Person
 from fusionbase.entities.relation import Relation
 
 

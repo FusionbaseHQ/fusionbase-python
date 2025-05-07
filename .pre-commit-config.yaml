@@ -1,47 +1,37 @@
 repos:
 -   repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v5.0.0
+    rev: v4.5.0
     hooks:
     -   id: trailing-whitespace
     -   id: end-of-file-fixer
     -   id: check-yaml
+    -   id: debug-statements
     -   id: check-added-large-files
-    -   id: check-merge-conflict
 
 -   repo: https://github.com/pycqa/isort
-    rev: 6.0.1
+    rev: 5.13.2
     hooks:
     -   id: isort
-        args: ["--profile", "google"]
+        args: ["--profile", "google"]  # Use Google profile to match yapf
 
 -   repo: https://github.com/google/yapf
-    rev: v0.43.0
+    rev: v0.40.2
     hooks:
     -   id: yapf
-        args: ["--style", "google", "--recursive", "--in-place"]
+        args: ["--style", "google"]  # Use Google style to match isort
 
 -   repo: local
     hooks:
     -   id: pylint
         name: pylint
-        entry: poetry run pylint
+        entry: pylint
         language: system
         types: [python]
-        # Only fail on actual errors (E), not warnings (W) or conventions (C)
-        args: ["--fail-on=E"]
-        pass_filenames: true
-        exclude: ^tests/
-        verbose: true
-        # Keep hooks running on pre-commit
-        stages: [pre-commit]
-
-    -   id: pytest
-        name: pytest
-        entry: poetry run pytest
-        language: system
-        pass_filenames: false
-        args: ["--no-header", "--no-summary", "-xvs"]
-        stages: [pre-commit, pre-push]
-        verbose: true
-        always_run: true
-        fail_fast: false
+        args:
+          - --fail-under=9.0
+          - --disable=import-error
+          - --ignore-paths=^tests/.*$
+          - --score=yes
+          - --load-plugins=pylint.extensions.docparams
+          - --max-line-length=120
+        require_serial: true

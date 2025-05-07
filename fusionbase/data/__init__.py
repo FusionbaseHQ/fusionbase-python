@@ -1,9 +1,11 @@
-"""Data module for Fusionbase SDK."""
+"""Data components for the Fusionbase SDK."""
 
 from fusionbase.data.dataservice import DataService
-from fusionbase.data.datastream import DataStream
+from fusionbase.data.dataservice import DataServiceMetadata
+from fusionbase.data.source import Source
 
 __all__ = [
-    "DataStream",
-    "DataService",
+    'DataService',
+    'DataServiceMetadata',
+    'Source',
 ]

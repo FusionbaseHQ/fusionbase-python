@@ -1,19 +1,14 @@
 """Person entity module."""
 
-import asyncio
 from datetime import datetime
-import inspect
 from typing import ClassVar, Dict, List, Optional
 
-import httpx
 from pydantic import BaseModel
 from pydantic import model_validator
 
+from fusionbase.data.source import Source
 from fusionbase.entities.base import Entity
 from fusionbase.entities.location import Location
-from fusionbase.exceptions import APIError
-from fusionbase.exceptions import parse_error_response
-from fusionbase.exceptions import ResourceNotFoundError
 from fusionbase.types.entities import EntityType
 from fusionbase.types.entities import PersonSubtype
 
@@ -32,18 +27,6 @@ class BirthDate(BaseModel):
 
     value: Optional[datetime] = None
     is_month: bool = False
-
-
-class Source(BaseModel):
-    """Source information.
-
-    Contains information about the data source for the person entity.
-
-    Attributes:
-        id: Source identifier
-    """
-
-    id: Optional[str] = None
 
 
 class Person(Entity):
@@ -150,134 +133,20 @@ class Person(Entity):
         return self.locations.get("home")
 
     @classmethod
-    def _from_id(cls, client, entity_id: str) -> "Person":  # pylint: disable=too-many-branches
-        """Internal method to create a Person instance by fetching it from the API.
+    def _from_id(cls, client, entity_id: str) -> "Person":
+        """Internal method to create a Person instance by fetching it from the API."""
+        from fusionbase.utils.api_utils import make_entity_request
+        data = make_entity_request(client, cls.entity_type.value, entity_id)
 
-        Args:
-            client: The Fusionbase client
-            entity_id: ID of the person to fetch
-
-        Returns:
-            A Person instance with fully resolved Location objects
-
-        Raises:
-            ResourceNotFoundError: If the person doesn't exist
-            AuthenticationError: If authentication fails
-            AuthorizationError: If the user is not authorized
-            APIError: For other API errors
-        """
-        # Use the request method with retry if available
-        if hasattr(client, "request"):
-            try:
-                data = client.request("GET", f"entities/person/get/{entity_id}")
-            except ResourceNotFoundError as e:
-                # Make the error more specific to persons
-                response = getattr(e, "response", None)
-                raise ResourceNotFoundError("person", entity_id,
-                                            response) from e
-            except httpx.HTTPStatusError as e:
-                if e.response.status_code == 404:
-                    raise ResourceNotFoundError("person", entity_id,
-                                                e.response) from e
-                raise parse_error_response(e.response) from e
-            except Exception as e:
-                raise e
-        elif hasattr(client, "make_request"):
-            # If client is an EntityManager
-            try:
-                data = client.make_request(f"entities/person/get/{entity_id}")
-            except ResourceNotFoundError as e:
-                # Make the error more specific to persons
-                response = getattr(e, "response", None)
-                raise ResourceNotFoundError("person", entity_id,
-                                            response) from e
-            except httpx.HTTPStatusError as e:
-                if e.response.status_code == 404:
-                    raise ResourceNotFoundError("person", entity_id,
-                                                e.response) from e
-                raise parse_error_response(e.response) from e
-            except Exception as e:
-                raise e
-        else:
-            try:
-                response = client.http_client.get(
-                    f"entities/person/get/{entity_id}")
-                response.raise_for_status()
-                data = response.json()
-            except httpx.HTTPStatusError as e:
-                # Use our error parser to generate appropriate exceptions
-                if e.response.status_code == 404:
-                    raise ResourceNotFoundError("person", entity_id,
-                                                e.response) from e
-                raise parse_error_response(e.response) from e
-            except Exception as e:  # pylint: disable=broad-except
-                if getattr(e, "response", None) is not None:
-                    raise parse_error_response(getattr(e, "response")) from e
-
-                raise APIError(
-                    f"Failed to retrieve person (ID: {entity_id}): {e}",
-                    500,
-                ) from e
-
-        # No need to process locations separately since the model_validator will handle it
-        # Just return the model_validate result directly
+        # Use the existing model_validator to process locations
         return cls.model_validate(data)
 
     @classmethod
     async def _afrom_id(cls, client, entity_id: str) -> "Person":
-        """Create Person instance by async fetching."""
-        try:
-            data = None
-            # Try direct async methods on the client
-            if hasattr(client, "aget"):
-                data = await client.aget(f"entities/person/get/{entity_id}")
-            # Use arequest method if available
-            elif hasattr(client, "arequest"):
-                data = await client.arequest(
-                    "GET", f"entities/person/get/{entity_id}")
-            # Use amake_request method if available (for entity managers)
-            elif hasattr(client, "amake_request"):
-                data = await client.amake_request(
-                    f"entities/person/get/{entity_id}")
-            # Use async HTTP client directly
-            elif hasattr(client, "_async_http_client"):
-                response = await client._async_http_client.get(
-                    f"entities/person/get/{entity_id}")
-                response.raise_for_status()
-                data = response.json()
-            else:
-                # Fall back to sync method through asyncio.to_thread
-                if hasattr(client,
-                           "request") and not inspect.iscoroutinefunction(
-                               client.request):
-                    data = await asyncio.to_thread(cls._from_id, client,
-                                                   entity_id)
-                    return data  # Return early as we already have a Person instance
+        """Asynchronously create a Person instance by fetching it from the API."""
+        from fusionbase.utils.api_utils import make_entity_request_async
+        data = await make_entity_request_async(client, cls.entity_type.value,
+                                               entity_id)
 
-                # No suitable async method found, raise an error
-                raise APIError(
-                    f"No suitable async method found to fetch person (ID: {entity_id})",
-                    status_code=500)
-
-            # Make sure we have data
-            if not data:
-                raise APIError(
-                    f"Failed to retrieve person data (ID: {entity_id})",
-                    status_code=500)
-
-            # No need to process locations separately since the model_validator will handle it
-            # Just return the model_validate result directly
-            return cls.model_validate(data)
-
-        except ResourceNotFoundError as e:
-            # Make the error more specific to persons
-            response = getattr(e, "response", None)
-            raise ResourceNotFoundError("person", entity_id, response) from e
-        except httpx.HTTPStatusError as e:
-            if getattr(e, "response", None) is not None:
-                if getattr(e.response, "status_code", None) == 404:
-                    raise ResourceNotFoundError("person", entity_id,
-                                                e.response) from e
-                raise parse_error_response(e.response) from e
-            raise APIError(("Failed to retrieve person "
-                            f"(ID: {entity_id}): {e}"), 500) from e
+        # Use the existing model_validator to process locations
+        return cls.model_validate(data)

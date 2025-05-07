@@ -32,16 +32,7 @@ class AddressComponent(BaseModel):
 
 
 class Location(Entity):
-    """Location entity in Fusionbase.
-
-    Attributes:
-        coordinate: Geographical coordinates
-        location_level: Hierarchical level of the location
-        address_components: Detailed address components
-        alternative_names: Alternative names for the location
-        formatted_address: Human-readable address format
-        entity_subtype: Type of location (e.g., CITY, STREET, etc.)
-    """
+    """Location entity in Fusionbase."""
 
     # Direct API response fields
     coordinate: Optional[Coordinate] = None
@@ -235,7 +226,6 @@ class Location(Entity):
             "location_level": data.get("location_level"),
             "address_components": data.get("address_components", []),
             "alternative_names": data.get("alternative_names", []),
-            "": data.get(""),
             "formatted_address": data.get("formatted_address"),
             # Parse entity subtype as enum
             "entity_subtype": data.get("entity_subtype", LocationSubtype.ANY),

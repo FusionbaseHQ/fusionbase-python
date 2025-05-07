@@ -1,7 +1,6 @@
 """Shared fixtures and configuration for tests."""
 
 import os
-import sys
 import traceback
 from unittest.mock import MagicMock
 

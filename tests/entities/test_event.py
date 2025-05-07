@@ -7,7 +7,6 @@ import pytest
 
 from fusionbase import Fusionbase
 from fusionbase.exceptions import ResourceNotFoundError
-from fusionbase.types.entities import EventSubtype
 
 
 class TestEvent(unittest.TestCase):

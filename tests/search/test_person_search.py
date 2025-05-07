@@ -7,8 +7,6 @@ import pytest
 
 from fusionbase import Fusionbase
 from fusionbase.entities.lazy_reference import LazyReference
-from fusionbase.entities.person import Person
-from fusionbase.entities.person import Source
 from fusionbase.search.person_search import PersonSearchParams
 
 

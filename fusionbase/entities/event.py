@@ -1,23 +1,18 @@
 """Event entity module."""
 
-import asyncio
 from datetime import datetime
-import inspect
 from typing import Any, ClassVar, Dict, Optional, Union
 
-import httpx
 from pydantic import BaseModel
 from pydantic import ConfigDict
 from pydantic import model_validator
 
+from fusionbase.data.source import Source
 from fusionbase.entities.base import Entity
 from fusionbase.entities.lazy_reference import LazyReference
 from fusionbase.entities.location import Location
 from fusionbase.entities.organization import Organization
 from fusionbase.entities.person import Person
-from fusionbase.exceptions import APIError
-from fusionbase.exceptions import parse_error_response
-from fusionbase.exceptions import ResourceNotFoundError
 from fusionbase.types.entities import ConflictEventCategory
 from fusionbase.types.entities import CyberSecurityEventCategory
 from fusionbase.types.entities import EntityType
@@ -115,12 +110,6 @@ class EventDetails(BaseModel):
     linked_entities: Optional[LinkedEntities] = None
 
 
-class SourceInfo(BaseModel):
-    """Source information."""
-
-    id: Optional[str] = None
-
-
 class Event(Entity):
     """Event entity in Fusionbase.
 
@@ -154,7 +143,7 @@ class Event(Entity):
     category: Optional[Union[PublicationEventCategory, NaturalEventCategory,
                              CyberSecurityEventCategory, ConflictEventCategory,
                              str]] = None
-    source: Optional[SourceInfo] = None
+    source: Optional[Source] = None
     details: Optional[EventDetails] = None
     origin_location: Optional[Union[Location, Dict[str, Any]]] = None
     event_location: Optional[Union[Location, Dict[str, Any]]] = None
@@ -271,71 +260,9 @@ class Event(Entity):
 
     @classmethod
     def _from_id(cls, client, entity_id: str) -> "Event":
-        """Internal method to create an Event instance by fetching it from the API.
-
-        Args:
-            client: The Fusionbase client
-            entity_id: ID of the event to fetch
-
-        Returns:
-            An Event instance with references to related entities
-
-        Raises:
-            ResourceNotFoundError: If the event doesn't exist
-            AuthenticationError: If authentication fails
-            AuthorizationError: If the user is not authorized
-            APIError: For other API errors
-        """
-        # Use the request method with retry if available
-        if hasattr(client, "request"):
-            try:
-                data = client.request("GET", f"entities/event/get/{entity_id}")
-            except ResourceNotFoundError as e:
-                # Make the error more specific to events
-                response = getattr(e, "response", None)
-                raise ResourceNotFoundError("event", entity_id, response) from e
-            except httpx.HTTPStatusError as e:
-                if e.response.status_code == 404:
-                    raise ResourceNotFoundError("event", entity_id,
-                                                e.response) from e
-                raise parse_error_response(e.response) from e
-            except Exception as e:
-                raise e
-        elif hasattr(client, "make_request"):
-            # If client is an EntityManager
-            try:
-                data = client.make_request(f"entities/event/get/{entity_id}")
-            except ResourceNotFoundError as e:
-                # Make the error more specific to events
-                response = getattr(e, "response", None)
-                raise ResourceNotFoundError("event", entity_id, response) from e
-            except httpx.HTTPStatusError as e:
-                if e.response.status_code == 404:
-                    raise ResourceNotFoundError("event", entity_id,
-                                                e.response) from e
-                raise parse_error_response(e.response) from e
-            except Exception as e:
-                raise e
-        else:
-            try:
-                response = client.http_client.get(
-                    f"entities/event/get/{entity_id}")
-                response.raise_for_status()
-                data = response.json()
-            except httpx.HTTPStatusError as e:
-                # Use our error parser to generate appropriate exceptions
-                if e.response.status_code == 404:
-                    raise ResourceNotFoundError("event", entity_id,
-                                                e.response) from e
-                raise parse_error_response(e.response) from e
-            except Exception as e:  # pylint: disable=broad-except
-                if getattr(e, "response", None) is not None:
-                    raise parse_error_response(getattr(e, "response")) from e
-
-                raise APIError(
-                    f"Failed to retrieve event (ID: {entity_id}): {e}",
-                    500,
-                ) from e
+        """Internal method to create an Event instance by fetching it from the API."""
+        from fusionbase.utils.api_utils import make_entity_request
+        data = make_entity_request(client, cls.entity_type.value, entity_id)
 
         # Create the event instance
         event = cls.model_validate(data)
@@ -347,78 +274,15 @@ class Event(Entity):
 
     @classmethod
     async def _afrom_id(cls, client, entity_id: str) -> "Event":
-        """Create Event instance by async fetching.
+        """Asynchronously create an Event instance by fetching it from the API."""
+        from fusionbase.utils.api_utils import make_entity_request_async
+        data = await make_entity_request_async(client, cls.entity_type.value,
+                                               entity_id)
 
-        Args:
-            client: The Fusionbase client
-            entity_id: ID of the event to fetch
+        # Create the event instance
+        event = cls.model_validate(data)
 
-        Returns:
-            An Event instance with references to related entities
+        # Process linked entities to create LazyReference objects
+        event._process_linked_entities(client)
 
-        Raises:
-            ResourceNotFoundError: If the event doesn't exist
-            AuthenticationError: If authentication fails
-            AuthorizationError: If the user is not authorized
-            APIError: For other API errors
-        """
-        try:
-            data = None
-            # Try direct async methods on the client
-            if hasattr(client, "aget"):
-                data = await client.aget(f"entities/event/get/{entity_id}")
-            # Use arequest method if available
-            elif hasattr(client, "arequest"):
-                data = await client.arequest("GET",
-                                             f"entities/event/get/{entity_id}")
-            # Use amake_request method if available (for entity managers)
-            elif hasattr(client, "amake_request"):
-                data = await client.amake_request(
-                    f"entities/event/get/{entity_id}")
-            # Use async HTTP client directly
-            elif hasattr(client, "_async_http_client"):
-                response = await client._async_http_client.get(
-                    f"entities/event/get/{entity_id}")
-                response.raise_for_status()
-                data = response.json()
-            else:
-                # Fall back to sync method through asyncio.to_thread
-                # BUT only if the client's request method is not async
-                if hasattr(client,
-                           "request") and not inspect.iscoroutinefunction(
-                               client.request):
-                    data = await asyncio.to_thread(cls._from_id, client,
-                                                   entity_id)
-                    return data  # Return early as we already have an Event instance
-
-                # No suitable async method found, raise an error
-                raise APIError(
-                    f"No suitable async method found to fetch event (ID: {entity_id})",
-                    status_code=500)
-
-            # Make sure we have data
-            if not data:
-                raise APIError(
-                    f"Failed to retrieve event data (ID: {entity_id})",
-                    status_code=500)
-
-            # Create event instance
-            event = cls.model_validate(data)
-
-            # Process linked entities to create LazyReference objects
-            event._process_linked_entities(client)
-
-            return event
-
-        except ResourceNotFoundError as e:
-            # Make the error more specific to events
-            response = getattr(e, "response", None)
-            raise ResourceNotFoundError("event", entity_id, response) from e
-        except httpx.HTTPStatusError as e:
-            if getattr(e, "response", None) is not None:
-                if getattr(e.response, "status_code", None) == 404:
-                    raise ResourceNotFoundError("event", entity_id,
-                                                e.response) from e
-                raise parse_error_response(e.response) from e
-            raise APIError(f"Failed to retrieve event (ID: {entity_id}): {e}",
-                           500) from e
+        return event

@@ -2,6 +2,8 @@
 
 from typing import Type, TypeVar
 
+from fusionbase.managers.search_wrappers import DataSearch
+from fusionbase.managers.search_wrappers import FusionSearch
 from fusionbase.managers.search_wrappers import LocationSearch
 from fusionbase.managers.search_wrappers import OrganizationSearch
 from fusionbase.managers.search_wrappers import PersonSearch
@@ -19,30 +21,23 @@ class SearchManager:
     """
 
     def __init__(self, client):
-        """Initialize the search manager with a client.
-
-        Args:
-            client: A Fusionbase client instance
-        """
+        """Initialize the search manager."""
         self._client = client
         self._search_classes = {}
-
-        # Initialize type-specific search managers lazily
         self._locations = None
-        self._organizations = None
         self._persons = None
-        self._events = None
+        self._organizations = None
         self._relations = None
+        self._data = None
+        self._fusion = None
 
-        # Initialize async search instances to None
-        self._person_search = None
-        self._org_search = None
-        self._loc_search = None
-        self._rel_search = None
+        # For async versions (separate instances to avoid state conflicts)
+        self._async_loc_search = None
         self._async_person_search = None
         self._async_org_search = None
-        self._async_loc_search = None
         self._async_rel_search = None
+        self._async_data_search = None
+        self._async_fusion_search = None
 
     def register_search_class(self, search_type: str,
                               cls: Type[BaseSearch]) -> None:
@@ -98,6 +93,28 @@ class SearchManager:
             self._relations = RelationSearch(self._client)
         return self._relations
 
+    @property
+    def data(self):
+        """Get the data search.
+
+        Returns:
+            A search manager for data entities (streams and services)
+        """
+        if self._data is None:
+            self._data = DataSearch(self._client)
+        return self._data
+
+    @property
+    def fusion(self):
+        """Get the fusion search.
+
+        Returns:
+            A search manager for fusion search across all entities
+        """
+        if self._fusion is None:
+            self._fusion = FusionSearch(self._client)
+        return self._fusion
+
     # Add async methods directly on the SearchManager
     async def asearch_persons(self, params=None, **kwargs):
         """Search for persons asynchronously."""
@@ -122,3 +139,15 @@ class SearchManager:
         if self._async_rel_search is None:
             self._async_rel_search = RelationSearch(self._client)
         return await self._async_rel_search.asearch(params, **kwargs)
+
+    async def asearch_data(self, params=None, **kwargs):
+        """Search for data (streams and services) asynchronously."""
+        if self._async_data_search is None:
+            self._async_data_search = DataSearch(self._client)
+        return await self._async_data_search.asearch(params, **kwargs)
+
+    async def asearch_fusion(self, params=None, **kwargs):
+        """Search across all entities asynchronously."""
+        if self._async_fusion_search is None:
+            self._async_fusion_search = FusionSearch(self._client)
+        return await self._async_fusion_search.asearch(params, **kwargs)

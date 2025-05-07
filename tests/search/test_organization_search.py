@@ -1,7 +1,6 @@
 """Tests for Organization search functionality."""
 
 import os
-from typing import Any, Dict
 import unittest
 
 import pytest
@@ -77,7 +76,7 @@ class TestOrganizationSearch(unittest.TestCase):
         # Test with invalid filter key
         with self.assertRaises(ValueError):
             # This should fail because we're using a string that's not a valid FilterKey
-            params = OrganizationSearchParams(
+            OrganizationSearchParams(
                 q="GmbH",
                 filters={"invalid_key": "some_value"
                         }  # This should cause validation to fail
