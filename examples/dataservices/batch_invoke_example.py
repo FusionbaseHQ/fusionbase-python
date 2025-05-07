@@ -21,13 +21,6 @@ async def main():
     client = Fusionbase(api_key=api_key)
 
     try:
-        # List available services
-        print("Available services:")
-        services = await client.services.alist_services()
-        for idx, service in enumerate(services[:5], 1):  # Show first 5 services
-            print(
-                f"  {idx}. {service.get('name', {}).get('en', 'Unnamed service')} "
-                f"(Key: {service.get('_key')})")
 
         # Get the Company Web Context service key (replace with actual service key)
         service_key = "4658603456"  # Company Web Context service
@@ -66,7 +59,7 @@ async def main():
             print("\nExecuting batch service invoke...")
 
             # Execute batch invoke asynchronously
-            batch_results = await client.services.abatch_invoke(
+            batch_results = await client.services.abatch_invoke_parallel(
                 service_key, batch_inputs)
 
             # Display summarized results
@@ -75,23 +68,7 @@ async def main():
             for i, result in enumerate(batch_results):
                 company = batch_inputs[i]["entity_name"]
                 print(f"\n{i+1}. {company}:")
-
-                # Print a summary of the result
-                if isinstance(result, dict):
-                    if "company_overview" in result:
-                        print(
-                            f"  Overview: {result['company_overview'][:100]}..."
-                        )
-
-                    if "topics" in result and isinstance(
-                            result["topics"], list):
-                        print(f"  Topics: {', '.join(result['topics'][:5])}")
-                        if len(result["topics"]) > 5:
-                            print(
-                                f"  ...and {len(result['topics']) - 5} more topics"
-                            )
-                else:
-                    print(f"  Result: {result}")
+                print(f"  Result: {result}")
         else:
             print("Batch invocation cancelled.")
 

@@ -59,9 +59,9 @@ def main():
         print("\n3. Resolution information:")
         if relation.resolve:
             print("  Can be resolved: Yes")
-            if relation.resolve.parameter_definition:
+            if relation.resolve_config.parameter_definition:
                 print("  Required parameters:")
-                for param in relation.resolve.parameter_definition:
+                for param in relation.resolve_config.parameter_definition:
                     print(f"    - {param.name} (Required: {param.required})")
             else:
                 print("  No parameters required for resolution")

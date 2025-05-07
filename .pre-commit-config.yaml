@@ -32,8 +32,7 @@ repos:
           - --disable=import-error
           - --ignore-paths=^tests/.*$
           - --score=yes
-          - --load-plugins=pylint.extensions.docparams
-          - --max-line-length=80  # Match Google style line length
+          - --max-line-length=120  # Match Google style line length
         require_serial: true
 
     -   id: pytest

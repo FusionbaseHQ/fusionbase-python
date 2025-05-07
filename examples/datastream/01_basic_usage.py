@@ -15,7 +15,7 @@ from fusionbase.core.logging import configure_logging
 configure_logging(level="INFO")
 
 # Example stream ID - replace with an actual stream ID from your account
-SAMPLE_STREAM_ID = "12345"  # Replace with your stream ID
+SAMPLE_STREAM_ID = "23532363"  # Replace with your stream ID
 
 
 def print_separator(title):

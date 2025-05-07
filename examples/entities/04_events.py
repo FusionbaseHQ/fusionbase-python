@@ -15,7 +15,7 @@ from fusionbase.exceptions import ResourceNotFoundError
 configure_logging(level="INFO")
 
 # Event example IDs
-SAMPLE_EVENT_ID = "abc123456789"  # Replace with an actual event ID from your system
+SAMPLE_EVENT_ID = "82a68ab9f7151fa0af9bf189c1caa753"
 
 
 def print_separator(title):

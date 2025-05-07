@@ -15,7 +15,7 @@ from fusionbase.exceptions import ResourceNotFoundError
 configure_logging(level="INFO")
 
 # Person example IDs
-SAMPLE_PERSON_ID = "8e03af05947fdff52a182084b5ce0a24"  # Kevin Gossling
+SAMPLE_PERSON_ID = "2fde1bea7758bd19ddf4f00d8dc65497"  # Kevin Gossling
 
 
 def print_separator(title):

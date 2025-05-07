@@ -76,10 +76,10 @@ async def run_relations_example():
         # Find a relation that can be resolved without parameters
         resolvable_relation = None
         for relation in location_instance_relations:
-            if relation.resolve and (
-                    not relation.resolve.parameter_definition or
+            if relation.resolve_config and (
+                    not relation.resolve_config.parameter_definition or
                     all(not param.required
-                        for param in relation.resolve.parameter_definition)):
+                        for param in relation.resolve_config.parameter_definition)):
                 resolvable_relation = relation
                 break
 

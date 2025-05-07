@@ -36,7 +36,7 @@ except ImportError as e:
 configure_logging(level="INFO")
 
 # Example stream ID - replace with an actual stream ID from your account
-SAMPLE_STREAM_ID = "12345"  # Replace with your stream ID
+SAMPLE_STREAM_ID = "23532363"  # Replace with your stream ID
 
 
 def print_separator(title):
@@ -55,24 +55,13 @@ def basic_dataframe_conversion(stream):
     # Method 1: Using to_pandas()
     print("1. Using to_pandas() method:")
     start = time.time()
-    df = stream.to_pandas(limit=10)
+    df = stream.get_data(limit=10, return_type="dataframe")
     end = time.time()
 
     print(f"   Converted to DataFrame in {end - start:.2f} seconds")
     print(f"   DataFrame shape: {df.shape}")
     print("\nDataFrame head:")
     print(df.head(3))
-
-    # Method 2: Using get_data with return_type
-    print("\n2. Using get_data() with return_type='dataframe':")
-    start = time.time()
-    df2 = stream.get_data(limit=10, return_type="dataframe")
-    end = time.time()
-
-    print(f"   Converted to DataFrame in {end - start:.2f} seconds")
-    print(f"   DataFrame shape: {df2.shape}")
-    print("\nDataFrame info:")
-    print(df2.dtypes)
 
 
 def filtered_dataframes(stream):
@@ -102,7 +91,11 @@ def filtered_dataframes(stream):
 
     # Get filtered DataFrame
     print("Getting filtered DataFrame...")
-    df = stream.to_pandas(filters=[equals_filter], limit=10)
+    df = stream.get_data(
+        limit=10,
+        return_type="dataframe",
+        filters=[equals_filter],
+    )
 
     print(f"DataFrame shape: {df.shape}")
     print("\nFiltered DataFrame head:")
@@ -158,7 +151,7 @@ def dataframe_visualization(stream):
         return
 
     # Get a DataFrame to visualize
-    df = stream.to_pandas(limit=100)
+    df = stream.get_data(limit=1000, return_type="dataframe")
 
     # Find numeric columns to visualize
     numeric_cols = df.select_dtypes(include=['number']).columns
@@ -206,7 +199,7 @@ def dataframe_analysis(stream):
         return
 
     # Get data as DataFrame
-    df = stream.to_pandas(limit=1000)
+    df = stream.get_data(limit=1000, return_type="dataframe")
 
     print("DataFrame summary statistics:")
     print(df.describe())

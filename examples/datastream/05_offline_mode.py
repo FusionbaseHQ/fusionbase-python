@@ -25,7 +25,7 @@ except ImportError:
 configure_logging(level="INFO")
 
 # Example stream ID - replace with an actual stream ID from your account
-SAMPLE_STREAM_ID = "12345"  # Replace with your stream ID
+SAMPLE_STREAM_ID = "23532363"  # Replace with your stream ID
 
 
 def print_separator(title):
@@ -40,7 +40,6 @@ def export_stream_to_file(stream, temp_dir):
     # Create file paths in the temp directory
     json_path = Path(temp_dir) / "stream_data.json"
     jsonl_path = Path(temp_dir) / "stream_data.jsonl"
-    msgpack_path = Path(temp_dir) / "stream_data.msgpack"
 
     # 1. Export to JSON format
     print(f"1. Exporting to JSON: {json_path}")
@@ -67,22 +66,6 @@ def export_stream_to_file(stream, temp_dir):
     print(f"   Export completed in {end_time - start_time:.2f} seconds")
     print(f"   File size: {jsonl_size:.2f} MB")
 
-    # 3. Export to MessagePack format
-    try:
-        print(f"\n3. Exporting to MessagePack: {msgpack_path}")
-        start_time = time.time()
-        stream.export_to_file(
-            msgpack_path,
-            limit=1000,  # Limit to 1000 records for the example
-            file_format="msgpack",
-            include_metadata=True)
-        msgpack_size = msgpack_path.stat().st_size / (1024 * 1024)  # Size in MB
-        end_time = time.time()
-        print(f"   Export completed in {end_time - start_time:.2f} seconds")
-        print(f"   File size: {msgpack_size:.2f} MB")
-    except ImportError:
-        print("   Skipped: msgpack package not installed")
-
     # 4. Export to DataFrame formats if pandas is available
     if PANDAS_AVAILABLE:
         # Export to CSV
@@ -98,49 +81,23 @@ def export_stream_to_file(stream, temp_dir):
         print(f"   Export completed in {end_time - start_time:.2f} seconds")
         print(f"   File size: {csv_size:.2f} MB")
 
-        # Export to Parquet
-        parquet_path = Path(temp_dir) / "stream_data.parquet"
-        try:
-            print(f"\n5. Exporting to Parquet: {parquet_path}")
-            start_time = time.time()
-            stream.export_to_file(parquet_path,
-                                  limit=1000,
-                                  file_format="parquet",
-                                  include_metadata=True)
-            parquet_size = parquet_path.stat().st_size / (1024 * 1024
-                                                         )  # Size in MB
-            end_time = time.time()
-            print(f"   Export completed in {end_time - start_time:.2f} seconds")
-            print(f"   File size: {parquet_size:.2f} MB")
-        except ImportError:
-            print("   Skipped: pyarrow or fastparquet not installed")
 
     # Compare file sizes
     print("\nFile size comparison:")
     print(f"  JSON:     {json_size:.2f} MB")
     print(f"  JSONL:    {jsonl_size:.2f} MB")
 
-    if 'msgpack_size' in locals():
-        print(f"  MsgPack:  {msgpack_size:.2f} MB")
-
     if PANDAS_AVAILABLE:
         if 'csv_size' in locals():
             print(f"  CSV:      {csv_size:.2f} MB")
-        if 'parquet_size' in locals():
-            print(f"  Parquet:  {parquet_size:.2f} MB")
 
     return {
         "json":
             json_path,
         "jsonl":
             jsonl_path,
-        "msgpack":
-            msgpack_path if 'msgpack_size' in locals() else None,
         "csv":
             csv_path if PANDAS_AVAILABLE and 'csv_size' in locals() else None,
-        "parquet":
-            parquet_path
-            if PANDAS_AVAILABLE and 'parquet_size' in locals() else None
     }
 
 
@@ -178,20 +135,6 @@ def load_data_from_files(file_paths, stream):
         )
         print(f"   Metadata available: {jsonl_metadata is not None}")
 
-    # 3. Load from MessagePack
-    if file_paths.get("msgpack"):
-        try:
-            print(f"\n3. Loading from MessagePack: {file_paths['msgpack']}")
-            start_time = time.time()
-            msgpack_data, msgpack_metadata = stream.load_from_file(
-                file_paths["msgpack"])
-            end_time = time.time()
-            print(
-                f"   Loaded {len(msgpack_data)} records in {end_time - start_time:.2f} seconds"
-            )
-            print(f"   Metadata available: {msgpack_metadata is not None}")
-        except ImportError:
-            print("   Skipped: msgpack package not installed")
 
     # 4. Load from CSV (if pandas is available)
     if PANDAS_AVAILABLE and file_paths.get("csv"):
@@ -209,28 +152,6 @@ def load_data_from_files(file_paths, stream):
             df = pd.DataFrame(csv_data)
             print(f"   Converted to DataFrame with shape: {df.shape}")
 
-    # 5. Load from Parquet (if pandas is available)
-    if PANDAS_AVAILABLE and file_paths.get("parquet"):
-        try:
-            print(f"\n5. Loading from Parquet: {file_paths['parquet']}")
-            start_time = time.time()
-            parquet_data, parquet_metadata = stream.load_from_file(
-                file_paths["parquet"])
-            end_time = time.time()
-            print(
-                f"   Loaded {len(parquet_data)} records in {end_time - start_time:.2f} seconds"
-            )
-            print(f"   Metadata available: {parquet_metadata is not None}")
-
-            # Show metadata if available
-            if parquet_metadata:
-                print("   Metadata sample:")
-                print(
-                    f"     Stream name: {parquet_metadata.get('name', {}).get('en')}"
-                )
-        except ImportError:
-            print("   Skipped: pyarrow or fastparquet not installed")
-
 
 def work_offline_mode(client, temp_dir, stream_id):
     """Demonstrate using DataStream in offline mode."""
@@ -238,9 +159,7 @@ def work_offline_mode(client, temp_dir, stream_id):
 
     # Create a DataStream in offline mode
     # Note: This will use the cached file if available, otherwise fetch from API
-    offline_stream = client.streams.from_id(stream_id,
-                                            live=False,
-                                            cache_dir=temp_dir)
+    offline_stream = client.streams.from_id(stream_id)
 
     print(f"Created offline stream for ID: {offline_stream.stream_id}")
     print(f"Cache directory: {offline_stream._cache_dir}")

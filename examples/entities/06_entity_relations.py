@@ -101,10 +101,10 @@ def main():
             print(f"    To: {relation.model_to.value}")
 
             # Check if relation can be resolved and show parameter info
-            if relation.resolve:
-                if relation.resolve.parameter_definition:
+            if relation.resolve_config:
+                if relation.resolve_config.parameter_definition:
                     params = ', '.join(
-                        [p.name for p in relation.resolve.parameter_definition])
+                        [p.name for p in relation.resolve_config.parameter_definition])
                     print(f"    Parameters: {params}")
                 else:
                     print("    No parameters required")

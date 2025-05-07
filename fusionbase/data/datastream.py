@@ -1708,15 +1708,16 @@ class DataStream:
             for row in data:
                 for key, value in row.items():
                     # Try to convert numeric values
-                    if value.isdigit():
-                        row[key] = int(value)
-                    elif value.replace('.', '', 1).isdigit():
-                        row[key] = float(value)
-                    # Handle boolean values
-                    elif value.lower() == 'true':
-                        row[key] = True
-                    elif value.lower() == 'false':
-                        row[key] = False
+                    if isinstance(value, str):
+                        if value.isdigit():
+                            row[key] = int(value)
+                        elif value.replace('.', '', 1).isdigit():
+                            row[key] = float(value)
+                        # Handle boolean values
+                        elif value.lower() == 'true':
+                            row[key] = True
+                        elif value.lower() == 'false':
+                            row[key] = False
 
             return data, metadata
 
@@ -2262,3 +2263,55 @@ class DataStream:
             logger.error(f"Error searching stream data asynchronously: {e}")
             logger.debug(traceback.format_exc())
             raise
+
+    @classmethod
+    def _from_id(cls, client, stream_id: str) -> 'DataStream':
+        """Create a DataStream instance from a stream ID.
+
+        This method conforms to the Entity interface for LazyReference loading.
+
+        Args:
+            client: The Fusionbase client
+            stream_id: The ID of the stream to load
+
+        Returns:
+            A new DataStream instance with metadata loaded
+
+        Raises:
+            ResourceNotFoundError: If the stream doesn't exist
+            APIError: If an API error occurs
+        """
+        # Create a new DataStream instance
+        stream = cls(client, stream_id)
+
+        # Immediately load metadata to verify the stream exists
+        stream.get_metadata()
+
+        # Return the initialized stream
+        return stream
+
+    @classmethod
+    async def _afrom_id(cls, client, stream_id: str) -> 'DataStream':
+        """Asynchronously create a DataStream instance from a stream ID.
+
+        This method conforms to the Entity interface for LazyReference loading.
+
+        Args:
+            client: The Fusionbase client
+            stream_id: The ID of the stream to load
+
+        Returns:
+            A new DataStream instance with metadata loaded
+
+        Raises:
+            ResourceNotFoundError: If the stream doesn't exist
+            APIError: If an API error occurs
+        """
+        # Create a new DataStream instance
+        stream = cls(client, stream_id)
+
+        # Immediately load metadata to verify the stream exists
+        await stream.aget_metadata()
+
+        # Return the initialized stream
+        return stream
