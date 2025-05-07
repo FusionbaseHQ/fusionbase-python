@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "fusionbase"
-version = "0.3.0"
+version = "1.0.0"
 description = "This is the main Fusionbase python package to make handling and interacting with data a piece of cake."
 authors = ["Fusionbase <info@fusionbase.com>"]
 readme = "README.md"

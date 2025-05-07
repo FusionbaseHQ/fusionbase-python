@@ -181,7 +181,7 @@ class Fusionbase:
         try:
             return importlib.metadata.version("fusionbase")
         except Exception:
-            return "0.3.0"  # Fallback version
+            return "1.0.0"
 
     def _should_retry(self, exception: Exception) -> bool:
         """Determine if a request should be retried based on exception.
