@@ -30,9 +30,11 @@ setup(
             "langchain>=0.3,<0.4",
             "langchain-core>=0.3,<0.4",
             "langchain-openai>=0.2,<0.3",
+            "langgraph>=0.0.16",  # Added for agent graph functionality
             "beautifulsoup4>=4.12.2",
             "html2text>=2020.1.16",  # Added for HTML to Markdown conversion
             "httpx>=0.23.0",
+            "rich>=10.0.0",  # For formatted console output
         ],
         "all": [
             "pandas>=1.5.0",
@@ -41,9 +43,11 @@ setup(
             "langchain>=0.3,<0.4",
             "langchain-core>=0.3,<0.4",
             "langchain-openai>=0.2,<0.3",
+            "langgraph>=0.0.16",  # Added for agent graph functionality
             "beautifulsoup4>=4.12.2",
             "html2text>=2020.1.16",  # Added for HTML to Markdown conversion
             "httpx>=0.23.0",
+            "rich>=10.0.0",  # For formatted console output
         ],
     },
     classifiers=[

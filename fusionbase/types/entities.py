@@ -26,6 +26,7 @@ class OrganizationSubtype(str, Enum):
 
     CORPORATION = "CORPORATION"
     ANY = "ANY"
+    BUSINESS = "BUSINESS"
 
 
 class OrganizationStatus(str, Enum):
