@@ -2,8 +2,7 @@
 
 import asyncio
 import os
-import time
-from typing import List, TypedDict
+from typing import Any, Dict, List, Optional, TypedDict
 
 from langchain_core.messages import HumanMessage
 from langchain_core.messages import SystemMessage
@@ -20,7 +19,13 @@ from fusionbase.ai.tools.web.content import web_content
 from fusionbase.ai.tools.web.search import google_search
 
 from .prompts import RESEARCH_INSTRUCTIONS
-from .prompts import SUPERVISOR_INSTRUCTIONS
+from .prompts import SYNTHESIS_INSTRUCTIONS
+
+# pylint: disable=line-too-long,too-many-arguments,too-many-locals,too-many-branches,too-many-statements
+# pylint: disable=too-many-nested-blocks,unused-variable,redefined-outer-name,too-many-positional-arguments
+
+
+
 
 
 @tool
@@ -71,15 +76,47 @@ class CompanyResearchResult(TypedDict):
     """Result of the company research agent."""
     final_report: str
 
+class ResearchPlan(BaseModel):
+    """A plan for researching the topic."""
+    key_questions: List[str]
+    research_areas: List[str]
+    information_sources: List[str]
+
+@tool
+class Plan(BaseModel):
+    """Define a research plan for the query."""
+    key_questions: List[str] = Field(
+        description="The key questions that need to be answered to fulfill the research goal."
+    )
+    research_areas: List[str] = Field(
+        description="Specific areas to investigate during research."
+    )
+    information_sources: List[str] = Field(
+        description="Potential sources of information to consult."
+    )
+
 def create_company_research_agent(
     fusionbase_client: Fusionbase,
     supervisor_model: str = "gpt-4o",
     researcher_model: str = "gpt-4o",
     serp_api_key: str = None,
     max_iterations: int = 10,
-    verbose: bool = False
+    verbose: bool = False,
+    proxies: Optional[Dict[str, str]] = None,
+    verify_ssl: bool = True
 ):
-    """Create a company research agent using direct implementation."""
+    """Create a company research agent using direct implementation.
+
+    Args:
+        fusionbase_client: Client for accessing Fusionbase data
+        supervisor_model: Model to use for the supervisor agent
+        researcher_model: Model to use for the researcher agent
+        serp_api_key: API key for SERP web search
+        max_iterations: Maximum iterations before forcing completion
+        verbose: Enable verbose output
+        proxies: Optional dictionary of proxies to use (e.g., {"http": "http://proxy:8080", "https": "https://proxy:8080"})
+        verify_ssl: Whether to verify SSL certificates (set to False when using certain proxies)
+    """
 
     if not fusionbase_client:
         raise ValueError("A valid Fusionbase client is required")
@@ -91,23 +128,14 @@ def create_company_research_agent(
     if not serp_api_key:
         serp_api_key = os.environ.get("SERP_API_KEY")
 
-    # Initialize chat models
-    supervisor_llm = ChatOpenAI(model=supervisor_model, temperature=0)
-    researcher_llm = ChatOpenAI(model=researcher_model, temperature=0)
-
-    # Define tools
-    supervisor_tools = [
+    # Define tools for different agent roles
+    planner_tools = [
         organization_search,
-        organization_detail,
         google_search,
-        web_content,
-        Sections,
-        Introduction,
-        Conclusion,
-        Queries
+        Plan
     ]
 
-    research_tools = [
+    researcher_tools = [
         organization_search,
         organization_detail,
         google_search,
@@ -116,404 +144,406 @@ def create_company_research_agent(
         Queries
     ]
 
-    # Create tool maps
-    supervisor_tool_map = {tool.name: tool for tool in supervisor_tools}
-    research_tool_map = {tool.name: tool for tool in research_tools}
+    synthesizer_tools = [
+        Introduction,
+        Conclusion
+    ]
 
-    # Bind tools to models
-    supervisor_model_with_tools = supervisor_llm.bind_tools(supervisor_tools)
-    researcher_model_with_tools = researcher_llm.bind_tools(research_tools)
+    # Create tool maps - fix variable name for consistency
+    planner_tool_map = {tool.name: tool for tool in planner_tools}
+    researcher_tool_map = {tool.name: tool for tool in researcher_tools}  # Changed from research_tool_map to researcher_tool_map
+    synthesizer_tool_map = {tool.name: tool for tool in synthesizer_tools}
 
-    async def research_section(company_topic: str, section_description: str):
-        """Research a specific section of the report."""
-        system_message = SystemMessage(content=RESEARCH_INSTRUCTIONS.format(
-            section_description=section_description))
+    # Bind tools to models with different temperatures
+    planner_model = ChatOpenAI(model=supervisor_model, temperature=0).bind_tools(planner_tools)
+    researcher_model = ChatOpenAI(model=researcher_model, temperature=0).bind_tools(researcher_tools)
+    synthesizer_model = ChatOpenAI(model=supervisor_model, temperature=0.2).bind_tools(synthesizer_tools)
 
-        # Initialize conversation with system message and initial prompt
+    async def create_research_plan(company_topic: str, query: str) -> ResearchPlan:
+        """Create a structured research plan for the query."""
+        if verbose:
+            print(f"\n📋 Creating research plan for: '{query}'")
+
         messages = [
-            system_message,
-            HumanMessage(content=f"Research the following section for {company_topic}: {section_description}")
+            SystemMessage(content=(
+                "You are a strategic research planner. Your job is to analyze a research question "
+                "and create a detailed plan for investigating it. Focus on breaking down complex "
+                "questions into manageable parts."
+            )),
+            HumanMessage(content=f"Create a research plan for the following query about {company_topic}: {query}")
         ]
 
-        completed_section = None
-
-        if verbose:
-            print(f"\n📝 [SECTION] Starting research for: '{section_description[:50]}...'")
-
-        # Loop for handling tool calls
+        research_plan = None
         iterations = 0
+
+        while iterations < 3 and not research_plan:  # Limit planning iterations
+            iterations += 1
+
+            if verbose:
+                print(f"  ↪ Planning iteration {iterations}/3")
+
+            try:
+                response = await planner_model.ainvoke(messages)
+                messages.append(response)
+
+                # Extract plan if tool was called
+                if hasattr(response, "tool_calls") and response.tool_calls:
+                    for tool_call in response.tool_calls:
+                        if tool_call["name"] == "Plan":
+                            tool_args = dict(tool_call["args"])
+                            research_plan = ResearchPlan(
+                                key_questions=tool_args.get("key_questions", []),
+                                research_areas=tool_args.get("research_areas", []),
+                                information_sources=tool_args.get("information_sources", [])
+                            )
+
+                            if verbose:
+                                print("  ✅ Research plan created")
+                                print(f"    📌 Key questions: {len(research_plan.key_questions)}")
+                                print(f"    🔍 Research areas: {len(research_plan.research_areas)}")
+                                print(f"    📚 Information sources: {len(research_plan.information_sources)}")
+                            break
+
+                # If no plan tool was called, prompt directly
+                if not research_plan:
+                    messages.append(HumanMessage(content=(
+                        "Please use the Plan tool to create a structured research plan. "
+                        "We need key_questions, research_areas, and information_sources."
+                    )))
+            except Exception as e:
+                if verbose:
+                    print(f"  ❌ Error in planning: {str(e)}")
+
+        # Create fallback plan if needed
+        if not research_plan:
+            if verbose:
+                print("  ⚠️ Using fallback research plan")
+
+            research_plan = ResearchPlan(
+                key_questions=[f"What information can be found about {company_topic}?",
+                              f"What are the main details about {company_topic}?"],
+                research_areas=["Company information", "Industry details"],
+                information_sources=["Fusionbase database", "Company website", "Web search"]
+            )
+
+        return research_plan
+
+    async def research_area(company_topic: str, area_description: str, context: str = "") -> Dict[str, Any]:
+        """Research a specific area related to the company."""
+        if verbose:
+            print(f"\n📝 [RESEARCH] Investigating: '{area_description[:50]}...'")
+
+        # Build context from plan and any previous findings
+        prompt = f"Research the following area for {company_topic}: {area_description}"
+        if context:
+            prompt += f"\n\nContext from previous research:\n{context}"
+
+        # Initialize conversation
+        messages = [
+            SystemMessage(content=RESEARCH_INSTRUCTIONS.format(section_description=area_description)),
+            HumanMessage(content=prompt)
+        ]
+
+        # Research variables
+        findings = {}
+        iterations = 0
+        last_response = ""
+
         while iterations < max_iterations:
             iterations += 1
 
             if verbose:
-                print(f"  ↪ Section iteration {iterations}/{max_iterations}")
+                print(f"  ↪ Research iteration {iterations}/{max_iterations}")
 
-            # Get response from model
-            response = await researcher_model_with_tools.ainvoke(messages)
+            try:
+                response = await researcher_model.ainvoke(messages)
+                messages.append(response)
+                last_response = response.content if hasattr(response, "content") else ""
 
-            # Add response to messages
-            messages.append(response)
+                # Process tool calls - fix the variable reference
+                if hasattr(response, "tool_calls") and response.tool_calls:
+                    for tool_call in response.tool_calls:
+                        tool_name = tool_call["name"]
+                        tool_call_id = tool_call["id"]
+                        tool_args = dict(tool_call["args"])
 
-            # FIX: If this is the last iteration and we haven't completed a section, force section creation
-            if iterations == max_iterations and not completed_section:
+                        if verbose:
+                            arg_str = ", ".join([f"{k}='{v}'" if isinstance(v, str) else f"{k}={v}"
+                                              for k, v in tool_args.items() if k not in ("client", "api_key")])
+                            print(f"  🔧 Tool: {tool_name}({arg_str})")
+
+                        try:
+                            # Add appropriate credentials and proxies
+                            if tool_name in ("organization_search", "organization_detail"):
+                                tool_args["client"] = fb_client
+                            elif tool_name == "google_search":
+                                tool_args["api_key"] = serp_api_key
+                                if proxies:
+                                    tool_args["proxies"] = proxies
+                                tool_args["verify_ssl"] = verify_ssl
+                            elif tool_name == "web_content" and proxies:
+                                tool_args["proxies"] = proxies
+                                tool_args["verify_ssl"] = verify_ssl
+
+                            # Execute tool - Fix the variable name here
+                            tool = researcher_tool_map[tool_name]  # Changed from research_tool_map to researcher_tool_map
+                            result = await tool.ainvoke(tool_args) if hasattr(tool, "ainvoke") else tool.invoke(tool_args)
+
+                            # Save Section results to findings
+                            if tool_name == "Section":
+                                findings[tool_args.get("name", "Untitled")] = tool_args.get("content", "")
+                                if verbose:
+                                    print(f"    ✅ Saved finding: '{tool_args.get('name', 'Untitled')}'")
+
+                            # Add tool message to conversation
+                            messages.append(ToolMessage(
+                                content=str(result),
+                                name=tool_name,
+                                tool_call_id=tool_call_id
+                            ))
+
+                        except Exception as e:
+                            error_msg = f"Error executing {tool_name}: {str(e)}"
+                            messages.append(ToolMessage(
+                                content=error_msg,
+                                name=tool_name,
+                                tool_call_id=tool_call_id
+                            ))
+                            if verbose:
+                                print(f"    ❌ Error: {str(e)}")
+                else:
+                    # No more tool calls - done with this research area
+                    if verbose:
+                        print("  ✓ Research area complete")
+                    break
+
+            except Exception as e:
                 if verbose:
-                    print(f"  ⚠️ Reached max iterations without completing section, forcing completion")
-
-                # Extract content from the conversation for the section
-                content_parts = []
-                for msg in messages:
-                    if hasattr(msg, "content") and msg.content and isinstance(msg.content, str):
-                        # Only include relevant parts, not tool calls or system messages
-                        if not msg.content.startswith("Research the following section"):
-                            content_parts.append(msg.content)
-
-                # Create a completed section from what we have
-                section_name = section_description.split("\n")[0] if "\n" in section_description else section_description
-                section_name = section_name[:50] + ("..." if len(section_name) > 50 else "")
-
-                # FIX: Use proper tool invocation instead of direct constructor
-                try:
-                    completed_section = Section.invoke({
-                        "name": section_name,
-                        "content": "\n\n".join(content_parts[-2:])
-                    })
-                    if verbose:
-                        print(f"    ✅ Forced section '{section_name}' completion ({len(completed_section.content)} chars)")
-                except Exception as e:
-                    if verbose:
-                        print(f"    ❌ Error creating section: {str(e)}")
+                    print(f"  ❌ Research error: {str(e)}")
                 break
 
-            # Check if we're done (no more tool calls)
-            if not hasattr(response, "tool_calls") or not response.tool_calls:
+        # Save the last response as a finding if no sections were created
+        if not findings and last_response:
+            findings["Summary"] = last_response
+
+        return {
+            "area": area_description,
+            "findings": findings,
+            "iterations": iterations,
+            "last_response": last_response
+        }
+
+    async def synthesize_findings(company_topic: str, query: str, research_plan, research_results) -> str:
+        """Synthesize all research findings into a cohesive answer."""
+        if verbose:
+            print("\n🔄 Synthesizing findings into final response")
+
+        # Extract findings from research results
+        all_findings = {}
+        for result in research_results:
+            all_findings.update(result.get("findings", {}))
+
+        # No findings - return error message
+        if not all_findings:
+            if verbose:
+                print("  ⚠️ No findings to synthesize")
+            return f"# Research on {company_topic}\n\nUnable to find specific information about {company_topic} related to your query."
+
+        # Prepare context with research plan and findings
+        context = [
+            f"## Research Query\n{query}",
+            "## Research Plan",
+            "Key Questions:",
+            *[f"- {q}" for q in research_plan.key_questions],
+            "Research Areas:",
+            *[f"- {area}" for area in research_plan.research_areas],
+            "## Research Findings"
+        ]
+
+        # Add all findings to context
+        for section, content in all_findings.items():
+            context.append(f"### {section}")
+            context.append(content)
+
+        context_text = "\n\n".join(context)
+
+        # Synthesize findings
+        messages = [
+            SystemMessage(content=SYNTHESIS_INSTRUCTIONS),
+            HumanMessage(content=f"Synthesize the following research findings about {company_topic} "
+                                f"to answer the query: '{query}'\n\n{context_text}")
+        ]
+
+        intro_content = None
+        conclusion_content = None
+        final_report = ""
+        iterations = 0
+
+        while iterations < 3 and not final_report:  # Limit synthesis iterations
+            iterations += 1
+
+            if verbose:
+                print(f"  ↪ Synthesis iteration {iterations}/3")
+
+            try:
+                response = await synthesizer_model.ainvoke(messages)
+                messages.append(response)
+
+                # Process tool calls for introduction and conclusion
+                if hasattr(response, "tool_calls") and response.tool_calls:
+                    for tool_call in response.tool_calls:
+                        tool_name = tool_call["name"]
+                        tool_call_id = tool_call["id"]
+                        tool_args = dict(tool_call["args"])
+
+                        if verbose:
+                            print(f"  🔧 Using: {tool_name}({tool_args.get('name', 'Untitled')})")
+
+                        try:
+                            tool = synthesizer_tool_map[tool_name]
+                            result = await tool.ainvoke(tool_args) if hasattr(tool, "ainvoke") else tool.invoke(tool_args)
+
+                            if tool_name == "Introduction":
+                                intro_content = f"# {result.name}\n\n{result.content}"
+                                if verbose:
+                                    print(f"  ✅ Introduction created: '{result.name}'")
+
+                            elif tool_name == "Conclusion":
+                                conclusion_content = f"## {result.name}\n\n{result.content}"
+                                if verbose:
+                                    print(f"  ✅ Conclusion created: '{result.name}'")
+
+                            # Add tool message to conversation
+                            messages.append(ToolMessage(
+                                content=str(result),
+                                name=tool_name,
+                                tool_call_id=tool_call_id
+                            ))
+
+                        except Exception as e:
+                            if verbose:
+                                print(f"  ❌ Error in synthesis: {str(e)}")
+                else:
+                    # No more tool calls - try to use response directly
+                    if not intro_content and not conclusion_content and response.content:
+                        final_report = response.content
+                        if verbose:
+                            print("  ✅ Created direct response without tools")
+                        break
+
+                # If we have both intro and conclusion, create the report
+                if intro_content and conclusion_content:
+                    # Create body content from findings
+                    body_parts = []
+                    for section, content in all_findings.items():
+                        body_parts.append(f"## {section}\n\n{content}")
+
+                    body_content = "\n\n".join(body_parts)
+                    final_report = f"{intro_content}\n\n{body_content}\n\n{conclusion_content}"
+
+                    if verbose:
+                        print("  ✅ Final report assembled with introduction and conclusion")
+                    break
+
+                # Prompt for missing parts
+                if not intro_content and not conclusion_content:
+                    messages.append(HumanMessage(content="Please use the Introduction and Conclusion tools to create a structured response."))
+                elif not intro_content:
+                    messages.append(HumanMessage(content="Please use the Introduction tool to create a proper introduction."))
+                elif not conclusion_content:
+                    messages.append(HumanMessage(content="Please use the Conclusion tool to create a proper conclusion."))
+
+            except Exception as e:
                 if verbose:
-                    print("  ✓ Section research complete - no more tool calls")
-
-                # FIX: If no section was explicitly created but we completed research,
-                # create one from the model's final response
-                if not completed_section and response.content:
-                    section_name = section_description.split("\n")[0] if "\n" in section_description else section_description
-                    section_name = section_name[:50] + ("..." if len(section_name) > 50 else "")
-
-                    # FIX: Use proper tool invocation instead of direct constructor
-                    try:
-                        completed_section = Section.invoke({
-                            "name": section_name,
-                            "content": response.content
-                        })
-                        if verbose:
-                            print(f"    ✅ Created implicit section '{section_name}' from final response")
-                    except Exception as e:
-                        if verbose:
-                            print(f"    ❌ Error creating section: {str(e)}")
+                    print(f"  ❌ Synthesis error: {str(e)}")
                 break
 
-            # Process each tool call
-            for tool_call in response.tool_calls:
-                tool_name = tool_call["name"]
-                tool_call_id = tool_call["id"]
-                tool_args = dict(tool_call["args"])
+        # If we still don't have a report, create a simple one
+        if not final_report:
+            if verbose:
+                print("  ⚠️ Creating fallback report from findings")
 
-                # Create a readable representation of tool arguments for display
-                display_args = {k: v for k, v in tool_args.items() if k not in ("client", "api_key")}
-                if verbose:
-                    arg_str = ", ".join([f"{k}='{v}'" if isinstance(v, str) else f"{k}={v}" for k, v in display_args.items()])
-                    print(f"  🔧 Tool: {tool_name}({arg_str})")
+            # Create a simple report structure
+            parts = [f"# Research on {company_topic}\n\n"]
 
-                try:
-                    # Add appropriate credentials
-                    if tool_name in ("organization_search", "organization_detail"):
-                        tool_args["client"] = fb_client
-                        if verbose and tool_name == "organization_search":
-                            print(f"    🔍 Searching Fusionbase for: '{tool_args.get('query', '')}'")
-                        elif verbose and tool_name == "organization_detail":
-                            print(f"    📋 Getting details for entity ID: {tool_args.get('entity_id', '')}")
-                    elif tool_name == "google_search":
-                        tool_args["api_key"] = serp_api_key
-                        if verbose:
-                            print(f"    🌐 Searching web for: '{tool_args.get('query', '')}'")
-                    elif tool_name == "web_content" and verbose:
-                        print(f"    📄 Extracting content from: {tool_args.get('url', '')[:60]}...")
-                    elif tool_name == "Section" and verbose:
-                        print(f"    📑 Creating section: '{tool_args.get('name', '')}'")
+            if intro_content:
+                parts.append(intro_content)
+            else:
+                parts.append(f"## Overview\n\nThis report presents findings about {company_topic} related to: {query}")
 
-                    # Execute tool
-                    tool = research_tool_map[tool_name]
-                    result = await tool.ainvoke(tool_args) if hasattr(tool, "ainvoke") else tool.invoke(tool_args)
+            for section, content in all_findings.items():
+                parts.append(f"## {section}\n\n{content}")
 
-                    # Check if this is a section completion
-                    if tool_name == "Section":
-                        completed_section = result
-                        if verbose:
-                            print(f"    ✅ Section '{result.name}' completed ({len(result.content)} chars)")
+            if conclusion_content:
+                parts.append(conclusion_content)
+            else:
+                # Extract a simple conclusion from the last response
+                if response and hasattr(response, "content") and response.content:
+                    parts.append(f"## Conclusion\n\n{response.content}")
+                else:
+                    parts.append("## Conclusion\n\nResearch completed with the findings presented above.")
 
-                except Exception as e:
-                    result = f"Error executing {tool_name}: {str(e)}"
-                    if verbose:
-                        print(f"    ❌ Error: {str(e)}")
+            final_report = "\n\n".join(parts)
 
-                # Add tool message to conversation
-                messages.append(ToolMessage(
-                    content=str(result),
-                    name=tool_name,
-                    tool_call_id=tool_call_id
-                ))
-
-        # Return the completed section
-        if verbose and completed_section:
-            print(f"📑 [COMPLETE] Section '{completed_section.name}' ready")
-        elif verbose:
-            print("⚠️ [WARNING] No completed section was produced")
-
-        return completed_section
+        return final_report
 
     async def ainvoke(initial_state):
-        """Run the company research agent."""
+        """Execute the research agent process."""
         company_topic = initial_state.get("company_topic")
         if not company_topic:
             raise ValueError("company_topic is required in the initial state")
 
-        # Initialize system message for supervisor
-        system_message = SystemMessage(content=SUPERVISOR_INSTRUCTIONS)
-
-        # Get user query from initial state
+        # Extract the query
         user_messages = initial_state.get("messages", [])
-        if not user_messages:
-            user_messages = [{"role": "user", "content": f"Research {company_topic} and create a comprehensive report."}]
+        user_query = f"Research {company_topic} and create a comprehensive report."
 
-        # Convert user messages to proper format
-        messages = [system_message]
-        for msg in user_messages:
-            if isinstance(msg, dict):
-                messages.append(HumanMessage(content=msg["content"]))
-            else:
-                messages.append(msg)
+        if user_messages:
+            if isinstance(user_messages[0], dict):
+                user_query = user_messages[0].get("content", user_query)
+            elif hasattr(user_messages[0], "content"):
+                user_query = user_messages[0].content
 
         if verbose:
-            print(f"\n🚀 Starting company research for: {company_topic}")
-            print(f"🔄 Using models: Supervisor={supervisor_model}, Researcher={researcher_model}")
-            if serp_api_key:
-                print("🌐 Web search enabled")
-            else:
-                print("⚠️ Web search disabled (no API key)")
+            print(f"\n🚀 Starting research process for: {company_topic}")
+            print(f"🔎 Query: '{user_query}'")
+            print(f"🔄 Using models: Plan/Synthesis={supervisor_model}, Research={researcher_model}")
 
-        # Initialize variables
-        sections_list = []
-        completed_sections = []
-        final_report = ""
-        intro_content = None
-        conclusion_content = None
+        try:
+            # PHASE 1: PLANNING
+            research_plan = await create_research_plan(company_topic, user_query)
 
-        # Main supervisor loop
-        iterations = 0
-        while iterations < max_iterations:
-            iterations += 1
+            # PHASE 2: RESEARCH
+            if verbose:
+                print(f"\n🔍 Executing research plan with {len(research_plan.research_areas)} areas")
+
+            # Convert research areas to actual research tasks
+            if not research_plan.research_areas:
+                research_plan.research_areas = ["Company information and details"]
+
+            # Execute research for each area
+            research_tasks = [
+                research_area(company_topic, area) for area in research_plan.research_areas
+            ]
+            research_results = await asyncio.gather(*research_tasks)
+
+            # PHASE 3: SYNTHESIS
+            final_report = await synthesize_findings(company_topic, user_query, research_plan, research_results)
 
             if verbose:
-                print(f"\n📊 Supervisor iteration {iterations}/{max_iterations}")
-
-            # Get supervisor response
-            response = await supervisor_model_with_tools.ainvoke(messages)
-
-            # Add response to messages
-            messages.append(response)
-
-            # Check if we're done (no more tool calls)
-            if not hasattr(response, "tool_calls") or not response.tool_calls:
-                if verbose:
-                    print("✓ No more tool calls, finishing up")
-                break
-
-            # Process each tool call
-            for tool_call in response.tool_calls:
-                tool_name = tool_call["name"]
-                tool_call_id = tool_call["id"]
-                tool_args = dict(tool_call["args"])
-
-                # Create a readable representation of tool arguments for display
-                display_args = {k: v for k, v in tool_args.items() if k not in ("client", "api_key")}
-                if verbose:
-                    arg_str = ", ".join([f"{k}='{v}'" if isinstance(v, str) else f"{k}={v}" for k, v in display_args.items()])
-                    print(f"🔧 Using tool: {tool_name}({arg_str})")
-
-                try:
-                    # Add appropriate credentials
-                    if tool_name in ("organization_search", "organization_detail"):
-                        tool_args["client"] = fb_client
-                        if verbose and tool_name == "organization_search":
-                            print(f"  🔍 Searching Fusionbase for: '{tool_args.get('query', '')}'")
-                        elif verbose and tool_name == "organization_detail":
-                            print(f"  📋 Getting details for entity ID: {tool_args.get('entity_id', '')}")
-                    elif tool_name == "google_search":
-                        tool_args["api_key"] = serp_api_key
-                        if verbose:
-                            print(f"  🌐 Searching web for: '{tool_args.get('query', '')}'")
-                    elif tool_name == "web_content" and verbose:
-                        print(f"  📄 Extracting content from: {tool_args.get('url', '')[:60]}...")
-                    elif tool_name == "Sections" and verbose:
-                        print(f"  📝 Planning report sections")
-                    elif tool_name == "Introduction" and verbose:
-                        print(f"  📝 Writing introduction: '{tool_args.get('name', '')}'")
-                    elif tool_name == "Conclusion" and verbose:
-                        print(f"  📝 Writing conclusion: '{tool_args.get('name', '')}'")
-
-                    # Execute tool
-                    tool = supervisor_tool_map[tool_name]
-                    result = await tool.ainvoke(tool_args) if hasattr(tool, "ainvoke") else tool.invoke(tool_args)
-
-                    # Process special tool results
-                    if tool_name == "Sections":
-                        sections_list = result.sections
-                        if verbose:
-                            print(f"  ✅ Planned {len(sections_list)} sections:")
-                            for i, section in enumerate(sections_list, 1):
-                                print(f"    {i}. {section[:50]}...")
-                    elif tool_name == "Introduction":
-                        intro_content = f"# {result.name}\n\n{result.content}" if not str(result.content).startswith("# ") else result.content
-                        if verbose:
-                            print(f"  ✅ Introduction written: '{result.name}' ({len(result.content)} chars)")
-                    elif tool_name == "Conclusion":
-                        conclusion_content = f"## {result.name}\n\n{result.content}" if not str(result.content).startswith("## ") else result.content
-                        if verbose:
-                            print(f"  ✅ Conclusion written: '{result.name}' ({len(result.content)} chars)")
-                    elif tool_name == "Queries" and verbose:
-                        print(f"  🔍 Search queries planned: {len(result.queries)}")
-                        for i, query in enumerate(result.queries[:3], 1):
-                            print(f"    {i}. {query}")
-                        if len(result.queries) > 3:
-                            print(f"    ... and {len(result.queries)-3} more")
-
-                except Exception as e:
-                    result = f"Error executing {tool_name}: {str(e)}"
-                    if verbose:
-                        print(f"  ❌ Error: {str(e)}")
-
-                # Add tool message to conversation
-                messages.append(ToolMessage(
-                    content=str(result),
-                    name=tool_name,
-                    tool_call_id=tool_call_id
-                ))
-
-            # Check if we need to research sections
-            if sections_list and not completed_sections:
-                if verbose:
-                    print(f"\n🔎 Starting research for {len(sections_list)} sections")
-
-                # Research all sections concurrently
-                section_tasks = [research_section(company_topic, section) for section in sections_list]
-                section_results = await asyncio.gather(*section_tasks)
-
-                # Collect completed sections
-                for result in section_results:
-                    if result:
-                        completed_sections.append(result)
-
-                # Inform supervisor of completed sections
-                if completed_sections:
-                    if verbose:
-                        print(f"📊 Progress: {len(completed_sections)}/{len(sections_list)} sections completed")
-
-                    section_summary = "\n\n".join([f"Section: {s.name}" for s in completed_sections])
-                    messages.append(HumanMessage(
-                        content=f"Research completed for {len(completed_sections)} sections. Here's a summary:\n\n{section_summary}"
-                    ))
-                else:
-                    # FIX: If no sections were completed after research, create simple sections
-                    # so we don't get stuck in a loop
-                    if verbose:
-                        print("⚠️ No sections were completed from research, creating fallback sections")
-
-                    for section_desc in sections_list:
-                        section_name = section_desc.split("\n")[0] if "\n" in section_desc else section_desc
-                        section_name = section_name[:50] + ("..." if len(section_name) > 50 else "")
-                        content = f"Information about {section_name} for {company_topic} could not be fully researched."
-                        try:
-                            completed_sections.append(Section.invoke({
-                                "name": section_name,
-                                "content": content
-                            }))
-                        except Exception as e:
-                            if verbose:
-                                print(f"❌ Error creating fallback section: {str(e)}")
-
-            # FIX: If we have an introduction but no sections were completed,
-            # create sections directly from the available information
-            if intro_content and not completed_sections:
-                if verbose:
-                    print("\n⚠️ Introduction was created but no sections - creating basic sections")
-
-                # Create a basic section
-                try:
-                    basic_section = Section.invoke({
-                        "name": "Company Information",
-                        "content": f"Fusionbase GmbH is a data technology company based in Munich, Germany specializing in data management solutions."
-                    })
-                    completed_sections.append(basic_section)
-                except Exception as e:
-                    if verbose:
-                        print(f"❌ Error creating basic section: {str(e)}")
-
-            # Check for final report assembly
-            if intro_content and completed_sections:
-                # Even if we don't have a conclusion, we can still create a report
-                if not conclusion_content and iterations >= max_iterations - 1:
-                    if verbose:
-                        print("\n⚠️ Creating basic conclusion for report completion")
-                    conclusion_content = "## Conclusion\n\nFusionbase GmbH continues to innovate in the data management space, offering solutions that help businesses access and utilize data more effectively."
-
-                # Combine the parts into a final report
-                if conclusion_content:
-                    body_content = "\n\n".join([s.content for s in completed_sections])
-                    final_report = f"{intro_content}\n\n{body_content}\n\n{conclusion_content}"
-
-                    if verbose:
-                        print("\n✅ Report assembly complete!")
-                        print(f"📊 Report stats:")
-                        print(f"  - Introduction: {len(intro_content)} chars")
-                        print(f"  - Body sections: {len(body_content)} chars ({len(completed_sections)} sections)")
-                        print(f"  - Conclusion: {len(conclusion_content)} chars")
-                        print(f"  - Total length: {len(final_report)} chars")
-
-                    # Exit the loop
-                    break
-
-        # If we've reached max iterations but have some content, create a partial report
-        if iterations >= max_iterations:
-            # If we have an intro but no sections or conclusion, add them
-            if intro_content and not final_report:
-                if not completed_sections:
-                    try:
-                        basic_section = Section.invoke({
-                            "name": "Company Information",
-                            "content": "Fusionbase GmbH is a data technology company based in Munich that specializes in data management solutions."
-                        })
-                        completed_sections.append(basic_section)
-                    except Exception as e:
-                        if verbose:
-                            print(f"❌ Error creating emergency section: {str(e)}")
-
-                body_content = "\n\n".join([s.content for s in completed_sections])
-
-                if not conclusion_content:
-                    conclusion_content = "## Conclusion\n\nIn conclusion, Fusionbase GmbH is positioned as a specialized provider in the data management industry, continuing to develop its offerings in this space."
-
-                final_report = f"{intro_content}\n\n{body_content}\n\n{conclusion_content}"
-
-                if verbose:
-                    print("📊 Emergency report created with all available information")
-
-        # Return the final result
-        if verbose:
-            print("\n🏁 Research process complete")
-            if final_report:
+                print("\n🏁 Research process complete")
                 print(f"📄 Report generated ({len(final_report)} chars)")
-            else:
-                print("⚠️ No report was generated")
 
-        return {
-            "final_report": final_report or "Could not generate a report due to technical difficulties."
-        }
+            return {"final_report": final_report}
+
+        except Exception as e:
+            import traceback
+            if verbose:
+                print(f"\n❌ Error in research process: {str(e)}")
+                traceback.print_exc()
+
+            return {
+                "final_report": f"# Research Error\n\nAn error occurred while researching {company_topic}: {str(e)}"
+            }
 
     # Create the agent object
     class CompanyResearchAgent:
@@ -528,3 +558,59 @@ def create_company_research_agent(
             return asyncio.run(self.ainvoke(state))
 
     return CompanyResearchAgent()
+
+def extract_url_from_text(text):
+    """Extract a URL from text."""
+    import re  # pylint: disable=import-outside-toplevel
+    urls = re.findall(r'https?://[^\s]+', text)
+    if urls and "linkedin.com" in urls[0]:
+        # Clean up URL (remove trailing punctuation)
+        url = urls[0]
+        return url.rstrip('.,"\')')
+    return None
+
+def create_direct_answer_report(company_topic, facts, query):
+    """Create a report for direct answer queries."""
+    report = f"# Information about {company_topic}\n\n"
+
+    # Add facts with headers
+    for key, value in facts.items():
+        report += f"## {key}\n"
+        if isinstance(value, list):
+            report += "\n".join(value) + "\n\n"
+        else:
+            report += f"{value}\n\n"
+
+    # If we have LinkedIn info, make it prominent
+    if "LinkedIn URL" in facts:
+        linkedin = facts["LinkedIn URL"]
+        if "linkedin.com" in linkedin and not linkedin.startswith("http"):
+            linkedin = "https://" + linkedin
+        report = report.replace("## LinkedIn URL", f"## LinkedIn URL\n[{company_topic} on LinkedIn]({linkedin})")
+
+    # Add a conclusion if NAICS info was requested but not found
+    if "naics" in query.lower() and "NAICS Information" not in facts:
+        report += "\n## NAICS Code\nNo specific NAICS code information was found for this company."
+        report += "\nBased on the company's activities in data technology and management, potential NAICS codes could include:"
+        report += "\n- 518210: Data Processing, Hosting, and Related Services"
+        report += "\n- 541512: Computer Systems Design Services"
+        report += "\n- 511210: Software Publishers"
+
+    return report
+
+def create_fallback_report(messages, company_topic, query):
+    """Create a fallback report from conversation history."""
+    # Extract useful information from messages
+    useful_content = []
+    for msg in messages:
+        if hasattr(msg, "content") and isinstance(msg.content, str):
+            content = msg.content.strip()
+            # Ignore system messages, short messages, and tool calls
+            if len(content) > 100 and not content.startswith("You are") and "tool_call" not in content:
+                useful_content.append(content)
+
+    # Use the most recent substantial content
+    if useful_content:
+        return f"# Information about {company_topic}\n\n{useful_content[-1]}"
+
+    return f"# Information about {company_topic}\n\nNo specific information could be found for the query: {query}"

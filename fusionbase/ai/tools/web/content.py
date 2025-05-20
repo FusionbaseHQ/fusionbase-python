@@ -1,10 +1,7 @@
-"""Web content retrieval tools for Fusionbase AI."""
+"""Web content extraction tools for Fusionbase AI."""
 
-import os
-import re
 from typing import Any, Dict, Optional
 from urllib.parse import urljoin
-from urllib.parse import urlparse
 
 from bs4 import BeautifulSoup
 import html2text
@@ -14,48 +11,44 @@ from typing_extensions import Annotated
 try:
     from langchain_core.tools import InjectedToolArg
     from langchain_core.tools import tool
-except ImportError:
+except ImportError as exc:
     raise ImportError(
         "Could not import langchain package. "
         "Please install the required dependencies: "
         "pip install fusionbase[ai] "
         "or "
         "pip install langchain>=0.3.0 langchain-core>=0.3.0"
-    )
+    ) from exc
 
 
 @tool
 def web_content(
-    url: Annotated[str, "The URL of the web page to retrieve"],
-    proxy_url: Annotated[Optional[str], InjectedToolArg] = None
-) -> Dict[str, Any]:
-    """Retrieve and process content from a web page, converting it to markdown.
+    url: Annotated[str, "The URL of the web page to extract content from"],
+    proxies: Annotated[Optional[Dict[str, str]], "HTTP proxies to use"] = None,
+    verify_ssl: Annotated[Optional[bool], "Whether to verify SSL certificates"] = True,
+) -> str:
+    """Extract and process the main content from a webpage.
 
-    This tool fetches a web page, cleans it by removing unnecessary elements like
-    scripts and ads, and converts the content to markdown format. All relative
-    links are converted to absolute URLs.
+    This tool fetches web pages and intelligently extracts the main content,
+    removing navigation, ads, footers and other irrelevant content.
 
-    Example usage:
-    - Get content from a company's homepage
-    - Retrieve an article from a news site
-    - Extract information from a documentation page
+    Returns the extracted content in a clean, readable format.
     """
-    # Validate URL
-    if not url.startswith(('http://', 'https://')):
-        return {"error": "Invalid URL. Must start with http:// or https://"}
-
-    # Set up httpx client with proxy if provided
-    client_kwargs = {"timeout": 30.0, "follow_redirects": True}
-    if proxy_url:
-        client_kwargs["proxies"] = {"all": proxy_url}
-
     try:
-        # Make the request
+        # Configure httpx client with proxies if provided
+        client_kwargs = {
+            "headers": {"User-Agent": "Mozilla/5.0 Fusionbase/1.0"},
+            "follow_redirects": True,
+            "timeout": 15.0
+        }
+        if proxies:
+            client_kwargs["proxies"] = proxies
+        # Allow disabling SSL verification when needed for certain proxies
+        client_kwargs["verify"] = verify_ssl
+
+        # Fetch the page
         with httpx.Client(**client_kwargs) as client:
-            headers = {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-            }
-            response = client.get(url, headers=headers)
+            response = client.get(url)
             response.raise_for_status()
 
             # Get content type
@@ -100,53 +93,38 @@ def web_content(
 
             return result
 
-    except httpx.HTTPStatusError as e:
-        return {
-            "error": f"HTTP error: {e.response.status_code}",
-            "details": e.response.text[:500] if hasattr(e.response, "text") else str(e)
-        }
-    except httpx.RequestError as e:
-        return {
-            "error": f"Request error: {str(e)}"
-        }
     except Exception as e:
-        return {
-            "error": f"Error processing page: {str(e)}"
-        }
+        return f"Error extracting content from {url}: {str(e)}"
 
 
 @tool
 async def async_web_content(
-    url: Annotated[str, "The URL of the web page to retrieve"],
-    proxy_url: Annotated[Optional[str], InjectedToolArg] = None
-) -> Dict[str, Any]:
-    """Asynchronously retrieve and process content from a web page, converting it to markdown.
+    url: Annotated[str, "The URL of the web page to extract content from"],
+    proxies: Annotated[Optional[Dict[str, str]], "HTTP proxies to use"] = None,
+    verify_ssl: Annotated[Optional[bool], "Whether to verify SSL certificates"] = True,
+) -> str:
+    """Extract and process the main content from a webpage asynchronously.
 
-    This tool fetches a web page, cleans it by removing unnecessary elements like
-    scripts and ads, and converts the content to markdown format. All relative
-    links are converted to absolute URLs.
+    This tool fetches web pages and intelligently extracts the main content,
+    removing navigation, ads, footers and other irrelevant content.
 
-    Example usage:
-    - Get content from a company's homepage
-    - Retrieve an article from a news site
-    - Extract information from a documentation page
+    Returns the extracted content in a clean, readable format.
     """
-    # Validate URL
-    if not url.startswith(('http://', 'https://')):
-        return {"error": "Invalid URL. Must start with http:// or https://"}
-
-    # Set up httpx client with proxy if provided
-    client_kwargs = {"timeout": 30.0, "follow_redirects": True}
-    if proxy_url:
-        client_kwargs["proxies"] = {"all": proxy_url}
-
     try:
-        # Make the request
+        # Configure httpx client with proxies if provided
+        client_kwargs = {
+            "headers": {"User-Agent": "Mozilla/5.0 Fusionbase/1.0"},
+            "follow_redirects": True,
+            "timeout": 15.0
+        }
+        if proxies:
+            client_kwargs["proxies"] = proxies
+        # Allow disabling SSL verification when needed for certain proxies
+        client_kwargs["verify"] = verify_ssl
+
+        # Fetch the page asynchronously
         async with httpx.AsyncClient(**client_kwargs) as client:
-            headers = {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-            }
-            response = await client.get(url, headers=headers)
+            response = await client.get(url)
             response.raise_for_status()
 
             # Get content type
@@ -191,16 +169,5 @@ async def async_web_content(
 
             return result
 
-    except httpx.HTTPStatusError as e:
-        return {
-            "error": f"HTTP error: {e.response.status_code}",
-            "details": e.response.text[:500] if hasattr(e.response, "text") else str(e)
-        }
-    except httpx.RequestError as e:
-        return {
-            "error": f"Request error: {str(e)}"
-        }
     except Exception as e:
-        return {
-            "error": f"Error processing page: {str(e)}"
-        }
+        return f"Error extracting content from {url}: {str(e)}"

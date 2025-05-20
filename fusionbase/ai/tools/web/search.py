@@ -25,6 +25,7 @@ def google_search(
     hl: Annotated[Optional[str], "The language parameter for the UI (e.g., 'en', 'de', 'fr')"] = None,
     gl: Annotated[Optional[str], "The country parameter to limit results (e.g., 'us', 'de', 'uk')"] = None,
     api_key: Annotated[str, InjectedToolArg] = None,
+    verify_ssl: Annotated[Optional[bool], "Whether to verify SSL certificates"] = True,
 ) -> Dict[str, Any]:
     """Search Google and get relevant search results.
 
@@ -61,7 +62,10 @@ def google_search(
 
     # Make the request to the SERP API
     try:
-        with httpx.Client(timeout=30.0) as client:
+        # ValueSERP API calls should not use proxies
+        client_kwargs = {"timeout": 30.0, "verify": verify_ssl}
+
+        with httpx.Client(**client_kwargs) as client:
             response = client.get(base_url, params=params)
             response.raise_for_status()  # Raise exception for non-200 responses
             data = response.json()
@@ -107,6 +111,7 @@ async def async_google_search(
     hl: Annotated[Optional[str], "The language parameter for the UI (e.g., 'en', 'de', 'fr')"] = None,
     gl: Annotated[Optional[str], "The country parameter to limit results (e.g., 'us', 'de', 'uk')"] = None,
     api_key: Annotated[str, InjectedToolArg] = None,
+    verify_ssl: Annotated[Optional[bool], "Whether to verify SSL certificates"] = True,
 ) -> Dict[str, Any]:
     """Search Google asynchronously and get relevant search results.
 
@@ -143,7 +148,10 @@ async def async_google_search(
 
     # Make the request to the SERP API
     try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        # ValueSERP API calls should not use proxies
+        client_kwargs = {"timeout": 30.0, "verify": verify_ssl}
+
+        async with httpx.AsyncClient(**client_kwargs) as client:
             response = await client.get(base_url, params=params)
             response.raise_for_status()  # Raise exception for non-200 responses
             data = response.json()
