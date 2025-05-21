@@ -186,30 +186,60 @@ def create_company_research_agent(
                 response = await planner_model.ainvoke(messages)
                 messages.append(response)
 
-                # Extract plan if tool was called
+                # Handle any tool calls from the model
                 if hasattr(response, "tool_calls") and response.tool_calls:
                     for tool_call in response.tool_calls:
-                        if tool_call["name"] == "Plan":
-                            tool_args = dict(tool_call["args"])
-                            research_plan = ResearchPlan(
-                                key_questions=tool_args.get("key_questions", []),
-                                research_areas=tool_args.get("research_areas", []),
-                                information_sources=tool_args.get("information_sources", [])
-                            )
+                        tool_name = tool_call["name"]
+                        tool_call_id = tool_call["id"]
+                        tool_args = dict(tool_call["args"])
 
+                        if verbose:
+                            arg_str = ", ".join([f"{k}='{v}'" if isinstance(v, str) else f"{k}={v}" for k, v in tool_args.items()])
+                            print(f"  🔧 Planner tool: {tool_name}({arg_str})")
+
+                        result = None
+                        try:
+                            if tool_name == "Plan":
+                                # Directly use the provided arguments as the plan
+                                research_plan = ResearchPlan(
+                                    key_questions=tool_args.get("key_questions", []),
+                                    research_areas=tool_args.get("research_areas", []),
+                                    information_sources=tool_args.get("information_sources", [])
+                                )
+
+                                result = "Plan received"
+
+                                if verbose:
+                                    print("  ✅ Research plan created")
+                                    print(f"    📌 Key questions: {len(research_plan.key_questions)}")
+                                    print(f"    🔍 Research areas: {len(research_plan.research_areas)}")
+                                    print(f"    📚 Information sources: {len(research_plan.information_sources)}")
+                            else:
+                                # For other tools, we don't execute them during planning
+                                result = f"{tool_name} skipped during planning"
+                        except Exception as e:
+                            result = f"Error executing {tool_name}: {str(e)}"
                             if verbose:
-                                print("  ✅ Research plan created")
-                                print(f"    📌 Key questions: {len(research_plan.key_questions)}")
-                                print(f"    🔍 Research areas: {len(research_plan.research_areas)}")
-                                print(f"    📚 Information sources: {len(research_plan.information_sources)}")
-                            break
+                                print(f"    ❌ Error: {str(e)}")
 
-                # If no plan tool was called, prompt directly
+                        # Send the tool result back to the model
+                        messages.append(
+                            ToolMessage(content=str(result), name=tool_name, tool_call_id=tool_call_id)
+                        )
+
+                    if research_plan:
+                        break
+
+                # If no plan created yet, prompt the model again
                 if not research_plan:
-                    messages.append(HumanMessage(content=(
-                        "Please use the Plan tool to create a structured research plan. "
-                        "We need key_questions, research_areas, and information_sources."
-                    )))
+                    messages.append(
+                        HumanMessage(
+                            content=(
+                                "Please use the Plan tool to create a structured research plan. "
+                                "We need key_questions, research_areas, and information_sources."
+                            )
+                        )
+                    )
             except Exception as e:
                 if verbose:
                     print(f"  ❌ Error in planning: {str(e)}")
