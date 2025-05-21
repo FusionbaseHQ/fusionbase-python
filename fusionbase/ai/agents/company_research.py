@@ -167,10 +167,17 @@ def create_company_research_agent(
     researcher_tool_map = {tool.name: tool for tool in researcher_tools}  # Changed from research_tool_map to researcher_tool_map
     synthesizer_tool_map = {tool.name: tool for tool in synthesizer_tools}
 
+    def _create_chat_model(model_name: str, temperature: float) -> ChatOpenAI:
+        """Create a ChatOpenAI model, omitting temperature for models that don't support it."""
+        kwargs = {"model": model_name}
+        if not model_name.lower().startswith("o"):
+            kwargs["temperature"] = temperature
+        return ChatOpenAI(**kwargs)
+
     # Bind tools to models with different temperatures
-    planner_model = ChatOpenAI(model=supervisor_model, temperature=0).bind_tools(planner_tools)
-    researcher_model = ChatOpenAI(model=researcher_model, temperature=0).bind_tools(researcher_tools)
-    synthesizer_model = ChatOpenAI(model=supervisor_model, temperature=0.2).bind_tools(synthesizer_tools)
+    planner_model = _create_chat_model(supervisor_model, 0).bind_tools(planner_tools)
+    researcher_model = _create_chat_model(researcher_model, 0).bind_tools(researcher_tools)
+    synthesizer_model = _create_chat_model(supervisor_model, 0.2).bind_tools(synthesizer_tools)
 
     async def create_research_plan(company_topic: str, query: str) -> ResearchPlan:
         """Create a structured research plan for the query."""
