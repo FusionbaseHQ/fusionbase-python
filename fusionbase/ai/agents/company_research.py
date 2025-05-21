@@ -97,8 +97,8 @@ class Plan(BaseModel):
 
 def create_company_research_agent(
     fusionbase_client: Fusionbase,
-    supervisor_model: str = "gpt-4o",
-    researcher_model: str = "gpt-4o",
+    supervisor_model: str = "gpt-4.1",
+    researcher_model: str = "gpt-4.1",
     serp_api_key: str = None,
     max_iterations: int = 10,
     verbose: bool = False,
@@ -489,22 +489,44 @@ def create_company_research_agent(
 
     async def ainvoke(initial_state):
         """Execute the research agent process."""
+        # Extract the query from the initial state
+        user_messages = initial_state.get("messages", [])
+
+        if not user_messages:
+            raise ValueError("No query provided in the initial state 'messages' field")
+
+        # Get the user query from messages
+        if isinstance(user_messages[0], dict):
+            user_query = user_messages[0].get("content", "")
+        elif hasattr(user_messages[0], "content"):
+            user_query = user_messages[0].content
+        else:
+            raise ValueError("Invalid message format in initial state")
+
+        if not user_query:
+            raise ValueError("Empty query provided")
+
+        # Extract company_topic from the query if not provided explicitly
         company_topic = initial_state.get("company_topic")
         if not company_topic:
-            raise ValueError("company_topic is required in the initial state")
+            # Try to extract a company or topic from the query
+            # This will be refined during the planning phase
+            company_topic = "the requested topic"  # Generic placeholder
 
-        # Extract the query
-        user_messages = initial_state.get("messages", [])
-        user_query = f"Research {company_topic} and create a comprehensive report."
-
-        if user_messages:
-            if isinstance(user_messages[0], dict):
-                user_query = user_messages[0].get("content", user_query)
-            elif hasattr(user_messages[0], "content"):
-                user_query = user_messages[0].content
+            # Look for potential company or topic indicators in the query
+            if "about " in user_query:
+                topic_start = user_query.find("about ") + 6
+                topic_end = user_query.find(" ", topic_start)
+                if topic_end > topic_start:
+                    company_topic = user_query[topic_start:topic_end]
+            elif "for " in user_query:
+                topic_start = user_query.find("for ") + 4
+                topic_end = user_query.find(" ", topic_start)
+                if topic_end > topic_start:
+                    company_topic = user_query[topic_start:topic_end]
 
         if verbose:
-            print(f"\n🚀 Starting research process for: {company_topic}")
+            print(f"\n🚀 Starting research process")
             print(f"🔎 Query: '{user_query}'")
             print(f"🔄 Using models: Plan/Synthesis={supervisor_model}, Research={researcher_model}")
 

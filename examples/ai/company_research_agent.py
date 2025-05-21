@@ -34,8 +34,16 @@ except ImportError as e:
 async def main_async(args):
     """Run the company research agent example asynchronously."""
     console = Console()
-    console.print("\n[bold blue]Fusionbase Company Research Agent[/bold blue]\n")
-    console.print(f"Researching: [bold yellow]{args.company}[/bold yellow]\n")
+    console.print("\n[bold blue]Fusionbase Research Agent[/bold blue]\n")
+
+    # Determine the research topic and query
+    if args.query:
+        query = args.query
+        console.print(f"Researching query: [bold yellow]{query}[/bold yellow]\n")
+    else:
+        # Fall back to company-specific query if no direct query is provided
+        query = f"Research {args.company} and create a comprehensive company report."
+        console.print(f"Researching company: [bold yellow]{args.company}[/bold yellow]\n")
 
     # Initialize clients
     console.print("Initializing clients...", end="")
@@ -70,21 +78,6 @@ async def main_async(args):
     )
     console.print(" [green]Done[/green]")
 
-    # Build the query
-    query = f"Research {args.company}"
-    if args.focus:
-        query += f" with focus on {args.focus}"
-    query += " and create a comprehensive company report."
-
-    # Override with user's specific query if provided
-    if args.query:
-        query = args.query
-
-    # Run the agent
-    console.print("\n[bold]Starting research... This may take a few minutes.[/bold]")
-    if args.verbose:
-        console.print(f"[dim]Query: {query}[/dim]\n")
-
     # Create status display
     status_display = "Conducting research"
     if args.verbose:
@@ -92,9 +85,8 @@ async def main_async(args):
 
     with console.status(f"[bold green]{status_display}...") as status:
         try:
-            # Initialize state with company topic and user query
+            # Initialize state with only the query - no separate company_topic
             initial_state = {
-                "company_topic": args.company,
                 "messages": [{"role": "user", "content": query}]
             }
 
@@ -119,7 +111,7 @@ async def main_async(args):
             f.write(report)
         console.print(f"\n[green]Report saved to {output_path}[/green]")
     else:
-        console.print("\n[bold]Company Research Report:[/bold]\n")
+        console.print("\n[bold]Research Report:[/bold]\n")
         console.print(Markdown(report))
 
     console.print("\n[bold green]Research completed successfully[/bold green]")
@@ -127,16 +119,17 @@ async def main_async(args):
 def main():
     """Run the company research agent example."""
     # Parse arguments
-    parser = argparse.ArgumentParser(description="Generate company research or answer specific questions")
-    parser.add_argument("company", help="Name of the company to research")
+    parser = argparse.ArgumentParser(description="Generate research reports or answer specific questions")
+
+    # Create mutually exclusive group for query vs company
+    query_group = parser.add_mutually_exclusive_group(required=True)
+    query_group.add_argument("--company", help="Name of the company to research")
+    query_group.add_argument("--query", help="Custom research query (e.g., 'What is the LinkedIn URL of Fusionbase?')")
+
     parser.add_argument("--model", default="gpt-4o", help="Model to use for research (default: gpt-4o)")
     parser.add_argument("--output", help="Output file path to save the report (default: stdout)")
     parser.add_argument("--verbose", action="store_true", help="Show verbose output during processing")
     parser.add_argument("--focus", help="Specific focus area for the research (optional)")
-    parser.add_argument(
-        "--query",
-        help="Custom query instead of standard report format (e.g., 'Find LinkedIn URL and NAICS code')"
-    )
     parser.add_argument(
         "--max-iterations",
         type=int,
