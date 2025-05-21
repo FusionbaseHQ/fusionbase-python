@@ -15,6 +15,9 @@ from pydantic import Field
 from fusionbase import Fusionbase
 from fusionbase.ai.tools.entity.organization import organization_detail
 from fusionbase.ai.tools.entity.organization import organization_search
+from fusionbase.ai.tools.entity.relation import relation_detail
+from fusionbase.ai.tools.entity.relation import relation_resolve
+from fusionbase.ai.tools.entity.relation import relation_search
 from fusionbase.ai.tools.web.content import web_content
 from fusionbase.ai.tools.web.search import google_search
 
@@ -136,10 +139,20 @@ def create_company_research_agent(
     ]
 
     researcher_tools = [
+        # Organization tools
         organization_search,
         organization_detail,
+
+        # Relation tools
+        relation_search,
+        relation_detail,
+        relation_resolve,
+
+        # Web tools
         google_search,
         web_content,
+
+        # Output tools
         Section,
         Queries
     ]
@@ -260,7 +273,7 @@ def create_company_research_agent(
                 messages.append(response)
                 last_response = response.content if hasattr(response, "content") else ""
 
-                # Process tool calls - fix the variable reference
+                # Process tool calls
                 if hasattr(response, "tool_calls") and response.tool_calls:
                     for tool_call in response.tool_calls:
                         tool_name = tool_call["name"]
@@ -269,12 +282,13 @@ def create_company_research_agent(
 
                         if verbose:
                             arg_str = ", ".join([f"{k}='{v}'" if isinstance(v, str) else f"{k}={v}"
-                                              for k, v in tool_args.items() if k not in ("client", "api_key")])
+                                                for k, v in tool_args.items() if k not in ("client", "api_key")])
                             print(f"  🔧 Tool: {tool_name}({arg_str})")
 
                         try:
                             # Add appropriate credentials and proxies
-                            if tool_name in ("organization_search", "organization_detail"):
+                            if tool_name in ("organization_search", "organization_detail",
+                                             "relation_search", "relation_detail", "relation_resolve"):
                                 tool_args["client"] = fb_client
                             elif tool_name == "google_search":
                                 tool_args["api_key"] = serp_api_key
@@ -580,59 +594,3 @@ def create_company_research_agent(
             return asyncio.run(self.ainvoke(state))
 
     return CompanyResearchAgent()
-
-def extract_url_from_text(text):
-    """Extract a URL from text."""
-    import re  # pylint: disable=import-outside-toplevel
-    urls = re.findall(r'https?://[^\s]+', text)
-    if urls and "linkedin.com" in urls[0]:
-        # Clean up URL (remove trailing punctuation)
-        url = urls[0]
-        return url.rstrip('.,"\')')
-    return None
-
-def create_direct_answer_report(company_topic, facts, query):
-    """Create a report for direct answer queries."""
-    report = f"# Information about {company_topic}\n\n"
-
-    # Add facts with headers
-    for key, value in facts.items():
-        report += f"## {key}\n"
-        if isinstance(value, list):
-            report += "\n".join(value) + "\n\n"
-        else:
-            report += f"{value}\n\n"
-
-    # If we have LinkedIn info, make it prominent
-    if "LinkedIn URL" in facts:
-        linkedin = facts["LinkedIn URL"]
-        if "linkedin.com" in linkedin and not linkedin.startswith("http"):
-            linkedin = "https://" + linkedin
-        report = report.replace("## LinkedIn URL", f"## LinkedIn URL\n[{company_topic} on LinkedIn]({linkedin})")
-
-    # Add a conclusion if NAICS info was requested but not found
-    if "naics" in query.lower() and "NAICS Information" not in facts:
-        report += "\n## NAICS Code\nNo specific NAICS code information was found for this company."
-        report += "\nBased on the company's activities in data technology and management, potential NAICS codes could include:"
-        report += "\n- 518210: Data Processing, Hosting, and Related Services"
-        report += "\n- 541512: Computer Systems Design Services"
-        report += "\n- 511210: Software Publishers"
-
-    return report
-
-def create_fallback_report(messages, company_topic, query):
-    """Create a fallback report from conversation history."""
-    # Extract useful information from messages
-    useful_content = []
-    for msg in messages:
-        if hasattr(msg, "content") and isinstance(msg.content, str):
-            content = msg.content.strip()
-            # Ignore system messages, short messages, and tool calls
-            if len(content) > 100 and not content.startswith("You are") and "tool_call" not in content:
-                useful_content.append(content)
-
-    # Use the most recent substantial content
-    if useful_content:
-        return f"# Information about {company_topic}\n\n{useful_content[-1]}"
-
-    return f"# Information about {company_topic}\n\nNo specific information could be found for the query: {query}"

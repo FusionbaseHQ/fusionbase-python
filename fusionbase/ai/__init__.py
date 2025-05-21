@@ -25,10 +25,16 @@ except ImportError as e:
 from .tools import async_google_search
 from .tools import async_organization_detail
 from .tools import async_organization_search
+from .tools import async_relation_detail
+from .tools import async_relation_resolve
+from .tools import async_relation_search
 from .tools import async_web_content
 from .tools import google_search
 from .tools import organization_detail
 from .tools import organization_search
+from .tools import relation_detail
+from .tools import relation_resolve
+from .tools import relation_search
 from .tools import web_content
 
 __all__ = [
@@ -36,6 +42,12 @@ __all__ = [
     "organization_detail",
     "async_organization_search",
     "async_organization_detail",
+    "relation_search",
+    "relation_detail",
+    "relation_resolve",
+    "async_relation_search",
+    "async_relation_detail",
+    "async_relation_resolve",
     "google_search",
     "async_google_search",
     "web_content",

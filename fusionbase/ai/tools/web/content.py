@@ -1,6 +1,6 @@
 """Web content extraction tools for Fusionbase AI."""
 
-from typing import Any, Dict, Optional
+from typing import Dict, Optional
 from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup

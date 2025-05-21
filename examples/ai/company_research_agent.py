@@ -129,7 +129,6 @@ def main():
     parser.add_argument("--model", default="gpt-4o", help="Model to use for research (default: gpt-4o)")
     parser.add_argument("--output", help="Output file path to save the report (default: stdout)")
     parser.add_argument("--verbose", action="store_true", help="Show verbose output during processing")
-    parser.add_argument("--focus", help="Specific focus area for the research (optional)")
     parser.add_argument(
         "--max-iterations",
         type=int,

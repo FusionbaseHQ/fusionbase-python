@@ -5,6 +5,12 @@ try:
     from .entity.organization import async_organization_search
     from .entity.organization import organization_detail
     from .entity.organization import organization_search
+    from .entity.relation import async_relation_detail
+    from .entity.relation import async_relation_resolve
+    from .entity.relation import async_relation_search
+    from .entity.relation import relation_detail
+    from .entity.relation import relation_resolve
+    from .entity.relation import relation_search
     from .web.content import async_web_content
     from .web.content import web_content
     from .web.search import async_google_search
@@ -15,6 +21,12 @@ try:
         "organization_detail",
         "async_organization_search",
         "async_organization_detail",
+        "relation_search",
+        "relation_detail",
+        "relation_resolve",
+        "async_relation_search",
+        "async_relation_detail",
+        "async_relation_resolve",
         "google_search",
         "async_google_search",
         "web_content",
