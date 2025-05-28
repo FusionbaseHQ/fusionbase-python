@@ -21,6 +21,7 @@ from fusionbase.ai.tools.entity.relation import relation_search
 from fusionbase.ai.tools.web.content import web_content
 from fusionbase.ai.tools.web.search import google_search
 
+from .prompts import HALLUCINATION_GRADING_INSTRUCTIONS
 from .prompts import RESEARCH_INSTRUCTIONS
 from .prompts import SYNTHESIS_INSTRUCTIONS
 
@@ -75,33 +76,73 @@ class Queries(BaseModel):
         description="List of search queries to gather information.",
     )
 
+@tool
+class FinalAnswer(BaseModel):
+    """Final answer formatted according to user's requirements."""
+    content: str = Field(
+        description="The final answer formatted exactly as requested by the user"
+    )
+    format_type: str = Field(
+        description="The format type detected (e.g., 'json', 'markdown', 'list', 'plain_text')"
+    )
+
 class CompanyResearchResult(TypedDict):
     """Result of the company research agent."""
     final_report: str
 
+class ResearchContext(BaseModel):
+    """Global research context shared across all agents."""
+    original_query: str
+    research_goal: str
+    target_entity: str
+    research_plan: Optional["ResearchPlan"] = None
+    findings_registry: Dict[str, str] = {}  # section_name -> content
+    completed_searches: List[str] = []  # Track what's been searched
+    key_insights: List[str] = []  # Store important discoveries
+
 class ResearchPlan(BaseModel):
     """A plan for researching the topic."""
-    key_questions: List[str]
-    research_areas: List[str]
-    information_sources: List[str]
+    key_questions: List[str]  # Questions that need to be answered
+    data_points: List[str]    # Specific data points to gather
+    search_strategies: List[str]  # Strategies for finding information
 
 @tool
 class Plan(BaseModel):
     """Define a research plan for the query."""
     key_questions: List[str] = Field(
-        description="The key questions that need to be answered to fulfill the research goal."
+        description="Key questions that need to be answered to fulfill the research goal (e.g., 'What is the company's main business?', 'Who are the key executives?')"
     )
-    research_areas: List[str] = Field(
-        description="Specific areas to investigate during research."
+    data_points: List[str] = Field(
+        description="Specific data points to gather about the company (e.g., 'LinkedIn URL', 'Website URL', 'Number of employees', 'Founding date', 'CEO name')"
     )
-    information_sources: List[str] = Field(
-        description="Potential sources of information to consult."
+    search_strategies: List[str] = Field(
+        description="Deep search strategies to use for comprehensive information gathering (e.g., 'Deep web search with multiple keyword variations', 'Social media profile searches', 'Industry database lookups', 'News article mining', 'Company filing searches')"
+    )
+
+@tool
+class GlobalFinding(BaseModel):
+    """Store a research finding in the global registry."""
+    section_name: str = Field(
+        description="Name/category of this finding (e.g., 'Company Overview', 'LinkedIn URL', 'Financial Data')"
+    )
+    content: str = Field(
+        description="The research finding content"
+    )
+    relevance_score: float = Field(
+        description="How relevant this finding is to the research goal (0.0-1.0)",
+        ge=0.0,
+        le=1.0
+    )
+    sources: List[str] = Field(
+        description="Sources where this information was found",
+        default_factory=list
     )
 
 def create_company_research_agent(
     fusionbase_client: Fusionbase,
     supervisor_model: str = "gpt-4.1",
     researcher_model: str = "gpt-4.1",
+    hallucination_grader_model: str = "gpt-4.1",
     serp_api_key: str = None,
     max_iterations: int = 10,
     verbose: bool = False,
@@ -114,6 +155,7 @@ def create_company_research_agent(
         fusionbase_client: Client for accessing Fusionbase data
         supervisor_model: Model to use for the supervisor agent
         researcher_model: Model to use for the researcher agent
+        hallucination_grader_model: Model to use for hallucination grading
         serp_api_key: API key for SERP web search
         max_iterations: Maximum iterations before forcing completion
         verbose: Enable verbose output
@@ -153,13 +195,14 @@ def create_company_research_agent(
         web_content,
 
         # Output tools
-        Section,
+        GlobalFinding,
         Queries
     ]
 
     synthesizer_tools = [
         Introduction,
-        Conclusion
+        Conclusion,
+        FinalAnswer  # Keep this but make it more flexible
     ]
 
     # Create tool maps - fix variable name for consistency
@@ -178,25 +221,81 @@ def create_company_research_agent(
     planner_model = _create_chat_model(supervisor_model, 0).bind_tools(planner_tools)
     researcher_model = _create_chat_model(researcher_model, 0).bind_tools(researcher_tools)
     synthesizer_model = _create_chat_model(supervisor_model, 0.2).bind_tools(synthesizer_tools)
+    hallucination_grader = _create_chat_model(hallucination_grader_model, 0)
 
-    async def create_research_plan(company_topic: str, query: str) -> ResearchPlan:
-        """Create a structured research plan for the query."""
+    async def grade_for_hallucination(claim: str, source_content: str, context: str = "") -> Dict[str, Any]:
+        """Grade whether a claim is grounded in the provided source content."""
         if verbose:
-            print(f"\n📋 Creating research plan for: '{query}'")
+            print(f"    🔍 Grading claim for hallucination...")
+
+        hallucination_prompt = HALLUCINATION_GRADING_INSTRUCTIONS.format(
+            claim=claim,
+            source_content=source_content,
+            context=context
+        )
+
+        try:
+            response = await hallucination_grader.ainvoke([
+                SystemMessage(content="You are a strict fact-checking expert. Always respond with valid JSON only."),
+                HumanMessage(content=hallucination_prompt)
+            ])
+
+            # Parse the JSON response
+            import json
+            result = json.loads(response.content)
+
+            if verbose:
+                grounded = "✅ GROUNDED" if result.get("is_grounded", False) else "❌ HALLUCINATED"
+                confidence = result.get("confidence", 0.0)
+                print(f"      {grounded} (confidence: {confidence:.2f})")
+                if not result.get("is_grounded", False):
+                    print(f"      Reason: {result.get('explanation', 'No explanation')}")
+
+            return result
+
+        except Exception as e:
+            if verbose:
+                print(f"      ⚠️ Error in hallucination grading: {str(e)}")
+            # Default to not grounded if grading fails
+            return {
+                "is_grounded": False,
+                "confidence": 0.0,
+                "explanation": f"Grading failed: {str(e)}",
+                "supported_parts": [],
+                "unsupported_parts": [claim]
+            }
+
+    async def create_research_plan(original_query: str, target_entity: str) -> ResearchContext:
+        """Create a structured research plan and context for the query."""
+        if verbose:
+            print(f"\n📋 Creating research plan for: '{original_query}'")
+
+        # Determine research goal from query
+        research_goal = original_query
+        if "research" in original_query.lower():
+            research_goal = f"Comprehensive research on {target_entity}"
+        elif "find" in original_query.lower() or "what is" in original_query.lower():
+            research_goal = f"Find specific information: {original_query}"
 
         messages = [
             SystemMessage(content=(
-                "You are a strategic research planner. Your job is to analyze a research question "
-                "and create a detailed plan for investigating it. Focus on breaking down complex "
-                "questions into manageable parts."
+                f"You are a strategic research planner. Create a detailed research plan for: '{original_query}'\n\n"
+                f"Target Entity: {target_entity}\n"
+                f"Research Goal: {research_goal}\n\n"
+                "Focus on creating a comprehensive plan that will directly answer the query. "
+                "Avoid generic research areas - be specific to what the user is asking for. "
+                "Examples of good key questions: 'What is the company's main business model?', 'Who are the key competitors?', 'What is the company's market position?' "
+                "Examples of good data points: 'LinkedIn URL', 'Website URL', 'Number of employees', 'Revenue 2023', 'CEO name', 'Founding date' "
+                "Examples of focused search strategies: 'Multi-layered keyword searches with company name variations', 'Deep social media profiling', "
+                "'Industry report mining', 'News archive searches', 'Patent database searches', 'Financial filing searches', 'Executive background searches'"
             )),
-            HumanMessage(content=f"Create a research plan for the following query about {company_topic}: {query}")
+            HumanMessage(content=f"Create a comprehensive research plan for: {original_query}")
         ]
 
         research_plan = None
         iterations = 0
 
-        while iterations < 3 and not research_plan:  # Limit planning iterations
+        while iterations < 3 and not research_plan:
             iterations += 1
 
             if verbose:
@@ -206,7 +305,6 @@ def create_company_research_agent(
                 response = await planner_model.ainvoke(messages)
                 messages.append(response)
 
-                # Handle any tool calls from the model
                 if hasattr(response, "tool_calls") and response.tool_calls:
                     for tool_call in response.tool_calls:
                         tool_name = tool_call["name"]
@@ -217,47 +315,37 @@ def create_company_research_agent(
                             arg_str = ", ".join([f"{k}='{v}'" if isinstance(v, str) else f"{k}={v}" for k, v in tool_args.items()])
                             print(f"  🔧 Planner tool: {tool_name}({arg_str})")
 
-                        result = None
                         try:
                             if tool_name == "Plan":
-                                # Directly use the provided arguments as the plan
                                 research_plan = ResearchPlan(
                                     key_questions=tool_args.get("key_questions", []),
-                                    research_areas=tool_args.get("research_areas", []),
-                                    information_sources=tool_args.get("information_sources", [])
+                                    data_points=tool_args.get("data_points", []),
+                                    search_strategies=tool_args.get("search_strategies", [])
                                 )
-
-                                result = "Plan received"
 
                                 if verbose:
                                     print("  ✅ Research plan created")
-                                    print(f"    📌 Key questions: {len(research_plan.key_questions)}")
-                                    print(f"    🔍 Research areas: {len(research_plan.research_areas)}")
-                                    print(f"    📚 Information sources: {len(research_plan.information_sources)}")
+                                    print(f"    ❓ Key questions: {len(research_plan.key_questions)}")
+                                    print(f"    📊 Data points: {len(research_plan.data_points)}")
+                                    print(f"    🔍 Search strategies: {len(research_plan.search_strategies)}")
                             else:
-                                # For other tools, we don't execute them during planning
                                 result = f"{tool_name} skipped during planning"
                         except Exception as e:
                             result = f"Error executing {tool_name}: {str(e)}"
                             if verbose:
                                 print(f"    ❌ Error: {str(e)}")
 
-                        # Send the tool result back to the model
                         messages.append(
-                            ToolMessage(content=str(result), name=tool_name, tool_call_id=tool_call_id)
+                            ToolMessage(content="Plan received", name=tool_name, tool_call_id=tool_call_id)
                         )
 
                     if research_plan:
                         break
 
-                # If no plan created yet, prompt the model again
                 if not research_plan:
                     messages.append(
                         HumanMessage(
-                            content=(
-                                "Please use the Plan tool to create a structured research plan. "
-                                "We need key_questions, research_areas, and information_sources."
-                            )
+                            content="Please use the Plan tool to create a structured research plan."
                         )
                     )
             except Exception as e:
@@ -270,34 +358,87 @@ def create_company_research_agent(
                 print("  ⚠️ Using fallback research plan")
 
             research_plan = ResearchPlan(
-                key_questions=[f"What information can be found about {company_topic}?",
-                              f"What are the main details about {company_topic}?"],
-                research_areas=["Company information", "Industry details"],
-                information_sources=["Fusionbase database", "Company website", "Web search"]
+                key_questions=[f"What are the key facts about {target_entity}?"],
+                data_points=[f"Basic information about {target_entity}"],
+                search_strategies=["Fusionbase database search", "Deep web search with multiple keyword variations"]
             )
 
-        return research_plan
+        # Create research context
+        context = ResearchContext(
+            original_query=original_query,
+            research_goal=research_goal,
+            target_entity=target_entity,
+            research_plan=research_plan,
+            findings_registry={},
+            completed_searches=[],
+            key_insights=[]
+        )
 
-    async def research_area(company_topic: str, area_description: str, context: str = "") -> Dict[str, Any]:
-        """Research a specific area related to the company."""
+        return context
+
+    async def research_area_with_context(context: ResearchContext, area_description: str, force_org_search: bool = False) -> Dict[str, Any]:
+        """Research a specific area with full context awareness and deep investigation capabilities."""
         if verbose:
             print(f"\n📝 [RESEARCH] Investigating: '{area_description[:50]}...'")
 
-        # Build context from plan and any previous findings
-        prompt = f"Research the following area for {company_topic}: {area_description}"
-        if context:
-            prompt += f"\n\nContext from previous research:\n{context}"
+        # Build context-aware prompt with emphasis on persistence and depth
+        context_info = f"""
+RESEARCH CONTEXT:
+- Original Query: {context.original_query}
+- Research Goal: {context.research_goal}
+- Target Entity: {context.target_entity}
 
-        # Initialize conversation
+CURRENT TASK: {area_description}
+
+PREVIOUSLY COMPLETED SEARCHES: {', '.join(context.completed_searches) if context.completed_searches else 'None'}
+
+EXISTING FINDINGS:
+{chr(10).join([f"- {name}: {content[:100]}..." for name, content in context.findings_registry.items()]) if context.findings_registry else 'None yet'}
+
+KEY INSIGHTS SO FAR:
+{chr(10).join([f"- {insight}" for insight in context.key_insights]) if context.key_insights else 'None yet'}
+
+YOUR MISSION: Focus specifically on finding information for "{area_description}" that directly serves the research goal: "{context.research_goal}".
+
+PERSISTENCE AND DEPTH STRATEGY:
+- If initial searches don't provide complete information, try alternative approaches
+- Use Google search pagination (page parameter) to explore more results if needed
+- When you find promising web pages, thoroughly extract content using web_content
+- If a page doesn't have the specific information, try related searches or navigate to related pages
+- Build upon previous tool results to guide your next searches
+- Don't give up after one search - iterate and refine your approach
+- Use the information from previous tool calls to inform your next moves
+
+SEARCH DEPTH TECHNIQUES:
+1. Start with broad searches, then narrow down based on results
+2. Use company name variations and synonyms
+3. Try industry-specific searches if company searches don't work
+4. Paginate through Google results using the 'page' parameter (1, 2, 3, etc.)
+5. Extract content from multiple promising URLs
+6. Cross-reference information between different sources
+
+You have up to {max_iterations} iterations to find comprehensive information. Use them strategically.
+"""
+
         messages = [
             SystemMessage(content=RESEARCH_INSTRUCTIONS.format(section_description=area_description)),
-            HumanMessage(content=prompt)
+            HumanMessage(content=context_info)
         ]
 
         # Research variables
         findings = {}
         iterations = 0
         last_response = ""
+        org_search_called = False
+        tool_results = []
+        search_page_tracking = {}  # Track which searches and pages we've explored
+
+        # Create models
+        regular_model = researcher_model
+        forced_org_search_model = _create_chat_model(researcher_model.model_name, 0).bind_tools(
+            researcher_tools,
+            tool_choice="organization_search"
+        ) if force_org_search else None
 
         while iterations < max_iterations:
             iterations += 1
@@ -306,20 +447,29 @@ def create_company_research_agent(
                 print(f"  ↪ Research iteration {iterations}/{max_iterations}")
 
             try:
-                response = await researcher_model.ainvoke(messages)
+                current_model = forced_org_search_model if (force_org_search and iterations == 1 and not org_search_called) else regular_model
+
+                if current_model == forced_org_search_model and verbose:
+                    print("    🔒 Forcing organization search in this iteration")
+
+                response = await current_model.ainvoke(messages)
                 messages.append(response)
                 last_response = response.content if hasattr(response, "content") else ""
 
-                # Process tool calls
                 if hasattr(response, "tool_calls") and response.tool_calls:
+                    iteration_had_findings = False
+
                     for tool_call in response.tool_calls:
                         tool_name = tool_call["name"]
                         tool_call_id = tool_call["id"]
                         tool_args = dict(tool_call["args"])
 
+                        if tool_name == "organization_search":
+                            org_search_called = True
+
                         if verbose:
                             arg_str = ", ".join([f"{k}='{v}'" if isinstance(v, str) else f"{k}={v}"
-                                                for k, v in tool_args.items() if k not in ("client", "api_key")])
+                                                for k, v in tool_args.items() if k not in ("client", "api_key", "proxies", "verify_ssl")])
                             print(f"  🔧 Tool: {tool_name}({arg_str})")
 
                         try:
@@ -332,23 +482,84 @@ def create_company_research_agent(
                                 if proxies:
                                     tool_args["proxies"] = proxies
                                 tool_args["verify_ssl"] = verify_ssl
+
+                                # Enhanced search tracking with pagination support
+                                search_query = tool_args.get("query", "")
+                                search_page = tool_args.get("page", 1)  # Default to page 1
+                                search_key = f"{search_query}:page{search_page}"
+
+                                # Track this specific search + page combination
+                                if search_key not in context.completed_searches:
+                                    context.completed_searches.append(search_key)
+
+                                # Update page tracking
+                                if search_query not in search_page_tracking:
+                                    search_page_tracking[search_query] = []
+                                if search_page not in search_page_tracking[search_query]:
+                                    search_page_tracking[search_query].append(search_page)
+
+                                if verbose:
+                                    print(f"    📄 Search page {search_page} for query: '{search_query}'")
+
                             elif tool_name == "web_content" and proxies:
                                 tool_args["proxies"] = proxies
                                 tool_args["verify_ssl"] = verify_ssl
 
-                            # Execute tool - Fix the variable name here
-                            tool = researcher_tool_map[tool_name]  # Changed from research_tool_map to researcher_tool_map
+                            # Execute tool
+                            tool = researcher_tool_map[tool_name]
                             result = await tool.ainvoke(tool_args) if hasattr(tool, "ainvoke") else tool.invoke(tool_args)
 
-                            # Save Section results to findings
-                            if tool_name == "Section":
-                                findings[tool_args.get("name", "Untitled")] = tool_args.get("content", "")
-                                if verbose:
-                                    print(f"    ✅ Saved finding: '{tool_args.get('name', 'Untitled')}'")
+                            tool_results.append({
+                                "tool_name": tool_name,
+                                "args": tool_args,
+                                "result": result,
+                                "iteration": iterations
+                            })
 
-                            # Add tool message to conversation
+                            # Handle GlobalFinding results
+                            if tool_name == "GlobalFinding":
+                                section_name = tool_args.get("section_name", "Untitled")
+                                content = tool_args.get("content", "")
+                                relevance_score = tool_args.get("relevance_score", 0.5)
+                                sources = tool_args.get("sources", [])
+
+                                # Grade for hallucination
+                                source_content = "\n\n".join([
+                                    f"Tool: {tr['tool_name']}\nArgs: {tr['args']}\nResult: {str(tr['result'])}"
+                                    for tr in tool_results[-5:]  # Use last 5 tool results for context
+                                ])
+
+                                grading_result = await grade_for_hallucination(
+                                    claim=content,
+                                    source_content=source_content,
+                                    context=f"Research area: {area_description}"
+                                )
+
+                                # Only add if grounded and relevant
+                                if grading_result.get("is_grounded", False) and relevance_score > 0.3:
+                                    # Store in global registry
+                                    context.findings_registry[section_name] = content
+                                    findings[section_name] = content
+                                    iteration_had_findings = True
+
+                                    # If high relevance, add to key insights
+                                    if relevance_score > 0.7:
+                                        insight = f"{section_name}: {content[:100]}..."
+                                        if insight not in context.key_insights:
+                                            context.key_insights.append(insight)
+
+                                    if verbose:
+                                        print(f"    ✅ Saved finding: '{section_name}' (relevance: {relevance_score:.2f})")
+                                else:
+                                    if verbose:
+                                        reason = "low relevance" if relevance_score <= 0.3 else "hallucinated"
+                                        print(f"    ❌ Rejected finding: '{section_name}' ({reason})")
+
+                            # Provide rich context back to the model about what happened
+                            tool_response = _create_contextual_tool_response(tool_name, result, tool_results, search_page_tracking, iterations)
+
                             messages.append(ToolMessage(
-                                content=str(result),
+                                content=tool_response,
                                 name=tool_name,
                                 tool_call_id=tool_call_id
                             ))
@@ -362,260 +573,340 @@ def create_company_research_agent(
                             ))
                             if verbose:
                                 print(f"    ❌ Error: {str(e)}")
+
+                    # Add guidance for next iteration if we haven't found enough yet
+                    if not iteration_had_findings and iterations < max_iterations:
+                        guidance = _create_iteration_guidance(tool_results, search_page_tracking, area_description, iterations)
+                        messages.append(HumanMessage(content=guidance))
+
+                        if verbose:
+                            print(f"    💡 Providing guidance for iteration {iterations + 1}")
+
                 else:
-                    # No more tool calls - done with this research area
-                    if verbose:
-                        print("  ✓ Research area complete")
-                    break
+                    # No tool calls - check if we should continue or wrap up
+                    if iterations < max_iterations and not findings:
+                        messages.append(HumanMessage(content=(
+                            f"You still have {max_iterations - iterations} iterations remaining. "
+                            f"Continue searching for information about '{area_description}'. "
+                            "Try different search strategies, visit web pages, or explore additional sources. "
+                            "Use the tools available to find relevant information."
+                        )))
+                        if verbose:
+                            print("  ↪ No tools called - encouraging continued search")
+                    else:
+                        if verbose:
+                            print("  ✓ Research area complete")
+                        break
 
             except Exception as e:
                 if verbose:
                     print(f"  ❌ Research error: {str(e)}")
                 break
 
-        # Save the last response as a finding if no sections were created
+        # Handle last response if no findings were created
         if not findings and last_response:
-            findings["Summary"] = last_response
+            source_content = "\n\n".join([
+                f"Tool: {tr['tool_name']}\nResult: {str(tr['result'])}"
+                for tr in tool_results
+            ])
+
+            if source_content:
+                grading_result = await grade_for_hallucination(
+                    claim=last_response,
+                    source_content=source_content,
+                    context=f"Research area: {area_description}"
+                )
+
+                if grading_result.get("is_grounded", False):
+                    findings["Summary"] = last_response
+                    context.findings_registry[f"{area_description} - Summary"] = last_response
 
         return {
             "area": area_description,
             "findings": findings,
             "iterations": iterations,
-            "last_response": last_response
+            "last_response": last_response,
+            "org_search_called": org_search_called,
+            "search_pages_explored": search_page_tracking
         }
 
-    async def synthesize_findings(company_topic: str, query: str, research_plan, research_results) -> str:
-        """Synthesize all research findings into a cohesive answer."""
+    def _create_contextual_tool_response(tool_name: str, result: Any, tool_results: List[Dict], search_page_tracking: Dict, iteration: int) -> str:
+        """Create a contextual response that helps the model understand what happened and what to do next."""
+
+        base_result = str(result)
+
+        # Add specific guidance based on tool type and results
+        if tool_name == "google_search":
+            if isinstance(result, dict) and "organic_results" in result:
+                organic_count = len(result["organic_results"])
+                context_info = f"\n\nCONTEXT: Found {organic_count} search results. "
+
+                if organic_count > 0:
+                    context_info += "Consider using web_content on promising URLs to extract detailed information. "
+                    context_info += "You can also try different search terms or use the 'page' parameter (2, 3, etc.) to see more results."
+                else:
+                    context_info += "No results found. Try different search terms or keywords."
+
+                return base_result + context_info
+
+        elif tool_name == "web_content":
+            if isinstance(result, dict) and result.get("content"):
+                content_length = len(result["content"])
+                context_info = f"\n\nCONTEXT: Extracted {content_length} characters of content. "
+
+                if content_length > 100:
+                    context_info += "Review this content for relevant information. If it doesn't contain what you need, try other URLs or search strategies."
+                else:
+                    context_info += "Limited content extracted. Consider trying other URLs or search approaches."
+
+                return base_result + context_info
+
+        elif tool_name in ["organization_search", "relation_search"]:
+            if isinstance(result, list) and len(result) > 0:
+                context_info = f"\n\nCONTEXT: Found {len(result)} database results. Consider using detail tools to get more information about specific entities."
+                return base_result + context_info
+
+        return base_result
+
+    def _create_iteration_guidance(tool_results: List[Dict], search_page_tracking: Dict, area_description: str, current_iteration: int) -> str:
+        """Create guidance for the next iteration based on what's been tried so far."""
+
+        # Analyze what's been done
+        tools_used = [tr["tool_name"] for tr in tool_results]
+        searches_done = [tr for tr in tool_results if tr["tool_name"] == "google_search"]
+        web_content_extractions = [tr for tr in tool_results if tr["tool_name"] == "web_content"]
+
+        guidance_parts = [
+            f"ITERATION {current_iteration + 1} GUIDANCE:",
+            f"You're researching: '{area_description}'"
+        ]
+
+        # Suggest strategies based on what's been tried
+        if "google_search" not in tools_used:
+            guidance_parts.append("• Consider starting with a Google search to find relevant information")
+        elif len(searches_done) == 1:
+            guidance_parts.append("• Try alternative search terms, or use the 'page' parameter to see more Google results (page=2, page=3, etc.)")
+        elif len(web_content_extractions) == 0 and searches_done:
+            guidance_parts.append("• You found search results but haven't extracted content from any pages. Use web_content on promising URLs")
+        else:
+            guidance_parts.append("• Try different search strategies: use synonyms, industry terms, or more specific queries")
+
+        # Add specific suggestions based on search tracking
+        if search_page_tracking:
+            for query, pages in search_page_tracking.items():
+                max_page = max(pages)
+                if max_page == 1:
+                    guidance_parts.append(f"• Consider exploring page 2+ for query '{query}' using page=2 parameter")
+
+        guidance_parts.append("• Don't give up - each iteration brings you closer to finding the information needed")
+
+        return "\n".join(guidance_parts)
+
+    async def synthesize_final_report(context: ResearchContext) -> str:
+        """Synthesize all findings into a comprehensive final report."""
         if verbose:
-            print("\n🔄 Synthesizing findings into final response")
+            print("\n🔄 Synthesizing final report")
 
-        # Extract findings from research results
-        all_findings = {}
-        for result in research_results:
-            all_findings.update(result.get("findings", {}))
-
-        # No findings - return error message
-        if not all_findings:
+        if not context.findings_registry:
             if verbose:
                 print("  ⚠️ No findings to synthesize")
-            return f"# Research on {company_topic}\n\nUnable to find specific information about {company_topic} related to your query."
+            return f"# Research Report: {context.target_entity}\n\nUnable to find specific information about {context.target_entity} related to your query."
 
-        # Prepare context with research plan and findings
-        context = [
-            f"## Research Query\n{query}",
-            "## Research Plan",
-            "Key Questions:",
-            *[f"- {q}" for q in research_plan.key_questions],
-            "Research Areas:",
-            *[f"- {area}" for area in research_plan.research_areas],
-            "## Research Findings"
-        ]
+        # Prepare comprehensive context for intelligent synthesis
+        context_text = f"""
+RESEARCH CONTEXT:
+Original Query: {context.original_query}
+Research Goal: {context.research_goal}
+Target Entity: {context.target_entity}
 
-        # Add all findings to context
-        for section, content in all_findings.items():
-            context.append(f"### {section}")
-            context.append(content)
+RESEARCH PLAN EXECUTED:
+Key Questions: {', '.join(context.research_plan.key_questions) if context.research_plan else 'None'}
+Data Points: {', '.join(context.research_plan.data_points) if context.research_plan else 'None'}
+Search Strategies: {', '.join(context.research_plan.search_strategies) if context.research_plan else 'None'}
 
-        context_text = "\n\n".join(context)
+KEY INSIGHTS DISCOVERED:
+{chr(10).join([f"- {insight}" for insight in context.key_insights]) if context.key_insights else 'No key insights recorded'}
 
-        # Synthesize findings
+ALL RESEARCH FINDINGS:
+{chr(10).join([f"## {name}{chr(10)}{content}{chr(10)}" for name, content in context.findings_registry.items()])}
+
+SEARCHES COMPLETED: {', '.join(context.completed_searches) if context.completed_searches else 'None'}
+"""
+
         messages = [
             SystemMessage(content=SYNTHESIS_INSTRUCTIONS),
-            HumanMessage(content=f"Synthesize the following research findings about {company_topic} "
-                                f"to answer the query: '{query}'\n\n{context_text}")
+            HumanMessage(content=context_text)
         ]
 
-        intro_content = None
-        conclusion_content = None
-        final_report = ""
-        iterations = 0
+        try:
+            response = await synthesizer_model.ainvoke(messages)
 
-        while iterations < 3 and not final_report:  # Limit synthesis iterations
-            iterations += 1
+            if hasattr(response, "tool_calls") and response.tool_calls:
+                final_content = None
 
-            if verbose:
-                print(f"  ↪ Synthesis iteration {iterations}/3")
-
-            try:
-                response = await synthesizer_model.ainvoke(messages)
-                messages.append(response)
-
-                # Process tool calls for introduction and conclusion
-                if hasattr(response, "tool_calls") and response.tool_calls:
-                    for tool_call in response.tool_calls:
-                        tool_name = tool_call["name"]
-                        tool_call_id = tool_call["id"]
-                        tool_args = dict(tool_call["args"])
-
-                        if verbose:
-                            print(f"  🔧 Using: {tool_name}({tool_args.get('name', 'Untitled')})")
-
-                        try:
-                            tool = synthesizer_tool_map[tool_name]
-                            result = await tool.ainvoke(tool_args) if hasattr(tool, "ainvoke") else tool.invoke(tool_args)
-
-                            if tool_name == "Introduction":
-                                intro_content = f"# {result.name}\n\n{result.content}"
-                                if verbose:
-                                    print(f"  ✅ Introduction created: '{result.name}'")
-
-                            elif tool_name == "Conclusion":
-                                conclusion_content = f"## {result.name}\n\n{result.content}"
-                                if verbose:
-                                    print(f"  ✅ Conclusion created: '{result.name}'")
-
-                            # Add tool message to conversation
-                            messages.append(ToolMessage(
-                                content=str(result),
-                                name=tool_name,
-                                tool_call_id=tool_call_id
-                            ))
-
-                        except Exception as e:
-                            if verbose:
-                                print(f"  ❌ Error in synthesis: {str(e)}")
-                else:
-                    # No more tool calls - try to use response directly
-                    if not intro_content and not conclusion_content and response.content:
-                        final_report = response.content
-                        if verbose:
-                            print("  ✅ Created direct response without tools")
-                        break
-
-                # If we have both intro and conclusion, create the report
-                if intro_content and conclusion_content:
-                    # Create body content from findings
-                    body_parts = []
-                    for section, content in all_findings.items():
-                        body_parts.append(f"## {section}\n\n{content}")
-
-                    body_content = "\n\n".join(body_parts)
-                    final_report = f"{intro_content}\n\n{body_content}\n\n{conclusion_content}"
+                for tool_call in response.tool_calls:
+                    tool_name = tool_call["name"]
+                    tool_args = dict(tool_call["args"])
 
                     if verbose:
-                        print("  ✅ Final report assembled with introduction and conclusion")
-                    break
+                        format_type = tool_args.get('format_type', 'intelligent')
+                        print(f"  🔧 Using: {tool_name} (format: {format_type})")
 
-                # Prompt for missing parts
-                if not intro_content and not conclusion_content:
-                    messages.append(HumanMessage(content="Please use the Introduction and Conclusion tools to create a structured response."))
-                elif not intro_content:
-                    messages.append(HumanMessage(content="Please use the Introduction tool to create a proper introduction."))
-                elif not conclusion_content:
-                    messages.append(HumanMessage(content="Please use the Conclusion tool to create a proper conclusion."))
+                    if tool_name == "FinalAnswer":
+                        final_content = tool_args.get("content", "")
 
-            except Exception as e:
-                if verbose:
-                    print(f"  ❌ Synthesis error: {str(e)}")
-                break
+                        if verbose:
+                            print(f"  ✅ Final answer synthesized intelligently")
 
-        # If we still don't have a report, create a simple one
-        if not final_report:
+                        return final_content
+
+                    # Handle legacy tools for backward compatibility
+                    elif tool_name in ["Introduction", "Conclusion"]:
+                        tool = synthesizer_tool_map[tool_name]
+                        result = await tool.ainvoke(tool_args) if hasattr(tool, "ainvoke") else tool.invoke(tool_args)
+
+                        if not final_content:
+                            # If no FinalAnswer was provided, fall back to traditional format
+                            if tool_name == "Introduction":
+                                intro_content = f"# {result.name}\n\n{result.content}"
+                            elif tool_name == "Conclusion":
+                                conclusion_content = f"## {result.name}\n\n{result.content}"
+
+                # If we got legacy format, assemble traditional report
+                if not final_content and ('intro_content' in locals() or 'conclusion_content' in locals()):
+                    body_parts = []
+                    for section_name, content in context.findings_registry.items():
+                        body_parts.append(f"## {section_name}\n\n{content}")
+
+                    body_content = "\n\n".join(body_parts)
+                    intro = locals().get('intro_content', f"# Research Report: {context.target_entity}")
+                    conclusion = locals().get('conclusion_content', "## Summary\nResearch completed.")
+                    final_content = f"{intro}\n\n{body_content}\n\n{conclusion}"
+
+            # Fallback to direct response if no tools were used
+            if not final_content and response.content:
+                final_content = response.content
+
+            # Return the final content
+            if final_content:
+                return final_content
+
+        except Exception as e:
             if verbose:
-                print("  ⚠️ Creating fallback report from findings")
+                print(f"  ❌ Synthesis error: {str(e)}")
 
-            # Create a simple report structure
-            parts = [f"# Research on {company_topic}\n\n"]
+        # Final fallback - create a simple markdown report
+        parts = [f"# Research Report: {context.target_entity}\n"]
+        parts.append(f"## Research Query\n{context.original_query}\n")
 
-            if intro_content:
-                parts.append(intro_content)
-            else:
-                parts.append(f"## Overview\n\nThis report presents findings about {company_topic} related to: {query}")
+        for section_name, content in context.findings_registry.items():
+            parts.append(f"## {section_name}\n{content}\n")
 
-            for section, content in all_findings.items():
-                parts.append(f"## {section}\n\n{content}")
+        parts.append(f"## Summary\nResearch completed with {len(context.findings_registry)} findings.")
 
-            if conclusion_content:
-                parts.append(conclusion_content)
-            else:
-                # Extract a simple conclusion from the last response
-                if response and hasattr(response, "content") and response.content:
-                    parts.append(f"## Conclusion\n\n{response.content}")
-                else:
-                    parts.append("## Conclusion\n\nResearch completed with the findings presented above.")
-
-            final_report = "\n\n".join(parts)
-
-        return final_report
+        return "\n".join(parts)
 
     async def ainvoke(initial_state):
-        """Execute the research agent process."""
-        # Extract the query from the initial state
+        """Execute the research agent process with context awareness."""
+
+        # Extract query and determine target entity
         user_messages = initial_state.get("messages", [])
-
         if not user_messages:
-            raise ValueError("No query provided in the initial state 'messages' field")
+            raise ValueError("No query provided")
 
-        # Get the user query from messages
         if isinstance(user_messages[0], dict):
             user_query = user_messages[0].get("content", "")
         elif hasattr(user_messages[0], "content"):
             user_query = user_messages[0].content
         else:
-            raise ValueError("Invalid message format in initial state")
+            raise ValueError("Invalid message format")
 
         if not user_query:
             raise ValueError("Empty query provided")
 
-        # Extract company_topic from the query if not provided explicitly
-        company_topic = initial_state.get("company_topic")
-        if not company_topic:
-            # Try to extract a company or topic from the query
-            # This will be refined during the planning phase
-            company_topic = "the requested topic"  # Generic placeholder
+        # Extract target entity from query - fix the case sensitivity issue
+        target_entity = initial_state.get("company_topic", "the requested topic")
+        if target_entity == "the requested topic":
+            # Try to extract from query with better logic
+            user_query_lower = user_query.lower()
+            for phrase in ["about ", "for ", "on "]:
+                if phrase in user_query_lower:
+                    start_pos = user_query_lower.find(phrase) + len(phrase)
+                    # Look for the end of the word/phrase (space, punctuation, or end of string)
+                    remaining = user_query[start_pos:]
+                    end_pos = len(remaining)
+                    for delimiter in [" ", "?", ".", ",", "!", "\n"]:
+                        delim_pos = remaining.find(delimiter)
+                        if delim_pos != -1 and delim_pos < end_pos:
+                            end_pos = delim_pos
 
-            # Look for potential company or topic indicators in the query
-            if "about " in user_query:
-                topic_start = user_query.find("about ") + 6
-                topic_end = user_query.find(" ", topic_start)
-                if topic_end > topic_start:
-                    company_topic = user_query[topic_start:topic_end]
-            elif "for " in user_query:
-                topic_start = user_query.find("for ") + 4
-                topic_end = user_query.find(" ", topic_start)
-                if topic_end > topic_start:
-                    company_topic = user_query[topic_start:topic_end]
+                    if end_pos > 0:
+                        target_entity = remaining[:end_pos].strip()
+                        break
+
+            # If still not found, try to extract company names (simple heuristic)
+            if target_entity == "the requested topic":
+                # Look for capitalized words that might be company names
+                import re
+                words = user_query.split()
+                for i, word in enumerate(words):
+                    if word[0].isupper() and len(word) > 2:
+                        # Check if next word is also capitalized (compound company name)
+                        if i + 1 < len(words) and words[i + 1][0].isupper():
+                            target_entity = f"{word} {words[i + 1]}"
+                        else:
+                            target_entity = word
+                        break
 
         if verbose:
-            print(f"\n🚀 Starting research process")
+            print(f"\n🚀 Starting context-aware research")
+            print(f"🎯 Target Entity: {target_entity}")
             print(f"🔎 Query: '{user_query}'")
-            print(f"🔄 Using models: Plan/Synthesis={supervisor_model}, Research={researcher_model}")
 
         try:
-            # PHASE 1: PLANNING
-            research_plan = await create_research_plan(company_topic, user_query)
+            # PHASE 1: Create research context and plan
+            research_context = await create_research_plan(user_query, target_entity)
 
-            # PHASE 2: RESEARCH
+            # PHASE 2: Execute research areas with context
             if verbose:
-                print(f"\n🔍 Executing research plan with {len(research_plan.research_areas)} areas")
+                print(f"\n🔍 Executing research with {len(research_context.research_plan.key_questions)} questions and {len(research_context.research_plan.data_points)} data points")
 
-            # Convert research areas to actual research tasks
-            if not research_plan.research_areas:
-                research_plan.research_areas = ["Company information and details"]
+            research_areas = []
+            for question in research_context.research_plan.key_questions:
+                research_areas.append(f"Question: {question}")
+            for data_point in research_context.research_plan.data_points:
+                research_areas.append(f"Data Point: {data_point}")
 
-            # Execute research for each area
-            research_tasks = [
-                research_area(company_topic, area) for area in research_plan.research_areas
-            ]
-            research_results = await asyncio.gather(*research_tasks)
+            if not research_areas:
+                research_areas = ["Basic company information"]
 
-            # PHASE 3: SYNTHESIS
-            final_report = await synthesize_findings(company_topic, user_query, research_plan, research_results)
+            # Execute research with context awareness
+            research_tasks = []
+            for i, area in enumerate(research_areas):
+                force_org_search = (i == 0)
+                research_tasks.append(research_area_with_context(research_context, area, force_org_search))
+
+            await asyncio.gather(*research_tasks)
+
+            # PHASE 3: Generate final report
+            final_report = await synthesize_final_report(research_context)
 
             if verbose:
-                print("\n🏁 Research process complete")
-                print(f"📄 Report generated ({len(final_report)} chars)")
+                print(f"\n🏁 Research complete")
+                print(f"📊 Total findings: {len(research_context.findings_registry)}")
+                print(f"💡 Key insights: {len(research_context.key_insights)}")
+                print(f"🔍 Searches completed: {len(research_context.completed_searches)}")
 
             return {"final_report": final_report}
 
         except Exception as e:
-            import traceback
             if verbose:
-                print(f"\n❌ Error in research process: {str(e)}")
+                print(f"\n❌ Error in research: {str(e)}")
+                import traceback
                 traceback.print_exc()
 
             return {
-                "final_report": f"# Research Error\n\nAn error occurred while researching {company_topic}: {str(e)}"
+                "final_report": f"# Research Error\n\nAn error occurred while researching {target_entity}: {str(e)}"
             }
 
     # Create the agent object

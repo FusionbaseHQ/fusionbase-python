@@ -24,18 +24,25 @@ def google_search(
     query: Annotated[str, "The search query to execute on Google"],
     hl: Annotated[Optional[str], "The language parameter for the UI (e.g., 'en', 'de', 'fr')"] = None,
     gl: Annotated[Optional[str], "The country parameter to limit results (e.g., 'us', 'de', 'uk')"] = None,
+    page: Annotated[Optional[int], "Page number for pagination (1 for first page, 2 for second, etc.). Default is 1"] = 1,
     api_key: Annotated[str, InjectedToolArg] = None,
     verify_ssl: Annotated[Optional[bool], "Whether to verify SSL certificates"] = True,
 ) -> Dict[str, Any]:
-    """Search Google and get relevant search results.
+    """Search Google and get relevant search results with pagination support.
 
     This tool performs a Google search and returns the most relevant results.
-    Use it to find current information on the web.
+    Use it to find current information on the web. You can paginate through results
+    using the 'page' parameter to explore more comprehensive results.
 
     Example queries:
     - "latest developments in AI"
     - "weather in Berlin Germany"
     - "who is the CEO of Microsoft"
+
+    Pagination examples:
+    - page=1 (default): First 10 results
+    - page=2: Results 11-20
+    - page=3: Results 21-30
     """
     # Check for API key
     if not api_key:
@@ -59,6 +66,10 @@ def google_search(
 
     if gl:
         params["gl"] = gl
+
+    # Add page parameter for pagination
+    if page and page > 1:
+        params["page"] = page
 
     # Make the request to the SERP API
     try:
@@ -92,7 +103,8 @@ def google_search(
 
     # Process and format the results
     results = {
-        "query": query
+        "query": query,
+        "page": page
     }
 
     # Include knowledge graph and organic results directly as they come from the API
@@ -110,18 +122,25 @@ async def async_google_search(
     query: Annotated[str, "The search query to execute on Google"],
     hl: Annotated[Optional[str], "The language parameter for the UI (e.g., 'en', 'de', 'fr')"] = None,
     gl: Annotated[Optional[str], "The country parameter to limit results (e.g., 'us', 'de', 'uk')"] = None,
+    page: Annotated[Optional[int], "Page number for pagination (1 for first page, 2 for second, etc.). Default is 1"] = 1,
     api_key: Annotated[str, InjectedToolArg] = None,
     verify_ssl: Annotated[Optional[bool], "Whether to verify SSL certificates"] = True,
 ) -> Dict[str, Any]:
-    """Search Google asynchronously and get relevant search results.
+    """Search Google asynchronously and get relevant search results with pagination support.
 
     This tool performs a Google search and returns the most relevant results.
-    Use it to find current information on the web.
+    Use it to find current information on the web. You can paginate through results
+    using the 'page' parameter to explore more comprehensive results.
 
     Example queries:
     - "latest developments in AI"
     - "weather in Berlin Germany"
     - "who is the CEO of Microsoft"
+
+    Pagination examples:
+    - page=1 (default): First 10 results
+    - page=2: Results 11-20
+    - page=3: Results 21-30
     """
     # Check for API key
     if not api_key:
@@ -145,6 +164,10 @@ async def async_google_search(
 
     if gl:
         params["gl"] = gl
+
+    # Add page parameter for pagination
+    if page and page > 1:
+        params["page"] = page
 
     # Make the request to the SERP API
     try:
@@ -178,7 +201,8 @@ async def async_google_search(
 
     # Process and format the results
     results = {
-        "query": query
+        "query": query,
+        "page": page
     }
 
     # Include knowledge graph and organic results directly as they come from the API
