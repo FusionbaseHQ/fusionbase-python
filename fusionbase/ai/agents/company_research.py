@@ -2,7 +2,8 @@
 
 import asyncio
 import os
-from typing import Any, Dict, List, Optional, TypedDict
+import json
+from typing import Any, Dict, List, Optional, TypedDict, Tuple, Set
 
 from langchain_core.messages import HumanMessage
 from langchain_core.messages import SystemMessage
@@ -221,6 +222,31 @@ def create_company_research_agent(
     researcher_model_with_tools = researcher_model.bind_tools(researcher_tools)
     synthesizer_model_with_tools = synthesizer_model.bind_tools(synthesizer_tools)
     # Hallucination grader doesn't need tools bound
+
+    # Track tool calls to prevent duplicates within a single run
+    seen_tool_calls: Set[Tuple[str, str]] = set()
+    tool_call_results: Dict[Tuple[str, str], Any] = {}
+
+    async def execute_tool(tool, tool_name: str, tool_args: Dict[str, Any]):
+        """Execute a tool with deduplication based on tool name and arguments."""
+        # Remove non-essential args for deduplication
+        filtered_args = {
+            k: v for k, v in tool_args.items() if k not in ("client", "api_key", "proxies", "verify_ssl")
+        }
+        try:
+            args_key = json.dumps(filtered_args, sort_keys=True, default=str)
+        except Exception:
+            args_key = str(filtered_args)
+        call_key = (tool_name, args_key)
+        if call_key in seen_tool_calls:
+            if verbose:
+                print(f"    🔄 Skipping duplicate tool call: {tool_name}({filtered_args})")
+            return tool_call_results.get(call_key)
+
+        seen_tool_calls.add(call_key)
+        result = await tool.ainvoke(tool_args) if hasattr(tool, "ainvoke") else tool.invoke(tool_args)
+        tool_call_results[call_key] = result
+        return result
 
     async def grade_for_hallucination(claim: str, source_content: str, context: str = "") -> Dict[str, Any]:
         """Grade whether a claim is grounded in the provided source content."""
@@ -504,9 +530,9 @@ You have up to {max_iterations} iterations to find comprehensive information. Us
                                 tool_args["proxies"] = proxies
                                 tool_args["verify_ssl"] = verify_ssl
 
-                            # Execute tool
+                            # Execute tool with deduplication
                             tool = researcher_tool_map[tool_name]
-                            result = await tool.ainvoke(tool_args) if hasattr(tool, "ainvoke") else tool.invoke(tool_args)
+                            result = await execute_tool(tool, tool_name, tool_args)
 
                             tool_results.append({
                                 "tool_name": tool_name,
@@ -762,7 +788,7 @@ SEARCHES COMPLETED: {', '.join(context.completed_searches) if context.completed_
                     # Handle legacy tools for backward compatibility
                     elif tool_name in ["Introduction", "Conclusion"]:
                         tool = synthesizer_tool_map[tool_name]
-                        result = await tool.ainvoke(tool_args) if hasattr(tool, "ainvoke") else tool.invoke(tool_args)
+                        result = await execute_tool(tool, tool_name, tool_args)
 
                         if not final_content:
                             # If no FinalAnswer was provided, fall back to traditional format
@@ -807,6 +833,10 @@ SEARCHES COMPLETED: {', '.join(context.completed_searches) if context.completed_
 
     async def ainvoke(initial_state):
         """Execute the research agent process with context awareness."""
+
+        # Reset tool call tracking for this run
+        seen_tool_calls.clear()
+        tool_call_results.clear()
 
         # Extract query and determine target entity
         user_messages = initial_state.get("messages", [])
