@@ -140,9 +140,10 @@ class GlobalFinding(BaseModel):
 
 def create_company_research_agent(
     fusionbase_client: Fusionbase,
-    supervisor_model: str = "gpt-4.1",
-    researcher_model: str = "gpt-4.1",
-    hallucination_grader_model: str = "gpt-4.1",
+    planner_model: Any,
+    researcher_model: Any,
+    synthesizer_model: Any,
+    hallucination_grader_model: Any,
     serp_api_key: str = None,
     max_iterations: int = 10,
     verbose: bool = False,
@@ -153,9 +154,10 @@ def create_company_research_agent(
 
     Args:
         fusionbase_client: Client for accessing Fusionbase data
-        supervisor_model: Model to use for the supervisor agent
-        researcher_model: Model to use for the researcher agent
-        hallucination_grader_model: Model to use for hallucination grading
+        planner_model: LLM model instance for planning (e.g., ChatOpenAI, ChatAnthropic)
+        researcher_model: LLM model instance for research (e.g., ChatOpenAI, ChatAnthropic)
+        synthesizer_model: LLM model instance for synthesis (e.g., ChatOpenAI, ChatAnthropic)
+        hallucination_grader_model: LLM model instance for hallucination grading (e.g., ChatOpenAI, ChatAnthropic)
         serp_api_key: API key for SERP web search
         max_iterations: Maximum iterations before forcing completion
         verbose: Enable verbose output
@@ -165,6 +167,10 @@ def create_company_research_agent(
 
     if not fusionbase_client:
         raise ValueError("A valid Fusionbase client is required")
+
+    # Validate that model instances are provided
+    if not all([planner_model, researcher_model, synthesizer_model, hallucination_grader_model]):
+        raise ValueError("All model instances (planner_model, researcher_model, synthesizer_model, hallucination_grader_model) are required")
 
     # Initialize the client
     fb_client = fusionbase_client
@@ -210,18 +216,11 @@ def create_company_research_agent(
     researcher_tool_map = {tool.name: tool for tool in researcher_tools}  # Changed from research_tool_map to researcher_tool_map
     synthesizer_tool_map = {tool.name: tool for tool in synthesizer_tools}
 
-    def _create_chat_model(model_name: str, temperature: float) -> ChatOpenAI:
-        """Create a ChatOpenAI model, omitting temperature for models that don't support it."""
-        kwargs = {"model": model_name}
-        if not model_name.lower().startswith("o"):
-            kwargs["temperature"] = temperature
-        return ChatOpenAI(**kwargs)
-
-    # Bind tools to models with different temperatures
-    planner_model = _create_chat_model(supervisor_model, 0).bind_tools(planner_tools)
-    researcher_model = _create_chat_model(researcher_model, 0).bind_tools(researcher_tools)
-    synthesizer_model = _create_chat_model(supervisor_model, 0.2).bind_tools(synthesizer_tools)
-    hallucination_grader = _create_chat_model(hallucination_grader_model, 0)
+    # Bind tools to the provided model instances
+    planner_model_with_tools = planner_model.bind_tools(planner_tools)
+    researcher_model_with_tools = researcher_model.bind_tools(researcher_tools)
+    synthesizer_model_with_tools = synthesizer_model.bind_tools(synthesizer_tools)
+    # Hallucination grader doesn't need tools bound
 
     async def grade_for_hallucination(claim: str, source_content: str, context: str = "") -> Dict[str, Any]:
         """Grade whether a claim is grounded in the provided source content."""
@@ -235,7 +234,7 @@ def create_company_research_agent(
         )
 
         try:
-            response = await hallucination_grader.ainvoke([
+            response = await hallucination_grader_model.ainvoke([
                 SystemMessage(content="You are a strict fact-checking expert. Always respond with valid JSON only."),
                 HumanMessage(content=hallucination_prompt)
             ])
@@ -302,7 +301,7 @@ def create_company_research_agent(
                 print(f"  ↪ Planning iteration {iterations}/3")
 
             try:
-                response = await planner_model.ainvoke(messages)
+                response = await planner_model_with_tools.ainvoke(messages)
                 messages.append(response)
 
                 if hasattr(response, "tool_calls") and response.tool_calls:
@@ -434,8 +433,8 @@ You have up to {max_iterations} iterations to find comprehensive information. Us
         search_page_tracking = {}  # Track which searches and pages we've explored
 
         # Create models
-        regular_model = researcher_model
-        forced_org_search_model = _create_chat_model(researcher_model.model_name, 0).bind_tools(
+        regular_model = researcher_model_with_tools
+        forced_org_search_model = researcher_model.bind_tools(
             researcher_tools,
             tool_choice="organization_search"
         ) if force_org_search else None
@@ -739,7 +738,7 @@ SEARCHES COMPLETED: {', '.join(context.completed_searches) if context.completed_
         ]
 
         try:
-            response = await synthesizer_model.ainvoke(messages)
+            response = await synthesizer_model_with_tools.ainvoke(messages)
 
             if hasattr(response, "tool_calls") and response.tool_calls:
                 final_content = None

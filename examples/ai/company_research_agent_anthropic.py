@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Example demonstrating the Company Research Agent with Fusionbase tools."""
+"""Example demonstrating the Company Research Agent with Anthropic models."""
 
 import argparse
 import asyncio
@@ -8,9 +8,9 @@ from pathlib import Path
 import sys
 
 # Check for required environment variables
-if not os.environ.get("OPENAI_API_KEY"):
-    print("Error: OPENAI_API_KEY environment variable not set.")
-    print("Please set it with: export OPENAI_API_KEY=your_key_here")
+if not os.environ.get("ANTHROPIC_API_KEY"):
+    print("Error: ANTHROPIC_API_KEY environment variable not set.")
+    print("Please set it with: export ANTHROPIC_API_KEY=your_key_here")
     sys.exit(1)
 
 if not os.environ.get("FUSIONBASE_API_KEY"):
@@ -19,7 +19,7 @@ if not os.environ.get("FUSIONBASE_API_KEY"):
     sys.exit(1)
 
 try:
-    from langchain_openai import ChatOpenAI
+    from langchain_anthropic import ChatAnthropic
     from rich.console import Console
     from rich.markdown import Markdown
 
@@ -28,21 +28,21 @@ try:
 except ImportError as e:
     print(f"Error importing required packages: {e}")
     print("Please install all required dependencies:")
-    print("pip install fusionbase[ai] rich 'langgraph>=0.0.16'")
+    print("pip install fusionbase[ai] rich langchain-anthropic")
     sys.exit(1)
 
-# pylint: disable=too-many-locals, too-many-statements
-def _create_chat_model(model_name: str, temperature: float = 0.0) -> ChatOpenAI:
-    """Create a ChatOpenAI model, omitting temperature for models that don't support it."""
-    kwargs = {"model": model_name}
-    if not model_name.lower().startswith("o"):
-        kwargs["temperature"] = temperature
-    return ChatOpenAI(**kwargs)
+def _create_anthropic_model(model_name: str, temperature: float = 0.0) -> ChatAnthropic:
+    """Create a ChatAnthropic model instance."""
+    return ChatAnthropic(
+        model=model_name,
+        temperature=temperature,
+        max_tokens=4000  # Anthropic requires max_tokens to be set
+    )
 
 async def main_async(args):
-    """Run the company research agent example asynchronously."""
+    """Run the company research agent example with Anthropic models."""
     console = Console()
-    console.print("\n[bold blue]Fusionbase Research Agent[/bold blue]\n")
+    console.print("\n[bold blue]Fusionbase Research Agent (Anthropic)[/bold blue]\n")
 
     # Determine the research topic and query
     if args.query:
@@ -64,17 +64,17 @@ async def main_async(args):
         console.print(f"Using proxy: {args.proxy}")
         proxies = {"http": args.proxy, "https": args.proxy}
 
-    # Create model instances
-    console.print("Creating model instances...", end="")
+    # Create Anthropic model instances
+    console.print("Creating Anthropic model instances...", end="")
     try:
-        planner_model = _create_chat_model(args.model, 0.0)
-        researcher_model = _create_chat_model(args.model, 0.0)
-        synthesizer_model = _create_chat_model(args.model, 0.2)
-        hallucination_grader_model = _create_chat_model(args.model, 0.0)
+        planner_model = _create_anthropic_model(args.model, 0.0)
+        researcher_model = _create_anthropic_model(args.model, 0.0)
+        synthesizer_model = _create_anthropic_model(args.model, 0.2)
+        hallucination_grader_model = _create_anthropic_model(args.model, 0.0)
         console.print(" [green]Done[/green]")
     except Exception as e:
-        console.print(f"\n[bold red]Error creating models: {str(e)}[/bold red]")
-        console.print("[yellow]Make sure your API keys are set correctly[/yellow]")
+        console.print(f"\n[bold red]Error creating Anthropic models: {str(e)}[/bold red]")
+        console.print("[yellow]Make sure your ANTHROPIC_API_KEY is set correctly[/yellow]")
         sys.exit(1)
 
     # Create the research agent
@@ -86,7 +86,7 @@ async def main_async(args):
         )
         console.print("[yellow]Set the API key with: export SERP_API_KEY=your_key_here[/yellow]\n")
 
-    # Create the agent with model instances instead of model names
+    # Create the agent with Anthropic model instances
     try:
         agent = create_company_research_agent(
             fusionbase_client=fb_client,
@@ -98,7 +98,7 @@ async def main_async(args):
             max_iterations=args.max_iterations,
             verbose=args.verbose,
             proxies=proxies,
-            verify_ssl=not args.no_verify_ssl  # Pass SSL verification setting
+            verify_ssl=not args.no_verify_ssl
         )
         console.print(" [green]Done[/green]")
     except Exception as e:
@@ -106,25 +106,24 @@ async def main_async(args):
         sys.exit(1)
 
     # Create status display
-    status_display = "Conducting research"
+    status_display = "Conducting research with Anthropic models"
     if args.verbose:
         status_display += " (use --verbose to see detailed progress)"
 
     with console.status(f"[bold green]{status_display}...") as status:
         try:
-            # Initialize state with only the query - no separate company_topic
+            # Initialize state with only the query
             initial_state = {
                 "messages": [{"role": "user", "content": query}]
             }
 
-            # Use ainvoke instead of invoke for async execution
+            # Use ainvoke for async execution
             result = await agent.ainvoke(initial_state)
             status.update("[bold green]Research complete! Generating report...")
-        # pylint: disable=broad-exception-caught
         except Exception as e:
             console.print(f"\n[bold red]Error during research: {str(e)}[/bold red]")
             if args.verbose:
-                import traceback  # pylint: disable=import-outside-toplevel
+                import traceback
                 traceback.print_exc()
             sys.exit(1)
 
@@ -138,22 +137,22 @@ async def main_async(args):
             f.write(report)
         console.print(f"\n[green]Report saved to {output_path}[/green]")
     else:
-        console.print("\n[bold]Research Report:[/bold]\n")
+        console.print("\n[bold]Research Report (Generated by Anthropic):[/bold]\n")
         console.print(Markdown(report))
 
-    console.print("\n[bold green]Research completed successfully[/bold green]")
+    console.print("\n[bold green]Research completed successfully with Anthropic[/bold green]")
 
 def main():
-    """Run the company research agent example."""
+    """Run the company research agent example with Anthropic."""
     # Parse arguments
-    parser = argparse.ArgumentParser(description="Generate research reports or answer specific questions")
+    parser = argparse.ArgumentParser(description="Generate research reports using Anthropic models")
 
     # Create mutually exclusive group for query vs company
     query_group = parser.add_mutually_exclusive_group(required=True)
     query_group.add_argument("--company", help="Name of the company to research")
-    query_group.add_argument("--query", help="Custom research query (e.g., 'What is the LinkedIn URL of Fusionbase?')")
+    query_group.add_argument("--query", help="Custom research query")
 
-    parser.add_argument("--model", default="gpt-4o", help="Model to use for research (default: gpt-4o)")
+    parser.add_argument("--model", default="claude-3-sonnet-20240229", help="Anthropic model to use (default: claude-3-sonnet-20240229)")
     parser.add_argument("--output", help="Output file path to save the report (default: stdout)")
     parser.add_argument("--verbose", action="store_true", help="Show verbose output during processing")
     parser.add_argument(
