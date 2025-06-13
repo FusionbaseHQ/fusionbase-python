@@ -1,9 +1,11 @@
 """Company research agent using LangChain, OpenAI, and Fusionbase tools."""
 
 import asyncio
-import os
 import json
-from typing import Any, Dict, List, Optional, TypedDict, Tuple, Set
+import os
+import re
+from typing import Any, Dict, List, Optional, Set, Tuple, TypedDict, Union
+from urllib.parse import urlparse
 
 from langchain_core.messages import HumanMessage
 from langchain_core.messages import SystemMessage
@@ -101,6 +103,12 @@ class ResearchContext(BaseModel):
     completed_searches: List[str] = []  # Track what's been searched
     key_insights: List[str] = []  # Store important discoveries
 
+    # NEW: Global Fusionbase entity data
+    fusionbase_entity: Optional[Dict[str, Any]] = None  # The found organization entity
+    fusionbase_entity_id: Optional[str] = None  # The entity ID
+    fusionbase_search_completed: bool = False  # Whether we've done the search
+    fusionbase_detail_completed: bool = False  # Whether we've got the details
+
 class ResearchPlan(BaseModel):
     """A plan for researching the topic."""
     key_questions: List[str]  # Questions that need to be answered
@@ -139,6 +147,119 @@ class GlobalFinding(BaseModel):
         default_factory=list
     )
 
+@tool
+class ResearchReflection(BaseModel):
+    """Assess whether research findings provide sufficient information for the area."""
+    is_sufficient: bool = Field(
+        description="Whether the research findings are sufficient to answer the research question"
+    )
+    confidence: float = Field(
+        description="Confidence level in the sufficiency assessment (0.0-1.0)",
+        ge=0.0,
+        le=1.0
+    )
+    reasoning: str = Field(
+        description="Brief explanation of why the research is sufficient or insufficient"
+    )
+    missing_information: List[str] = Field(
+        description="List of specific information that is still needed (if insufficient)",
+        default_factory=list
+    )
+
+@tool
+class ExtractCompanyName(BaseModel):
+    """Extract the actual company name from a research query."""
+    company_name: str = Field(
+        description="The clean company name extracted from the query (e.g., 'Apple Inc', 'Microsoft Corporation', 'BMW AG')"
+    )
+
+def _parse_proxy_config(proxies: Union[Dict[str, str], Dict[str, Dict[str, str]], None]) -> Dict[str, Dict[str, str]]:
+    """Parse proxy configuration to support both simple and domain-specific formats.
+
+    Args:
+        proxies: Proxy configuration in one of these formats:
+            - Simple: {"http": "proxy_url", "https": "proxy_url"}
+            - Domain-specific: {
+                "*": {"http": "default_proxy", "https": "default_proxy"},
+                "linkedin.com": {"http": "linkedin_proxy", "https": "linkedin_proxy"},
+                "*.linkedin.com": {"http": "linkedin_proxy", "https": "linkedin_proxy"}
+            }
+
+    Returns:
+        Normalized domain-specific proxy configuration
+    """
+    if not proxies:
+        return {}
+
+    # Check if this is a simple proxy config (has http/https keys directly)
+    if any(key in proxies for key in ["http", "https"]):
+        # Convert simple format to domain-specific format with wildcard
+        return {"*": proxies}
+
+    # Already in domain-specific format
+    return proxies
+
+def _get_proxy_for_url(url: str, proxy_config: Dict[str, Dict[str, str]]) -> Dict[str, str]:
+    """Get the appropriate proxy configuration for a given URL.
+
+    Args:
+        url: The URL to get proxy for
+        proxy_config: Domain-specific proxy configuration
+
+    Returns:
+        Proxy configuration dict for the URL's domain
+    """
+    if not proxy_config:
+        return {}
+
+    parsed_url = urlparse(url)
+    domain = parsed_url.netloc.lower()
+
+    # Remove port if present
+    if ":" in domain:
+        domain = domain.split(":")[0]
+
+    # Check for exact domain match first
+    if domain in proxy_config:
+        return proxy_config[domain]
+
+    # Check for pattern matches (including wildcards)
+    for pattern, proxy_settings in proxy_config.items():
+        if _domain_matches_pattern(domain, pattern):
+            return proxy_settings
+
+    # Fall back to wildcard if available
+    if "*" in proxy_config:
+        return proxy_config["*"]
+
+    return {}
+
+def _domain_matches_pattern(domain: str, pattern: str) -> bool:
+    """Check if a domain matches a pattern (supporting wildcards).
+
+    Args:
+        domain: The domain to check (e.g., "de.linkedin.com")
+        pattern: The pattern to match against (e.g., "*.linkedin.com", "linkedin.com")
+
+    Returns:
+        True if domain matches pattern
+    """
+    if pattern == "*":
+        return True
+
+    if pattern == domain:
+        return True
+
+    # Handle wildcard patterns
+    if "*" in pattern:
+        # Convert pattern to regex
+        # Escape special regex characters except *
+        escaped_pattern = re.escape(pattern).replace(r"\*", ".*")
+        regex_pattern = f"^{escaped_pattern}$"
+        return bool(re.match(regex_pattern, domain))
+
+    return False
+
 def create_company_research_agent(
     fusionbase_client: Fusionbase,
     planner_model: Any,
@@ -148,7 +269,7 @@ def create_company_research_agent(
     serp_api_key: str = None,
     max_iterations: int = 10,
     verbose: bool = False,
-    proxies: Optional[Dict[str, str]] = None,
+    proxies: Optional[Union[Dict[str, str], Dict[str, Dict[str, str]]]] = None,
     verify_ssl: bool = True
 ):
     """Create a company research agent using direct implementation.
@@ -162,7 +283,13 @@ def create_company_research_agent(
         serp_api_key: API key for SERP web search
         max_iterations: Maximum iterations before forcing completion
         verbose: Enable verbose output
-        proxies: Optional dictionary of proxies to use (e.g., {"http": "http://proxy:8080", "https": "https://proxy:8080"})
+        proxies: Proxy configuration. Can be either:
+            - Simple: {"http": "http://proxy:8080", "https": "https://proxy:8080"}
+            - Domain-specific: {
+                "*": {"http": "http://default-proxy:8080", "https": "https://default-proxy:8080"},
+                "linkedin.com": {"http": "http://linkedin-proxy:8080", "https": "https://linkedin-proxy:8080"},
+                "*.linkedin.com": {"http": "http://linkedin-proxy:8080", "https": "https://linkedin-proxy:8080"}
+            }
         verify_ssl: Whether to verify SSL certificates (set to False when using certain proxies)
     """
 
@@ -180,11 +307,21 @@ def create_company_research_agent(
     if not serp_api_key:
         serp_api_key = os.environ.get("SERP_API_KEY")
 
+    # Parse proxy configuration for domain-specific routing
+    proxy_config = _parse_proxy_config(proxies)
+    if verbose and proxy_config:
+        print("🌐 Proxy configuration:")
+        for domain_pattern, proxy_settings in proxy_config.items():
+            http_proxy = proxy_settings.get("http", "None")
+            https_proxy = proxy_settings.get("https", "None")
+            print(f"  {domain_pattern}: HTTP={http_proxy}, HTTPS={https_proxy}")
+
     # Define tools for different agent roles
     planner_tools = [
         organization_search,
         google_search,
-        Plan
+        Plan,
+        ExtractCompanyName  # Add the extraction tool to planner
     ]
 
     researcher_tools = [
@@ -203,6 +340,7 @@ def create_company_research_agent(
 
         # Output tools
         GlobalFinding,
+        ResearchReflection,  # Add back the ResearchReflection tool
         Queries
     ]
 
@@ -227,25 +365,66 @@ def create_company_research_agent(
     seen_tool_calls: Set[Tuple[str, str]] = set()
     tool_call_results: Dict[Tuple[str, str], Any] = {}
 
-    async def execute_tool(tool, tool_name: str, tool_args: Dict[str, Any]):
-        """Execute a tool with deduplication based on tool name and arguments."""
-        # Remove non-essential args for deduplication
-        filtered_args = {
-            k: v for k, v in tool_args.items() if k not in ("client", "api_key", "proxies", "verify_ssl")
-        }
-        try:
-            args_key = json.dumps(filtered_args, sort_keys=True, default=str)
-        except Exception:
-            args_key = str(filtered_args)
-        call_key = (tool_name, args_key)
-        if call_key in seen_tool_calls:
-            if verbose:
-                print(f"    🔄 Skipping duplicate tool call: {tool_name}({filtered_args})")
-            return tool_call_results.get(call_key)
+    # Track early termination statistics
+    early_termination_stats = {
+        "total_research_areas": 0,
+        "early_terminations": 0,
+        "termination_reasons": []
+    }
 
-        seen_tool_calls.add(call_key)
-        result = await tool.ainvoke(tool_args) if hasattr(tool, "ainvoke") else tool.invoke(tool_args)
-        tool_call_results[call_key] = result
+    async def execute_tool(tool, tool_name: str, tool_args: Dict[str, Any]):
+        """Execute a tool with simple deduplication that prevents unnecessary API calls."""
+        # Remove non-essential args for deduplication (these don't affect the core operation)
+        filtered_args = {
+            k: v for k, v in tool_args.items()
+            if k not in ("client", "api_key", "proxies", "verify_ssl")
+        }
+
+        # Create a cache key from tool name and filtered arguments
+        try:
+            # Use a more stable serialization approach
+            args_str = f"{tool_name}:" + "|".join(f"{k}={v}" for k, v in sorted(filtered_args.items()))
+        except Exception:
+            args_str = f"{tool_name}:{str(filtered_args)}"
+
+        # Check if we've already executed this exact tool call
+        if args_str in seen_tool_calls:
+            if verbose:
+                print(f"    🔄 Using cached result: {tool_name}({', '.join([f'{k}={v}' for k, v in filtered_args.items()])})")
+
+            # Return the cached result if available
+            cached_result = tool_call_results.get(args_str)
+            if cached_result is not None:
+                return cached_result
+            else:
+                # If no cached result, remove from seen_tool_calls and execute
+                if verbose:
+                    print(f"    ⚠️ Cache inconsistency detected, executing tool")
+                seen_tool_calls.discard(args_str)
+
+        # Execute the tool
+        if verbose:
+            print(f"    🔧 Executing: {tool_name}({', '.join([f'{k}={v}' for k, v in filtered_args.items()])})")
+
+        try:
+            if hasattr(tool, "ainvoke"):
+                result = await tool.ainvoke(tool_args)
+            else:
+                result = tool.invoke(tool_args)
+
+        except Exception as e:
+            if verbose:
+                print(f"    ❌ Tool execution failed: {str(e)}")
+            result = [{"error": f"Tool execution failed: {str(e)}"}]
+
+        # Cache the result AFTER successful execution
+        seen_tool_calls.add(args_str)
+        tool_call_results[args_str] = result
+
+        # No verbose logging of results - keep output clean
+        if verbose:
+            print(f"    ✅ Completed: {tool_name}")
+
         return result
 
     async def grade_for_hallucination(claim: str, source_content: str, context: str = "") -> Dict[str, Any]:
@@ -253,21 +432,65 @@ def create_company_research_agent(
         if verbose:
             print(f"    🔍 Grading claim for hallucination...")
 
+        # Truncate source content to reduce tokens
+        truncated_source = source_content
+        if len(source_content) > 8000:
+            truncated_source = source_content[:8000] + "... [content truncated]"
+            if verbose:
+                print(f"    📄 Source content truncated from {len(source_content)} to 8000 characters")
+
         hallucination_prompt = HALLUCINATION_GRADING_INSTRUCTIONS.format(
             claim=claim,
-            source_content=source_content,
+            source_content=truncated_source,
             context=context
         )
 
         try:
             response = await hallucination_grader_model.ainvoke([
-                SystemMessage(content="You are a strict fact-checking expert. Always respond with valid JSON only."),
+                SystemMessage(content="You are a strict fact-checking expert. Always respond with valid JSON only. Do NOT use markdown formatting or code blocks."),
                 HumanMessage(content=hallucination_prompt)
             ])
 
+            # Clean the response content from markdown formatting
+            content = response.content.strip()
+
+            # Remove markdown code blocks if present
+            if content.startswith("```json"):
+                content = content[7:]  # Remove ```json
+            elif content.startswith("```"):
+                content = content[3:]   # Remove ```
+
+            if content.endswith("```"):
+                content = content[:-3]  # Remove trailing ```
+
+            content = content.strip()
+
             # Parse the JSON response
-            import json
-            result = json.loads(response.content)
+            try:
+                result = json.loads(content)
+            except json.JSONDecodeError as json_error:
+                # Only show raw response when JSON parsing fails
+                if verbose:
+                    print(f"    ❌ JSON decode error: {json_error}")
+                    print(f"    📄 Raw grading response: {response.content[:200]}...")
+                    print(f"    📄 Cleaned response content: {content}")
+
+                # Try to extract JSON from response if it's still wrapped in other text
+                import re
+                json_match = re.search(r'\{.*\}', content, re.DOTALL)
+                if json_match:
+                    try:
+                        result = json.loads(json_match.group())
+                        if verbose:
+                            print(f"    ✅ Successfully extracted JSON from wrapped response")
+                    except json.JSONDecodeError:
+                        if verbose:
+                            print(f"    ❌ Failed to parse extracted JSON")
+                        raise json_error
+                else:
+                    if verbose:
+                        print(f"    ❌ No JSON found in response")
+                    raise json_error
 
             if verbose:
                 grounded = "✅ GROUNDED" if result.get("is_grounded", False) else "❌ HALLUCINATED"
@@ -281,6 +504,10 @@ def create_company_research_agent(
         except Exception as e:
             if verbose:
                 print(f"      ⚠️ Error in hallucination grading: {str(e)}")
+                print(f"      📄 Error type: {type(e).__name__}")
+                if hasattr(e, 'response'):
+                    print(f"      📄 Response object: {e.response}")
+
             # Default to not grounded if grading fails
             return {
                 "is_grounded": False,
@@ -401,12 +628,194 @@ def create_company_research_agent(
 
         return context
 
+    async def extract_clean_company_name(original_query: str) -> str:
+        """Use LLM to extract clean company name from query."""
+        if verbose:
+            print(f"\n🏷️ Extracting company name from: '{original_query}'")
+
+        extraction_prompt = f"""Extract the actual company name from this research query: "{original_query}"
+
+Examples:
+- "Research Apple Inc and provide company overview" → "Apple Inc"
+- "What is Microsoft Corporation's LinkedIn URL?" → "Microsoft Corporation"
+- "Find BMW AG contact information" → "BMW AG"
+- "Tell me about Tesla Inc's website" → "Tesla Inc"
+- "Get information about Fusionbase GmbH" → "Fusionbase GmbH"
+
+Return only the clean company name, no additional text."""
+
+        try:
+            # Force the model to use the ExtractCompanyName tool
+            response = await planner_model_with_tools.ainvoke(
+                [HumanMessage(content=extraction_prompt)],
+                tool_choice={"type": "function", "function": {"name": "ExtractCompanyName"}}
+            )
+
+            if hasattr(response, "tool_calls") and response.tool_calls:
+                for tool_call in response.tool_calls:
+                    if tool_call["name"] == "ExtractCompanyName":
+                        extracted_name = tool_call["args"].get("company_name", "").strip()
+                        if extracted_name and len(extracted_name) > 1:
+                            if verbose:
+                                print(f"    ✅ Extracted company name: '{extracted_name}'")
+                            return extracted_name
+
+        except Exception as e:
+            if verbose:
+                print(f"    ❌ Extraction failed: {str(e)}")
+
+        # Fallback to a simple extraction if LLM fails
+        if verbose:
+            print("    ↪ Falling back to simple extraction")
+
+        # Simple fallback logic
+        query_lower = original_query.lower()
+        for phrase in ["about ", "for ", "on ", "of "]:
+            if phrase in query_lower:
+                start_pos = query_lower.find(phrase) + len(phrase)
+                remaining = original_query[start_pos:]
+                end_pos = len(remaining)
+                for delimiter in [" and ", " linkedin", " website", " contact", "?", ".", ",", "!", "\n"]:
+                    delim_pos = remaining.lower().find(delimiter)
+                    if delim_pos != -1 and delim_pos < end_pos:
+                        end_pos = delim_pos
+
+                if end_pos > 0:
+                    extracted = remaining[:end_pos].strip()
+                    if len(extracted) > 1:
+                        return extracted
+
+        return original_query  # Final fallback
+
+    async def establish_fusionbase_foundation(context: ResearchContext) -> bool:
+        """Establish the foundational Fusionbase entity data for the entire research mission."""
+        if verbose:
+            print(f"\n🏛️ Establishing Fusionbase foundation for: {context.target_entity}")
+
+        # Skip if already completed
+        if context.fusionbase_search_completed and context.fusionbase_detail_completed:
+            if verbose:
+                print("  ✅ Fusionbase foundation already established")
+            return True
+
+        # Step 1: Organization Search (if not done)
+        if not context.fusionbase_search_completed:
+            if verbose:
+                print("  🔍 Performing global organization search...")
+
+            try:
+                # Use LLM to extract clean company name for Fusionbase search
+                company_name = await extract_clean_company_name(context.original_query)
+                if company_name != context.target_entity:
+                    # Update target entity with cleaner name if extraction improved it
+                    if len(company_name) > 2 and not any(word in company_name.lower() for word in ['research', 'find', 'what', 'information']):
+                        context.target_entity = company_name
+                        if verbose:
+                            print(f"    📝 Refined company name: '{company_name}'")
+
+                search_result = await execute_tool(
+                    researcher_tool_map["organization_search"],
+                    "organization_search",
+                    {"query": context.target_entity, "client": fb_client}  # Use clean company name
+                )
+
+                context.fusionbase_search_completed = True
+
+                # Check if we found an entity
+                if isinstance(search_result, list) and len(search_result) > 0:
+                    first_result = search_result[0]
+                    if isinstance(first_result, dict) and "entity_id" in first_result:
+                        context.fusionbase_entity_id = first_result["entity_id"]
+
+                        # Store search results in findings
+                        context.findings_registry["Fusionbase Search Results"] = f"Found {len(search_result)} organizations matching '{context.target_entity}'. Primary match: {first_result.get('name', 'Unknown')} (ID: {first_result['entity_id']})"
+
+                        if verbose:
+                            print(f"    ✅ Found entity ID: {context.fusionbase_entity_id}")
+                            print(f"    📋 Organization name: {first_result.get('name', 'Unknown')}")
+                    else:
+                        if verbose:
+                            print("    ⚠️ No valid entity ID found in search results")
+                        return False
+                else:
+                    if verbose:
+                        print("    ⚠️ No organizations found in search")
+                    return False
+
+            except Exception as e:
+                if verbose:
+                    print(f"    ❌ Organization search failed: {str(e)}")
+                return False
+
+        # Step 2: Organization Detail (if we have an entity ID and haven't done this)
+        if context.fusionbase_entity_id and not context.fusionbase_detail_completed:
+            if verbose:
+                print(f"  📋 Retrieving detailed organization information...")
+
+            try:
+                detail_result = await execute_tool(
+                    researcher_tool_map["organization_detail"],
+                    "organization_detail",
+                    {"entity_id": context.fusionbase_entity_id, "client": fb_client}
+                )
+
+                context.fusionbase_detail_completed = True
+                context.fusionbase_entity = detail_result
+
+                # Store detailed information in findings
+                if isinstance(detail_result, dict) and "name" in detail_result:
+                    entity_summary = f"Organization: {detail_result['name']}"
+                    if detail_result.get("primary_website"):
+                        entity_summary += f"\nWebsite: {detail_result['primary_website']}"
+                    if detail_result.get("country"):
+                        entity_summary += f"\nCountry: {detail_result['country']}"
+                    if detail_result.get("founding_date"):
+                        entity_summary += f"\nFounding Date: {detail_result['founding_date']}"
+                    if detail_result.get("contact"):
+                        contact = detail_result["contact"]
+                        if contact.get("email"):
+                            entity_summary += f"\nEmail: {contact['email']}"
+                        if contact.get("phone"):
+                            entity_summary += f"\nPhone: {contact['phone']}"
+
+                    context.findings_registry["Fusionbase Organization Details"] = entity_summary
+
+                    # Add high-value insights
+                    if detail_result.get("primary_website"):
+                        context.key_insights.append(f"Website: {detail_result['primary_website']}")
+
+                    if verbose:
+                        print(f"    ✅ Retrieved detailed information for: {detail_result['name']}")
+                else:
+                    if verbose:
+                        print("    ⚠️ Invalid detail result received")
+                    return False
+
+            except Exception as e:
+                if verbose:
+                    print(f"    ❌ Organization detail retrieval failed: {str(e)}")
+                return False
+
+        if verbose:
+            print("  🏛️ Fusionbase foundation established successfully")
+
+        return True
+
     async def research_area_with_context(context: ResearchContext, area_description: str, force_org_search: bool = False) -> Dict[str, Any]:
-        """Research a specific area with full context awareness and deep investigation capabilities."""
+        """Research a specific area with full context awareness and shared Fusionbase foundation."""
         if verbose:
             print(f"\n📝 [RESEARCH] Investigating: '{area_description[:50]}...'")
 
-        # Build context-aware prompt with emphasis on persistence and depth
+        # Track this research area
+        early_termination_stats["total_research_areas"] += 1
+
+        # Build context-aware prompt with Fusionbase foundation information
+        fusionbase_info = "None - Fusionbase lookup not completed yet"
+        if context.fusionbase_entity:
+            fusionbase_info = f"AVAILABLE: Organization details for {context.fusionbase_entity.get('name', 'Unknown')} (ID: {context.fusionbase_entity_id})"
+            if context.fusionbase_entity.get("primary_website"):
+                fusionbase_info += f", Website: {context.fusionbase_entity['primary_website']}"
+
         context_info = f"""
 RESEARCH CONTEXT:
 - Original Query: {context.original_query}
@@ -414,6 +823,8 @@ RESEARCH CONTEXT:
 - Target Entity: {context.target_entity}
 
 CURRENT TASK: {area_description}
+
+FUSIONBASE FOUNDATION DATA: {fusionbase_info}
 
 PREVIOUSLY COMPLETED SEARCHES: {', '.join(context.completed_searches) if context.completed_searches else 'None'}
 
@@ -425,24 +836,20 @@ KEY INSIGHTS SO FAR:
 
 YOUR MISSION: Focus specifically on finding information for "{area_description}" that directly serves the research goal: "{context.research_goal}".
 
-PERSISTENCE AND DEPTH STRATEGY:
-- If initial searches don't provide complete information, try alternative approaches
-- Use Google search pagination (page parameter) to explore more results if needed
-- When you find promising web pages, thoroughly extract content using web_content
-- If a page doesn't have the specific information, try related searches or navigate to related pages
-- Build upon previous tool results to guide your next searches
-- Don't give up after one search - iterate and refine your approach
-- Use the information from previous tool calls to inform your next moves
+IMPORTANT NOTES:
+- Fusionbase organization search and detail lookup have been completed globally
+- You have access to the organization's basic information from Fusionbase
+- Focus on finding ADDITIONAL information that complements what we already know
+- Use web search for supplementary information not available in Fusionbase
+- Use relation tools to explore connections and additional data points
 
-SEARCH DEPTH TECHNIQUES:
-1. Start with broad searches, then narrow down based on results
-2. Use company name variations and synonyms
-3. Try industry-specific searches if company searches don't work
-4. Paginate through Google results using the 'page' parameter (1, 2, 3, etc.)
-5. Extract content from multiple promising URLs
-6. Cross-reference information between different sources
+EARLY TERMINATION STRATEGY:
+- After each significant finding, assess if you have sufficient information for your research goal
+- Use ResearchReflection tool with confidence 0.6+ if you believe the research is complete
+- Don't over-research - efficiency is key
+- Focus on getting the core information needed, not exhaustive coverage
 
-You have up to {max_iterations} iterations to find comprehensive information. Use them strategically.
+You have up to {max_iterations} iterations to find comprehensive information. Use them strategically and terminate early when sufficient.
 """
 
         messages = [
@@ -454,16 +861,13 @@ You have up to {max_iterations} iterations to find comprehensive information. Us
         findings = {}
         iterations = 0
         last_response = ""
-        org_search_called = False
         tool_results = []
         search_page_tracking = {}  # Track which searches and pages we've explored
+        early_termination = False
+        sufficiency_reason = ""
 
-        # Create models
-        regular_model = researcher_model_with_tools
-        forced_org_search_model = researcher_model.bind_tools(
-            researcher_tools,
-            tool_choice="organization_search"
-        ) if force_org_search else None
+        # No forced tool choices needed since foundation is established globally
+        current_model = researcher_model_with_tools
 
         while iterations < max_iterations:
             iterations += 1
@@ -472,11 +876,6 @@ You have up to {max_iterations} iterations to find comprehensive information. Us
                 print(f"  ↪ Research iteration {iterations}/{max_iterations}")
 
             try:
-                current_model = forced_org_search_model if (force_org_search and iterations == 1 and not org_search_called) else regular_model
-
-                if current_model == forced_org_search_model and verbose:
-                    print("    🔒 Forcing organization search in this iteration")
-
                 response = await current_model.ainvoke(messages)
                 messages.append(response)
                 last_response = response.content if hasattr(response, "content") else ""
@@ -488,9 +887,6 @@ You have up to {max_iterations} iterations to find comprehensive information. Us
                         tool_name = tool_call["name"]
                         tool_call_id = tool_call["id"]
                         tool_args = dict(tool_call["args"])
-
-                        if tool_name == "organization_search":
-                            org_search_called = True
 
                         if verbose:
                             arg_str = ", ".join([f"{k}='{v}'" if isinstance(v, str) else f"{k}={v}"
@@ -504,8 +900,9 @@ You have up to {max_iterations} iterations to find comprehensive information. Us
                                 tool_args["client"] = fb_client
                             elif tool_name == "google_search":
                                 tool_args["api_key"] = serp_api_key
-                                if proxies:
-                                    tool_args["proxies"] = proxies
+                                # Google search doesn't need domain-specific proxies since it goes to ValueSERP API
+                                if proxy_config and "*" in proxy_config:
+                                    tool_args["proxies"] = proxy_config["*"]
                                 tool_args["verify_ssl"] = verify_ssl
 
                                 # Enhanced search tracking with pagination support
@@ -526,8 +923,19 @@ You have up to {max_iterations} iterations to find comprehensive information. Us
                                 if verbose:
                                     print(f"    📄 Search page {search_page} for query: '{search_query}'")
 
-                            elif tool_name == "web_content" and proxies:
-                                tool_args["proxies"] = proxies
+                            elif tool_name == "web_content":
+                                # For web_content, determine the appropriate proxy based on the URL
+                                url = tool_args.get("url", "")
+                                if url and proxy_config:
+                                    domain_proxy = _get_proxy_for_url(url, proxy_config)
+                                    if domain_proxy:
+                                        tool_args["proxies"] = domain_proxy
+                                        if verbose:
+                                            parsed_url = urlparse(url)
+                                            domain = parsed_url.netloc
+                                            http_proxy = domain_proxy.get("http", "None")
+                                            https_proxy = domain_proxy.get("https", "None")
+                                            print(f"    🌐 Using domain-specific proxy for {domain}: HTTP={http_proxy}, HTTPS={https_proxy}")
                                 tool_args["verify_ssl"] = verify_ssl
 
                             # Execute tool with deduplication
@@ -560,15 +968,15 @@ You have up to {max_iterations} iterations to find comprehensive information. Us
                                     context=f"Research area: {area_description}"
                                 )
 
-                                # Only add if grounded and relevant
-                                if grading_result.get("is_grounded", False) and relevance_score > 0.3:
+                                # Only add if grounded and relevant (relaxed thresholds)
+                                if grading_result.get("is_grounded", False) and relevance_score > 0.4:
                                     # Store in global registry
                                     context.findings_registry[section_name] = content
                                     findings[section_name] = content
                                     iteration_had_findings = True
 
-                                    # If high relevance, add to key insights
-                                    if relevance_score > 0.7:
+                                    # If high relevance, add to key insights (lowered threshold)
+                                    if relevance_score > 0.6:
                                         insight = f"{section_name}: {content[:100]}..."
                                         if insight not in context.key_insights:
                                             context.key_insights.append(insight)
@@ -577,10 +985,28 @@ You have up to {max_iterations} iterations to find comprehensive information. Us
                                         print(f"    ✅ Saved finding: '{section_name}' (relevance: {relevance_score:.2f})")
                                 else:
                                     if verbose:
-                                        reason = "low relevance" if relevance_score <= 0.3 else "hallucinated"
+                                        reason = "low relevance" if relevance_score <= 0.4 else "hallucinated"
                                         print(f"    ❌ Rejected finding: '{section_name}' ({reason})")
 
-                            # Provide rich context back to the model about what happened
+                            # Handle ResearchReflection results
+                            elif tool_name == "ResearchReflection":
+                                is_sufficient = tool_args.get("is_sufficient", False)
+                                confidence = tool_args.get("confidence", 0.0)
+                                reasoning = tool_args.get("reasoning", "")
+
+                                # Only consider early termination if reasonably confident (lowered threshold)
+                                if is_sufficient and confidence > 0.6:
+                                    early_termination = True
+                                    sufficiency_reason = reasoning
+
+                                    if verbose:
+                                        print(f"🏁 Research may be sufficient: {reasoning}")
+
+                                if verbose:
+                                    status = "SUFFICIENT" if is_sufficient else "INSUFFICIENT"
+                                    print(f"📊 Research reflection: {status} (confidence: {confidence:.2f})")
+
+                            # Create appropriate tool response
                             tool_response = _create_contextual_tool_response(tool_name, result, tool_results, search_page_tracking, iterations)
 
                             messages.append(ToolMessage(
@@ -599,8 +1025,16 @@ You have up to {max_iterations} iterations to find comprehensive information. Us
                             if verbose:
                                 print(f"    ❌ Error: {str(e)}")
 
+                    # Check if we should terminate early AFTER processing all tool calls
+                    if early_termination:
+                        early_termination_stats["early_terminations"] += 1
+                        early_termination_stats["termination_reasons"].append(sufficiency_reason)
+                        if verbose:
+                            print(f"🏁 Stopping research early - {sufficiency_reason}")
+                        break
+
                     # Add guidance for next iteration if we haven't found enough yet
-                    if not iteration_had_findings and iterations < max_iterations:
+                    if not iteration_had_findings and iterations < max_iterations and not early_termination:
                         guidance = _create_iteration_guidance(tool_results, search_page_tracking, area_description, iterations)
                         messages.append(HumanMessage(content=guidance))
 
@@ -609,7 +1043,7 @@ You have up to {max_iterations} iterations to find comprehensive information. Us
 
                 else:
                     # No tool calls - check if we should continue or wrap up
-                    if iterations < max_iterations and not findings:
+                    if iterations < max_iterations and not findings and not early_termination:
                         messages.append(HumanMessage(content=(
                             f"You still have {max_iterations - iterations} iterations remaining. "
                             f"Continue searching for information about '{area_description}'. "
@@ -646,13 +1080,20 @@ You have up to {max_iterations} iterations to find comprehensive information. Us
                     findings["Summary"] = last_response
                     context.findings_registry[f"{area_description} - Summary"] = last_response
 
+        # Add completion summary to findings if research was terminated early
+        if early_termination:
+            completion_summary = f"Research for '{area_description}' was completed early after {iterations} iterations because: {sufficiency_reason}"
+            context.findings_registry[f"{area_description} - Research Status"] = completion_summary
+            findings["Research Status"] = completion_summary
+
         return {
             "area": area_description,
             "findings": findings,
             "iterations": iterations,
             "last_response": last_response,
-            "org_search_called": org_search_called,
-            "search_pages_explored": search_page_tracking
+            "search_pages_explored": search_page_tracking,
+            "early_termination": early_termination,
+            "termination_reason": sufficiency_reason if early_termination else "Max iterations reached or complete"
         }
 
     def _create_contextual_tool_response(tool_name: str, result: Any, tool_results: List[Dict], search_page_tracking: Dict, iteration: int) -> str:
@@ -838,6 +1279,11 @@ SEARCHES COMPLETED: {', '.join(context.completed_searches) if context.completed_
         seen_tool_calls.clear()
         tool_call_results.clear()
 
+        # Reset early termination stats for this run
+        early_termination_stats["total_research_areas"] = 0
+        early_termination_stats["early_terminations"] = 0
+        early_termination_stats["termination_reasons"] = []
+
         # Extract query and determine target entity
         user_messages = initial_state.get("messages", [])
         if not user_messages:
@@ -853,39 +1299,10 @@ SEARCHES COMPLETED: {', '.join(context.completed_searches) if context.completed_
         if not user_query:
             raise ValueError("Empty query provided")
 
-        # Extract target entity from query - fix the case sensitivity issue
+        # Extract target entity from query with improved extraction using LLM
         target_entity = initial_state.get("company_topic", "the requested topic")
         if target_entity == "the requested topic":
-            # Try to extract from query with better logic
-            user_query_lower = user_query.lower()
-            for phrase in ["about ", "for ", "on "]:
-                if phrase in user_query_lower:
-                    start_pos = user_query_lower.find(phrase) + len(phrase)
-                    # Look for the end of the word/phrase (space, punctuation, or end of string)
-                    remaining = user_query[start_pos:]
-                    end_pos = len(remaining)
-                    for delimiter in [" ", "?", ".", ",", "!", "\n"]:
-                        delim_pos = remaining.find(delimiter)
-                        if delim_pos != -1 and delim_pos < end_pos:
-                            end_pos = delim_pos
-
-                    if end_pos > 0:
-                        target_entity = remaining[:end_pos].strip()
-                        break
-
-            # If still not found, try to extract company names (simple heuristic)
-            if target_entity == "the requested topic":
-                # Look for capitalized words that might be company names
-                import re
-                words = user_query.split()
-                for i, word in enumerate(words):
-                    if word[0].isupper() and len(word) > 2:
-                        # Check if next word is also capitalized (compound company name)
-                        if i + 1 < len(words) and words[i + 1][0].isupper():
-                            target_entity = f"{word} {words[i + 1]}"
-                        else:
-                            target_entity = word
-                        break
+            target_entity = await extract_clean_company_name(user_query)
 
         if verbose:
             print(f"\n🚀 Starting context-aware research")
@@ -896,7 +1313,13 @@ SEARCHES COMPLETED: {', '.join(context.completed_searches) if context.completed_
             # PHASE 1: Create research context and plan
             research_context = await create_research_plan(user_query, target_entity)
 
-            # PHASE 2: Execute research areas with context
+            # PHASE 2: Establish Fusionbase foundation BEFORE research areas
+            foundation_success = await establish_fusionbase_foundation(research_context)
+            if not foundation_success:
+                if verbose:
+                    print("⚠️ Could not establish Fusionbase foundation - proceeding with web-only research")
+
+            # PHASE 3: Execute research areas with shared foundation
             if verbose:
                 print(f"\n🔍 Executing research with {len(research_context.research_plan.key_questions)} questions and {len(research_context.research_plan.data_points)} data points")
 
@@ -909,15 +1332,14 @@ SEARCHES COMPLETED: {', '.join(context.completed_searches) if context.completed_
             if not research_areas:
                 research_areas = ["Basic company information"]
 
-            # Execute research with context awareness
+            # Execute research with context awareness (no forced org search needed)
             research_tasks = []
-            for i, area in enumerate(research_areas):
-                force_org_search = (i == 0)
-                research_tasks.append(research_area_with_context(research_context, area, force_org_search))
+            for area in research_areas:
+                research_tasks.append(research_area_with_context(research_context, area, force_org_search=False))
 
             await asyncio.gather(*research_tasks)
 
-            # PHASE 3: Generate final report
+            # PHASE 4: Generate final report
             final_report = await synthesize_final_report(research_context)
 
             if verbose:
@@ -925,6 +1347,16 @@ SEARCHES COMPLETED: {', '.join(context.completed_searches) if context.completed_
                 print(f"📊 Total findings: {len(research_context.findings_registry)}")
                 print(f"💡 Key insights: {len(research_context.key_insights)}")
                 print(f"🔍 Searches completed: {len(research_context.completed_searches)}")
+
+                # Log early termination statistics
+                total_areas = early_termination_stats["total_research_areas"]
+                early_terms = early_termination_stats["early_terminations"]
+                print(f"⏱️ Early terminations: {early_terms}/{total_areas} research areas completed early")
+                if early_terms > 0:
+                    efficiency_pct = (early_terms / total_areas) * 100
+                    print(f"⚡ Research efficiency: {efficiency_pct:.1f}% of areas completed ahead of schedule")
+                    if verbose and early_termination_stats["termination_reasons"]:
+                        print(f"📝 Termination reasons: {', '.join(early_termination_stats['termination_reasons'][:3])}{'...' if len(early_termination_stats['termination_reasons']) > 3 else ''}")
 
             return {"final_report": final_report}
 

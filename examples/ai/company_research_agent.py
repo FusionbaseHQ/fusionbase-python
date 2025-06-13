@@ -3,6 +3,7 @@
 
 import argparse
 import asyncio
+import json
 import os
 from pathlib import Path
 import sys
@@ -63,6 +64,19 @@ async def main_async(args):
     if args.proxy:
         console.print(f"Using proxy: {args.proxy}")
         proxies = {"http": args.proxy, "https": args.proxy}
+    elif args.proxy_config:
+        console.print(f"Using proxy configuration file: {args.proxy_config}")
+        try:
+            with open(args.proxy_config, 'r', encoding='utf-8') as f:
+                proxies = json.load(f)
+                console.print("Proxy configuration loaded:")
+                for domain, proxy_settings in proxies.items():
+                    http_proxy = proxy_settings.get("http", "None")
+                    https_proxy = proxy_settings.get("https", "None")
+                    console.print(f"  {domain}: HTTP={http_proxy}, HTTPS={https_proxy}")
+        except Exception as e:
+            console.print(f"[bold red]Error loading proxy configuration: {str(e)}[/bold red]")
+            sys.exit(1)
 
     # Create model instances
     console.print("Creating model instances...", end="")
@@ -86,7 +100,7 @@ async def main_async(args):
         )
         console.print("[yellow]Set the API key with: export SERP_API_KEY=your_key_here[/yellow]\n")
 
-    # Create the agent with model instances instead of model names
+    # Create the agent with proxy configuration
     try:
         agent = create_company_research_agent(
             fusionbase_client=fb_client,
@@ -97,7 +111,7 @@ async def main_async(args):
             serp_api_key=serp_api_key,
             max_iterations=args.max_iterations,
             verbose=args.verbose,
-            proxies=proxies,
+            proxies=proxies,  # Pass proxy configuration directly to agent
             verify_ssl=not args.no_verify_ssl  # Pass SSL verification setting
         )
         console.print(" [green]Done[/green]")
@@ -162,7 +176,15 @@ def main():
         default=10,
         help="Maximum iterations before forcing completion (default: 10)"
     )
-    parser.add_argument("--proxy", help="HTTP proxy URL to use for web requests")
+
+    # Proxy configuration options
+    proxy_group = parser.add_mutually_exclusive_group()
+    proxy_group.add_argument("--proxy", help="HTTP proxy URL to use for all web requests")
+    proxy_group.add_argument(
+        "--proxy-config",
+        help="Path to JSON file with domain-specific proxy configuration"
+    )
+
     parser.add_argument(
         "--no-verify-ssl",
         action="store_true",

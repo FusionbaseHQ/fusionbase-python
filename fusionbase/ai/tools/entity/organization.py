@@ -44,28 +44,33 @@ def organization_search(
     if not client:
         return [{"error": "Fusionbase client is required."}]
 
-    # Execute the search with default limit
-    results = client.search.organizations.search(q=query)
+    try:
+        # Execute the search with default limit
+        results = client.search.organizations.search(q=query)
 
-    # Format results in a readable way for LLM
-    formatted_results = []
-    for org_ref in results.items:
-        try:
-            # Get basic information without loading full entity
-            org_info = {
-                "entity_id": org_ref.entity_id,
-                "name": getattr(org_ref, "name", None),
-                "country": getattr(org_ref, "country", None),
-                "score": getattr(org_ref, "score", None)
-            }
-            formatted_results.append(org_info)
-        except Exception as e:
-            formatted_results.append({
-                "entity_id": org_ref.entity_id,
-                "error": str(e)
-            })
+        # Format results in a readable way for LLM
+        formatted_results = []
+        if hasattr(results, 'items'):
+            for org_ref in results.items:
+                try:
+                    # Get basic information without loading full entity
+                    org_info = {
+                        "entity_id": org_ref.entity_id,
+                        "name": getattr(org_ref, "name", None),
+                        "country": getattr(org_ref, "country", None),
+                        "score": getattr(org_ref, "score", None)
+                    }
+                    formatted_results.append(org_info)
+                except Exception as e:
+                    formatted_results.append({
+                        "entity_id": getattr(org_ref, "entity_id", "unknown"),
+                        "error": str(e)
+                    })
 
-    return formatted_results
+        return formatted_results
+
+    except Exception as e:
+        return [{"error": f"Search failed: {str(e)}"}]
 
 
 @tool

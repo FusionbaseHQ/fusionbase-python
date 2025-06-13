@@ -24,13 +24,16 @@ except ImportError as exc:
 @tool
 def web_content(
     url: Annotated[str, "The URL of the web page to extract content from"],
-    proxies: Annotated[Optional[Dict[str, str]], "HTTP proxies to use"] = None,
+    proxies: Annotated[Optional[Dict[str, str]], "HTTP proxies to use for this specific request"] = None,
     verify_ssl: Annotated[Optional[bool], "Whether to verify SSL certificates"] = True,
 ) -> str:
     """Extract and process the main content from a webpage.
 
     This tool fetches web pages and intelligently extracts the main content,
     removing navigation, ads, footers and other irrelevant content.
+
+    The proxies parameter should be in the format:
+    {"http": "http://proxy:8080", "https": "https://proxy:8080"}
 
     Returns the extracted content in a clean, readable format.
     """
@@ -100,13 +103,16 @@ def web_content(
 @tool
 async def async_web_content(
     url: Annotated[str, "The URL of the web page to extract content from"],
-    proxies: Annotated[Optional[Dict[str, str]], "HTTP proxies to use"] = None,
+    proxies: Annotated[Optional[Dict[str, str]], "HTTP proxies to use for this specific request"] = None,
     verify_ssl: Annotated[Optional[bool], "Whether to verify SSL certificates"] = True,
 ) -> str:
     """Extract and process the main content from a webpage asynchronously.
 
     This tool fetches web pages and intelligently extracts the main content,
     removing navigation, ads, footers and other irrelevant content.
+
+    The proxies parameter should be in the format:
+    {"http": "http://proxy:8080", "https": "https://proxy:8080"}
 
     Returns the extracted content in a clean, readable format.
     """
