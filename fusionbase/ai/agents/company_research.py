@@ -154,7 +154,7 @@ class GlobalFinding(BaseModel):
     )
     sources: List[str] = Field(
         description="Sources where this information was found",
-        default_factory=list
+        default=[]
     )
 
 @tool
@@ -173,7 +173,7 @@ class ResearchReflection(BaseModel):
     )
     missing_information: List[str] = Field(
         description="List of specific information that is still needed (if insufficient)",
-        default_factory=list
+        default=[]
     )
 
 @tool
