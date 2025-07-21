@@ -705,7 +705,7 @@ Return only the clean company name, no additional text."""
             # Force the model to use the ExtractCompanyName tool
             response = await planner_model_with_tools.ainvoke(
                 [HumanMessage(content=extraction_prompt)],
-                tool_choice="ExtractCompanyName"
+                tool_choice={"type": "function", "function": {"name": "ExtractCompanyName"}}
             )
 
             if hasattr(response, "tool_calls") and response.tool_calls:
