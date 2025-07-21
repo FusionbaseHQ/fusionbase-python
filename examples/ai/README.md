@@ -1,122 +1,156 @@
 # Fusionbase AI Examples
 
-This directory contains examples for using Fusionbase AI tools and agents.
+This directory contains examples demonstrating the Fusionbase AI agents and tools.
 
-## Company Research Agent
+## Examples Overview
 
-The company research agent is a powerful tool for gathering comprehensive information about companies using both Fusionbase data and web research.
+### Core Examples
 
-### Basic Usage
+1. **`company_research_agent.py`** - Command-line interface for company research
+   - Full-featured CLI with all configuration options
+   - Supports different output formats
+   - Proxy configuration support
 
+2. **`usage_example.py`** - Basic programmatic usage
+   - Simple Python API usage
+   - Shows how to integrate the agent in your code
+
+### Tool Configuration Examples
+
+3. **`custom_tools_configuration.py`** - Configure which tools the agent uses
+   - Create minimal agents for speed
+   - Financial-focused agents
+   - Web-enhanced agents
+   - Learn to optimize for specific use cases
+
+4. **`using_tool_presets.py`** - Use pre-configured tool sets
+   - Minimal, Financial, News, and Comprehensive presets
+   - Quick setup without manual tool selection
+   - Shows how to customize presets
+
+### Structured Output Examples
+
+5. **`structured_output_personnel.py`** - Extract data into structured schemas
+   - Uses Pydantic models for type-safe output
+   - Extracts company personnel information
+   - Ready for database storage or APIs
+
+6. **`output_formats_comparison.py`** - Compare output formats
+   - See the difference between markdown and structured output
+   - Understand when to use each format
+
+7. **`system_prompt_example.py`** - Using system prompts
+   - Pass system instructions via messages array
+   - Guide agent behavior and tool usage
+   - Enable intent-based token efficiency
+
+## Quick Start
+
+### Basic Research
+```bash
+python examples/ai/company_research_agent.py --query "Research SAP SE"
+```
+
+### With Custom Tools
 ```python
-from fusionbase import Fusionbase
-from fusionbase.ai.agents import create_company_research_agent
-from langchain_openai import ChatOpenAI
+from fusionbase.ai.agents import create_company_research_agent, ToolPresets
 
-# Initialize clients
-fb_client = Fusionbase()
-model = ChatOpenAI(model="gpt-4o")
-
-# Create agent
+# Use minimal tools for speed
 agent = create_company_research_agent(
-    fusionbase_client=fb_client,
-    planner_model=model,
-    researcher_model=model,
-    synthesizer_model=model,
-    hallucination_grader_model=model
+    ...,
+    researcher_tools=ToolPresets.minimal_researcher_tools()
 )
+```
 
-# Run research
+### With Structured Output
+```python
+from pydantic import BaseModel
+
+class CompanyInfo(BaseModel):
+    name: str
+    revenue: float
+    employees: int
+
+agent = create_company_research_agent(
+    ...,
+    output_schema=CompanyInfo  # Get structured data
+)
+```
+
+### With System Prompts
+```python
+# Pass system prompts in messages
 result = await agent.ainvoke({
-    "messages": [{"role": "user", "content": "Research Fusionbase GmbH"}]
+    "messages": [
+        {
+            "role": "system",
+            "content": "Focus on ESG and sustainability aspects"
+        },
+        {
+            "role": "user",
+            "content": "Research Tesla Inc"
+        }
+    ]
 })
 ```
 
-### Proxy Configuration
+## Requirements
 
-The agent supports both simple and domain-specific proxy configurations:
+Set these environment variables:
+- `FUSIONBASE_API_KEY` - Your Fusionbase API key (required)
+- `OPENAI_API_KEY` - Your OpenAI API key (required)
+- `SERP_API_KEY` - For web search capabilities (optional)
 
-#### Simple Proxy Configuration
+## Features Demonstrated
 
-```python
-simple_proxies = {
-    "http": "http://proxy:8080",
-    "https": "https://proxy:8080"
-}
+### Custom Tools Configuration
+- Control which data sources the agent can access
+- Optimize for speed vs comprehensiveness
+- Create specialized agents for specific tasks
 
-agent = create_company_research_agent(
-    # ... other parameters ...
-    proxies=simple_proxies,
-    verify_ssl=False  # Disable SSL verification if needed
-)
-```
+### Structured Output
+- Get typed, validated data instead of markdown
+- Use Pydantic models or JSON schemas
+- Perfect for automation and integrations
 
-#### Domain-Specific Proxy Configuration
+### Tool Presets
+- Pre-configured tool sets for common scenarios
+- Minimal, Financial, News, Comprehensive options
+- Easy to extend and customize
 
-```python
-domain_proxies = {
-    "*": {  # Default proxy for all domains
-        "http": "http://default-proxy:8080",
-        "https": "https://default-proxy:8080"
-    },
-    "linkedin.com": {  # Specific proxy for LinkedIn
-        "http": "http://linkedin-proxy:8080",
-        "https": "https://linkedin-proxy:8080"
-    },
-    "*.linkedin.com": {  # Proxy for LinkedIn subdomains
-        "http": "http://linkedin-proxy:8080",
-        "https": "https://linkedin-proxy:8080"
-    }
-}
+### Proxy Support
+- Simple proxy configuration
+- Domain-specific proxy routing
+- SSL verification options
 
-agent = create_company_research_agent(
-    # ... other parameters ...
-    proxies=domain_proxies
-)
-```
+## Running the Examples
 
-### Command Line Usage
-
+Each example can be run directly:
 ```bash
-# Simple proxy
-python examples/ai/company_research_agent.py --query "Research MediaMir GmbH" --proxy "http://proxy:8080"
-
-# Domain-specific proxy from file
-python examples/ai/company_research_agent.py --query "Research MediaMir GmbH" --proxy-config proxy_config.json
-
-# With SSL verification disabled
-python examples/ai/company_research_agent.py --query "Research MediaMir GmbH" --proxy "http://proxy:8080" --no-verify-ssl
+python examples/ai/<example_name>.py
 ```
 
-### Proxy Configuration File Format
-
-Create a JSON file with domain-specific proxy settings:
-
-```json
-{
-  "*": {
-    "http": "http://default-proxy:8080",
-    "https": "https://default-proxy:8080"
-  },
-  "linkedin.com": {
-    "http": "http://linkedin-proxy:8080",
-    "https": "https://linkedin-proxy:8080"
-  },
-  "*.linkedin.com": {
-    "http": "http://linkedin-proxy:8080",
-    "https": "https://linkedin-proxy:8080"
-  }
-}
+Most examples include helpful command-line arguments:
+```bash
+python examples/ai/company_research_agent.py --help
 ```
 
-### Environment Variables
+## Tips
 
-- `FUSIONBASE_API_KEY`: Your Fusionbase API key
-- `OPENAI_API_KEY`: Your OpenAI API key
-- `SERP_API_KEY`: Your SERP API key for web search
+1. **Start Simple**: Use `company_research_agent.py` for basic research
+2. **Optimize Tools**: Use `custom_tools_configuration.py` to learn about tool selection
+3. **Structure Data**: Use `structured_output_personnel.py` for API/database integration
+4. **Use Presets**: Start with `using_tool_presets.py` for quick configuration
 
-## Files
+## Advanced Usage
 
-- `company_research_agent.py`: Command-line interface for the research agent
-- `usage_example.py`: Programmatic usage examples with different proxy configurations
-- `proxy_config_example.json`: Example proxy configuration file
+### Custom Output Schema
+Define your own Pydantic models for exactly the data you need.
+
+### Tool Selection
+Choose only the tools you need for faster, more focused research.
+
+### Proxy Configuration
+Route different domains through different proxies for optimal access.
+
+See individual example files for detailed documentation and usage.

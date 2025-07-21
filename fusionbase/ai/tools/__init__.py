@@ -11,6 +11,15 @@ try:
     from .entity.relation import relation_detail
     from .entity.relation import relation_resolve
     from .entity.relation import relation_search
+    from .relation.convenience import annual_financial_statements
+    from .relation.convenience import balance_sheet_accounts
+    from .relation.convenience import financial_kpi
+    from .relation.convenience import insolvency_publications
+    from .relation.convenience import network
+    from .relation.convenience import news
+    from .relation.convenience import profit_and_loss_account
+    from .relation.convenience import publications
+    from .relation.convenience import related_persons
     from .web.content import async_web_content
     from .web.content import web_content
     from .web.search import async_google_search
@@ -27,6 +36,15 @@ try:
         "async_relation_search",
         "async_relation_detail",
         "async_relation_resolve",
+        "financial_kpi",
+        "network",
+        "related_persons",
+        "profit_and_loss_account",
+        "publications",
+        "balance_sheet_accounts",
+        "insolvency_publications",
+        "annual_financial_statements",
+        "news",
         "google_search",
         "async_google_search",
         "web_content",

@@ -21,12 +21,22 @@ from fusionbase.ai.tools.entity.organization import organization_search
 from fusionbase.ai.tools.entity.relation import relation_detail
 from fusionbase.ai.tools.entity.relation import relation_resolve
 from fusionbase.ai.tools.entity.relation import relation_search
+from fusionbase.ai.tools.relation import annual_financial_statements
+from fusionbase.ai.tools.relation import balance_sheet_accounts
+from fusionbase.ai.tools.relation import financial_kpi
+from fusionbase.ai.tools.relation import insolvency_publications
+from fusionbase.ai.tools.relation import network
+from fusionbase.ai.tools.relation import news
+from fusionbase.ai.tools.relation import profit_and_loss_account
+from fusionbase.ai.tools.relation import publications
+from fusionbase.ai.tools.relation import related_persons
 from fusionbase.ai.tools.web.content import web_content
 from fusionbase.ai.tools.web.search import google_search
 
 from .prompts import HALLUCINATION_GRADING_INSTRUCTIONS
 from .prompts import RESEARCH_INSTRUCTIONS
 from .prompts import SYNTHESIS_INSTRUCTIONS
+from .token_efficient_tools_v2 import IntentBasedTokenHandler
 
 # pylint: disable=line-too-long,too-many-arguments,too-many-locals,too-many-branches,too-many-statements
 # pylint: disable=too-many-nested-blocks,unused-variable,redefined-outer-name,too-many-positional-arguments
@@ -91,7 +101,7 @@ class FinalAnswer(BaseModel):
 
 class CompanyResearchResult(TypedDict):
     """Result of the company research agent."""
-    final_report: str
+    final_report: Union[str, Dict[str, Any]]
 
 class ResearchContext(BaseModel):
     """Global research context shared across all agents."""
@@ -270,7 +280,11 @@ def create_company_research_agent(
     max_iterations: int = 10,
     verbose: bool = False,
     proxies: Optional[Union[Dict[str, str], Dict[str, Dict[str, str]]]] = None,
-    verify_ssl: bool = True
+    verify_ssl: bool = True,
+    planner_tools: Optional[List[Any]] = None,
+    researcher_tools: Optional[List[Any]] = None,
+    synthesizer_tools: Optional[List[Any]] = None,
+    output_schema: Optional[Union[Dict[str, Any], type[BaseModel]]] = None
 ):
     """Create a company research agent using direct implementation.
 
@@ -291,6 +305,14 @@ def create_company_research_agent(
                 "*.linkedin.com": {"http": "http://linkedin-proxy:8080", "https": "https://linkedin-proxy:8080"}
             }
         verify_ssl: Whether to verify SSL certificates (set to False when using certain proxies)
+        planner_tools: Optional custom list of tools for the planner. If not provided, uses default planner tools.
+        researcher_tools: Optional custom list of tools for the researcher. If not provided, uses default researcher tools
+            including organization tools, relation tools, web tools, and output tools.
+        synthesizer_tools: Optional custom list of tools for the synthesizer. If not provided, uses default synthesizer tools.
+        output_schema: Optional schema for structured output. Can be either:
+            - A Pydantic model class for typed structured output
+            - A dictionary/JSON schema for flexible structured output
+            When provided, the synthesizer will return data conforming to this schema instead of markdown.
     """
 
     if not fusionbase_client:
@@ -317,38 +339,59 @@ def create_company_research_agent(
             print(f"  {domain_pattern}: HTTP={http_proxy}, HTTPS={https_proxy}")
 
     # Define tools for different agent roles
-    planner_tools = [
-        organization_search,
-        google_search,
-        Plan,
-        ExtractCompanyName  # Add the extraction tool to planner
-    ]
+    # Use custom tools if provided, otherwise use defaults
+    if planner_tools is None:
+        planner_tools = [
+            organization_search,
+            google_search,
+            Plan,
+            ExtractCompanyName  # Add the extraction tool to planner
+        ]
 
-    researcher_tools = [
-        # Organization tools
-        organization_search,
-        organization_detail,
-
-        # Relation tools
-        relation_search,
-        relation_detail,
-        relation_resolve,
-
-        # Web tools
-        google_search,
-        web_content,
-
-        # Output tools
+    # Define internal tools that are always required
+    researcher_internal_tools = [
         GlobalFinding,
-        ResearchReflection,  # Add back the ResearchReflection tool
+        ResearchReflection,
         Queries
     ]
 
-    synthesizer_tools = [
-        Introduction,
-        Conclusion,
-        FinalAnswer  # Keep this but make it more flexible
-    ]
+    if researcher_tools is None:
+        # Default external tools
+        researcher_tools = [
+            # Organization tools
+            organization_search,
+            organization_detail,
+
+            # Relation tools
+            relation_search,
+            relation_detail,
+            relation_resolve,
+
+            # Convenience relation tools
+            financial_kpi,
+            network,
+            related_persons,
+            profit_and_loss_account,
+            publications,
+            balance_sheet_accounts,
+            insolvency_publications,
+            annual_financial_statements,
+            news,
+
+            # Web tools
+            google_search,
+            web_content,
+        ]
+
+    # Always append internal tools to whatever tools were provided
+    researcher_tools = researcher_tools + researcher_internal_tools
+
+    if synthesizer_tools is None:
+        synthesizer_tools = [
+            Introduction,
+            Conclusion,
+            FinalAnswer  # Keep this but make it more flexible
+        ]
 
     # Create tool maps - fix variable name for consistency
     planner_tool_map = {tool.name: tool for tool in planner_tools}
@@ -371,6 +414,9 @@ def create_company_research_agent(
         "early_terminations": 0,
         "termination_reasons": []
     }
+
+    # Initialize intent-based token handler
+    token_handler = IntentBasedTokenHandler()
 
     async def execute_tool(tool, tool_name: str, tool_args: Dict[str, Any]):
         """Execute a tool with simple deduplication that prevents unnecessary API calls."""
@@ -517,7 +563,7 @@ def create_company_research_agent(
                 "unsupported_parts": [claim]
             }
 
-    async def create_research_plan(original_query: str, target_entity: str) -> ResearchContext:
+    async def create_research_plan(original_query: str, target_entity: str, system_content: Optional[str] = None) -> ResearchContext:
         """Create a structured research plan and context for the query."""
         if verbose:
             print(f"\n📋 Creating research plan for: '{original_query}'")
@@ -529,19 +575,30 @@ def create_company_research_agent(
         elif "find" in original_query.lower() or "what is" in original_query.lower():
             research_goal = f"Find specific information: {original_query}"
 
+        # Base system prompt for planning
+        base_system_content = (
+            f"You are a strategic research planner. Create a detailed research plan for: '{original_query}'\n\n"
+            f"Target Entity: {target_entity}\n"
+            f"Research Goal: {research_goal}\n\n"
+            "Focus on creating a comprehensive plan that will directly answer the query. "
+            "Avoid generic research areas - be specific to what the user is asking for. "
+            "Examples of good key questions: 'What is the company's main business model?', 'Who are the key competitors?', 'What is the company's market position?' "
+            "Examples of good data points: 'LinkedIn URL', 'Website URL', 'Number of employees', 'Revenue 2023', 'CEO name', 'Founding date' "
+            "Examples of focused search strategies: 'Multi-layered keyword searches with company name variations', 'Deep social media profiling', "
+            "'Industry report mining', 'News archive searches', 'Patent database searches', 'Financial filing searches', 'Executive background searches'"
+        )
+
+        # Append custom system content if provided
+        full_system_content = base_system_content
+        if system_content:
+            full_system_content += f"\n\n{system_content}"
+
+        # User content for planning
+        user_content = f"Create a comprehensive research plan for: {original_query}"
+
         messages = [
-            SystemMessage(content=(
-                f"You are a strategic research planner. Create a detailed research plan for: '{original_query}'\n\n"
-                f"Target Entity: {target_entity}\n"
-                f"Research Goal: {research_goal}\n\n"
-                "Focus on creating a comprehensive plan that will directly answer the query. "
-                "Avoid generic research areas - be specific to what the user is asking for. "
-                "Examples of good key questions: 'What is the company's main business model?', 'Who are the key competitors?', 'What is the company's market position?' "
-                "Examples of good data points: 'LinkedIn URL', 'Website URL', 'Number of employees', 'Revenue 2023', 'CEO name', 'Founding date' "
-                "Examples of focused search strategies: 'Multi-layered keyword searches with company name variations', 'Deep social media profiling', "
-                "'Industry report mining', 'News archive searches', 'Patent database searches', 'Financial filing searches', 'Executive background searches'"
-            )),
-            HumanMessage(content=f"Create a comprehensive research plan for: {original_query}")
+            SystemMessage(content=full_system_content),
+            HumanMessage(content=user_content)
         ]
 
         research_plan = None
@@ -801,7 +858,7 @@ Return only the clean company name, no additional text."""
 
         return True
 
-    async def research_area_with_context(context: ResearchContext, area_description: str, force_org_search: bool = False) -> Dict[str, Any]:
+    async def research_area_with_context(context: ResearchContext, area_description: str, system_content: Optional[str] = None, force_org_search: bool = False) -> Dict[str, Any]:
         """Research a specific area with full context awareness and shared Fusionbase foundation."""
         if verbose:
             print(f"\n📝 [RESEARCH] Investigating: '{area_description[:50]}...'")
@@ -852,8 +909,16 @@ EARLY TERMINATION STRATEGY:
 You have up to {max_iterations} iterations to find comprehensive information. Use them strategically and terminate early when sufficient.
 """
 
+        # Base research instructions
+        base_research_content = RESEARCH_INSTRUCTIONS.format(section_description=area_description)
+
+        # Append custom system content if provided
+        full_research_content = base_research_content
+        if system_content:
+            full_research_content += f"\n\n{system_content}"
+
         messages = [
-            SystemMessage(content=RESEARCH_INSTRUCTIONS.format(section_description=area_description)),
+            SystemMessage(content=full_research_content),
             HumanMessage(content=context_info)
         ]
 
@@ -895,8 +960,19 @@ You have up to {max_iterations} iterations to find comprehensive information. Us
 
                         try:
                             # Add appropriate credentials and proxies
-                            if tool_name in ("organization_search", "organization_detail",
-                                             "relation_search", "relation_detail", "relation_resolve"):
+                            # Check if the tool requires a Fusionbase client by examining its parameters
+                            tool_obj = researcher_tool_map.get(tool_name)
+                            if tool_obj and hasattr(tool_obj, 'args_schema'):
+                                # Check if the tool's schema includes a 'client' parameter
+                                schema_fields = getattr(tool_obj.args_schema, '__fields__', {})
+                                if 'client' in schema_fields:
+                                    tool_args["client"] = fb_client
+                            # Fallback: check by tool name for backward compatibility
+                            elif tool_name in ("organization_search", "organization_detail",
+                                             "relation_search", "relation_detail", "relation_resolve",
+                                             "financial_kpi", "network", "related_persons",
+                                             "profit_and_loss_account", "publications", "balance_sheet_accounts",
+                                             "insolvency_publications", "annual_financial_statements", "news"):
                                 tool_args["client"] = fb_client
                             elif tool_name == "google_search":
                                 tool_args["api_key"] = serp_api_key
@@ -1006,8 +1082,15 @@ You have up to {max_iterations} iterations to find comprehensive information. Us
                                     status = "SUFFICIENT" if is_sufficient else "INSUFFICIENT"
                                     print(f"📊 Research reflection: {status} (confidence: {confidence:.2f})")
 
-                            # Create appropriate tool response
-                            tool_response = _create_contextual_tool_response(tool_name, result, tool_results, search_page_tracking, iterations)
+                            # Create appropriate tool response based on the tool's response type
+                            if token_handler.is_placeholder_response(result):
+                                # Tool returned placeholder mode - use efficient handling
+                                tool_response = token_handler.create_contextual_response(tool_name, result)
+                            else:
+                                # Regular response for tools that returned full data
+                                tool_response = _create_contextual_tool_response(
+                                    tool_name, result, tool_results, search_page_tracking, iterations
+                                )
 
                             messages.append(ToolMessage(
                                 content=tool_response,
@@ -1168,10 +1251,13 @@ You have up to {max_iterations} iterations to find comprehensive information. Us
 
         return "\n".join(guidance_parts)
 
-    async def synthesize_final_report(context: ResearchContext) -> str:
-        """Synthesize all findings into a comprehensive final report."""
+    async def synthesize_final_report(context: ResearchContext, system_content: Optional[str] = None) -> Union[str, Dict[str, Any]]:
+        """Synthesize all findings into a comprehensive final report or structured output."""
         if verbose:
-            print("\n🔄 Synthesizing final report")
+            if output_schema:
+                print("\n🔄 Synthesizing structured output")
+            else:
+                print("\n🔄 Synthesizing final report")
 
         if not context.findings_registry:
             if verbose:
@@ -1199,8 +1285,57 @@ ALL RESEARCH FINDINGS:
 SEARCHES COMPLETED: {', '.join(context.completed_searches) if context.completed_searches else 'None'}
 """
 
+        # Check if structured output is requested
+        if output_schema:
+            # Use structured output with schema
+            if verbose:
+                print("  📋 Using structured output schema")
+
+            # Create instruction for structured output
+            structured_prompt = f"""
+{context_text}
+
+Based on the research findings above, extract and structure the information according to the provided schema.
+Be comprehensive and include all relevant information that fits the schema structure.
+"""
+
+            try:
+                # Use with_structured_output for the synthesizer model
+                structured_model = synthesizer_model.with_structured_output(output_schema)
+                # Base structured output instructions
+                base_structured_content = "You are a research synthesizer. Extract and structure information from research findings according to the provided schema."
+
+                # Append custom system content if provided
+                full_structured_content = base_structured_content
+                if system_content:
+                    full_structured_content += f"\n\n{system_content}"
+
+                result = await structured_model.ainvoke([
+                    SystemMessage(content=full_structured_content),
+                    HumanMessage(content=structured_prompt)
+                ])
+
+                if verbose:
+                    print("  ✅ Structured output generated successfully")
+
+                return result
+            except Exception as e:
+                if verbose:
+                    print(f"  ❌ Error generating structured output: {str(e)}")
+                    print("  ↪ Falling back to regular synthesis")
+                # Fall through to regular synthesis
+
+        # Regular synthesis (non-structured)
+        # Base synthesis instructions
+        base_synthesis_content = SYNTHESIS_INSTRUCTIONS
+
+        # Append custom system content if provided
+        full_synthesis_content = base_synthesis_content
+        if system_content:
+            full_synthesis_content += f"\n\n{system_content}"
+
         messages = [
-            SystemMessage(content=SYNTHESIS_INSTRUCTIONS),
+            SystemMessage(content=full_synthesis_content),
             HumanMessage(content=context_text)
         ]
 
@@ -1284,20 +1419,32 @@ SEARCHES COMPLETED: {', '.join(context.completed_searches) if context.completed_
         early_termination_stats["early_terminations"] = 0
         early_termination_stats["termination_reasons"] = []
 
-        # Extract query and determine target entity
-        user_messages = initial_state.get("messages", [])
-        if not user_messages:
-            raise ValueError("No query provided")
+        # Extract messages and separate system/user content
+        messages = initial_state.get("messages", [])
+        if not messages:
+            raise ValueError("No messages provided")
 
-        if isinstance(user_messages[0], dict):
-            user_query = user_messages[0].get("content", "")
-        elif hasattr(user_messages[0], "content"):
-            user_query = user_messages[0].content
-        else:
-            raise ValueError("Invalid message format")
+        # Extract system and user messages
+        system_content = None
+        user_query = None
+
+        for msg in messages:
+            if isinstance(msg, dict):
+                role = msg.get("role", "")
+                content = msg.get("content", "")
+            elif hasattr(msg, "role") and hasattr(msg, "content"):
+                role = msg.role
+                content = msg.content
+            else:
+                continue
+
+            if role == "system" and content:
+                system_content = content
+            elif role == "user" and content and not user_query:
+                user_query = content
 
         if not user_query:
-            raise ValueError("Empty query provided")
+            raise ValueError("No user query provided")
 
         # Extract target entity from query with improved extraction using LLM
         target_entity = initial_state.get("company_topic", "the requested topic")
@@ -1311,7 +1458,7 @@ SEARCHES COMPLETED: {', '.join(context.completed_searches) if context.completed_
 
         try:
             # PHASE 1: Create research context and plan
-            research_context = await create_research_plan(user_query, target_entity)
+            research_context = await create_research_plan(user_query, target_entity, system_content)
 
             # PHASE 2: Establish Fusionbase foundation BEFORE research areas
             foundation_success = await establish_fusionbase_foundation(research_context)
@@ -1335,12 +1482,12 @@ SEARCHES COMPLETED: {', '.join(context.completed_searches) if context.completed_
             # Execute research with context awareness (no forced org search needed)
             research_tasks = []
             for area in research_areas:
-                research_tasks.append(research_area_with_context(research_context, area, force_org_search=False))
+                research_tasks.append(research_area_with_context(research_context, area, system_content, force_org_search=False))
 
             await asyncio.gather(*research_tasks)
 
             # PHASE 4: Generate final report
-            final_report = await synthesize_final_report(research_context)
+            final_report = await synthesize_final_report(research_context, system_content)
 
             if verbose:
                 print(f"\n🏁 Research complete")
@@ -1358,7 +1505,13 @@ SEARCHES COMPLETED: {', '.join(context.completed_searches) if context.completed_
                     if verbose and early_termination_stats["termination_reasons"]:
                         print(f"📝 Termination reasons: {', '.join(early_termination_stats['termination_reasons'][:3])}{'...' if len(early_termination_stats['termination_reasons']) > 3 else ''}")
 
-            return {"final_report": final_report}
+            # Apply placeholder replacement if any placeholders were used
+            final_report_processed = token_handler.replace_placeholders(final_report)
+
+            # Clear the token handler for next run
+            token_handler.clear()
+
+            return final_report_processed
 
         except Exception as e:
             if verbose:
@@ -1366,9 +1519,7 @@ SEARCHES COMPLETED: {', '.join(context.completed_searches) if context.completed_
                 import traceback
                 traceback.print_exc()
 
-            return {
-                "final_report": f"# Research Error\n\nAn error occurred while researching {target_entity}: {str(e)}"
-            }
+            return f"# Research Error\n\nAn error occurred while researching {target_entity}: {str(e)}"
 
     # Create the agent object
     class CompanyResearchAgent:

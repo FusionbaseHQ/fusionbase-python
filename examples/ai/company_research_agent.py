@@ -143,7 +143,7 @@ async def main_async(args):
             sys.exit(1)
 
     # Extract the final report
-    report = result.get("final_report", "No report generated.")
+    report = result if result else "No report generated."
 
     # Output the report
     if args.output:

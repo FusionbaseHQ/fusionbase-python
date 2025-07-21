@@ -14,5 +14,6 @@ except ImportError:
     )
 
 from .company_research import create_company_research_agent
+from .tool_presets import ToolPresets
 
-__all__ = ["create_company_research_agent"]
+__all__ = ["create_company_research_agent", "ToolPresets"]

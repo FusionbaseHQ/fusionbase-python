@@ -72,7 +72,7 @@ async def main():
     }
 
     result = await agent.ainvoke(initial_state)
-    print(result["final_report"])
+    print(result)
 
 if __name__ == "__main__":
     asyncio.run(main())
