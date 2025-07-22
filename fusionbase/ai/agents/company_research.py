@@ -1340,8 +1340,19 @@ If a required field is not found in the research, use null or an appropriate emp
 """
 
             try:
+                # Ensure schema has required top-level fields for LangChain
+                schema_to_use = output_schema
+                if isinstance(output_schema, dict):
+                    # Add title and description if missing
+                    if "title" not in output_schema:
+                        schema_to_use = {
+                            "title": "StructuredOutput",
+                            "description": "Structured information extracted from research findings",
+                            **output_schema
+                        }
+
                 # Use with_structured_output for the synthesizer model
-                structured_model = synthesizer_model.with_structured_output(output_schema)
+                structured_model = synthesizer_model.with_structured_output(schema_to_use)
                 # Base structured output instructions
                 base_structured_content = "You are a research synthesizer. Extract and structure information from research findings according to the provided schema. Only return data in the exact structure requested."
 
