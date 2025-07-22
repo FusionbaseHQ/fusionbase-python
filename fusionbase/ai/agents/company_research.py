@@ -588,6 +588,28 @@ def create_company_research_agent(
             "'Industry report mining', 'News archive searches', 'Patent database searches', 'Financial filing searches', 'Executive background searches'"
         )
 
+        # If we have a schema, add field hints to the planning prompt
+        if output_schema:
+            schema_hint = "\n\n🎯 STRUCTURED OUTPUT REQUIREMENTS:"
+            if isinstance(output_schema, dict):
+                # JSON schema - extract field names and descriptions
+                properties = output_schema.get("properties", {})
+                required_fields = output_schema.get("required", [])
+                field_descriptions = []
+                for field, spec in properties.items():
+                    desc = spec.get("description", field)
+                    req_marker = " (REQUIRED)" if field in required_fields else ""
+                    field_descriptions.append(f"  • {field}: {desc}{req_marker}")
+                schema_hint += "\nThe research must gather information for these specific fields:\n" + "\n".join(field_descriptions)
+                schema_hint += "\n\nFocus your research plan specifically on finding data for these fields."
+            elif hasattr(output_schema, "__fields__"):
+                # Pydantic model - extract field names
+                field_names = list(output_schema.__fields__.keys())
+                schema_hint += f"\nThe research must gather information for these specific fields: {', '.join(field_names)}"
+                schema_hint += "\n\nFocus your research plan specifically on finding data for these fields."
+
+            base_system_content += schema_hint
+
         # Append custom system content if provided
         full_system_content = base_system_content
         if system_content:
@@ -873,6 +895,22 @@ Return only the clean company name, no additional text."""
             if context.fusionbase_entity.get("primary_website"):
                 fusionbase_info += f", Website: {context.fusionbase_entity['primary_website']}"
 
+        # Add schema field requirements if structured output is requested
+        schema_fields_hint = ""
+        if output_schema:
+            schema_fields_hint = "\n\n🎯 STRUCTURED OUTPUT FIELDS TO RESEARCH:"
+            if isinstance(output_schema, dict):
+                properties = output_schema.get("properties", {})
+                required_fields = output_schema.get("required", [])
+                for field, spec in properties.items():
+                    desc = spec.get("description", field)
+                    req_marker = " (REQUIRED)" if field in required_fields else ""
+                    schema_fields_hint += f"\n- {field}: {desc}{req_marker}"
+            elif hasattr(output_schema, "__fields__"):
+                field_names = list(output_schema.__fields__.keys())
+                schema_fields_hint += f"\n- Fields needed: {', '.join(field_names)}"
+            schema_fields_hint += "\n\nPrioritize finding information for these specific fields."
+
         context_info = f"""
 RESEARCH CONTEXT:
 - Original Query: {context.original_query}
@@ -889,7 +927,7 @@ EXISTING FINDINGS:
 {chr(10).join([f"- {name}: {content[:100]}..." for name, content in context.findings_registry.items()]) if context.findings_registry else 'None yet'}
 
 KEY INSIGHTS SO FAR:
-{chr(10).join([f"- {insight}" for insight in context.key_insights]) if context.key_insights else 'None yet'}
+{chr(10).join([f"- {insight}" for insight in context.key_insights]) if context.key_insights else 'None yet'}{schema_fields_hint}
 
 YOUR MISSION: Focus specifically on finding information for "{area_description}" that directly serves the research goal: "{context.research_goal}".
 
@@ -1297,13 +1335,15 @@ SEARCHES COMPLETED: {', '.join(context.completed_searches) if context.completed_
 
 Based on the research findings above, extract and structure the information according to the provided schema.
 Be comprehensive and include all relevant information that fits the schema structure.
+Only include fields that are defined in the schema - do not add extra fields.
+If a required field is not found in the research, use null or an appropriate empty value.
 """
 
             try:
                 # Use with_structured_output for the synthesizer model
                 structured_model = synthesizer_model.with_structured_output(output_schema)
                 # Base structured output instructions
-                base_structured_content = "You are a research synthesizer. Extract and structure information from research findings according to the provided schema."
+                base_structured_content = "You are a research synthesizer. Extract and structure information from research findings according to the provided schema. Only return data in the exact structure requested."
 
                 # Append custom system content if provided
                 full_structured_content = base_structured_content
@@ -1322,8 +1362,30 @@ Be comprehensive and include all relevant information that fits the schema struc
             except Exception as e:
                 if verbose:
                     print(f"  ❌ Error generating structured output: {str(e)}")
-                    print("  ↪ Falling back to regular synthesis")
-                # Fall through to regular synthesis
+                    print(f"  📝 Error details: {type(e).__name__}")
+
+                # For structured output, we should NOT fall back to regular synthesis
+                # Instead, return an error or empty structure
+                if isinstance(output_schema, dict):
+                    # Return empty JSON structure with required fields
+                    properties = output_schema.get("properties", {})
+                    empty_result = {}
+                    for field, spec in properties.items():
+                        field_type = spec.get("type", "string")
+                        if field_type == "array":
+                            empty_result[field] = []
+                        elif field_type == "object":
+                            empty_result[field] = {}
+                        elif field_type == "number":
+                            empty_result[field] = 0
+                        elif field_type == "boolean":
+                            empty_result[field] = False
+                        else:
+                            empty_result[field] = None
+                    return empty_result
+                else:
+                    # For other schema types, raise the error
+                    raise e
 
         # Regular synthesis (non-structured)
         # Base synthesis instructions
