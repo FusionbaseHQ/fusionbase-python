@@ -51,6 +51,7 @@ then combine and cross-verify findings for the most reliable result.
 3. **Gather Information Strategically**
    Use appropriate tools based on the specific information needed:
    - For company lookups: Use `organization_search` and `organization_detail` tools
+   - For person lookups: Use `person_search` and `person_detail` tools
    - For factual information and data: Try BOTH `relation_search`/`relation_resolve` AND web searches, comparing results
    - For entity relationships: Use `relation_search`, `relation_detail`, and `relation_resolve` to discover connections and statistical data
    - For web information: Use `google_search` followed by `web_content` for details
@@ -134,8 +135,8 @@ RESEARCH_INSTRUCTIONS = """You are a specialized researcher working as part of a
 - **relation_search, relation_detail, relation_resolve**: Explore entity connections, statistical data, financial metrics
 - **google_search, web_content**: Find supplementary information not in Fusionbase (recent news, social media, etc.)
 - **organization_search, organization_detail**: **AVOID - Foundation already established**
+- **person_search, person_detail**: Search and retrieve detailed information about persons
 - **GlobalFinding**: Store your discoveries
-- **ResearchReflection**: Indicate when research is sufficient
 
 **IMPORTANT: TOKEN-EFFICIENT DATA HANDLING**:
 For tools that support `return_mode` parameter (financial_kpi, balance_sheet_accounts, etc.):
@@ -173,6 +174,7 @@ For tools that support `return_mode` parameter (financial_kpi, balance_sheet_acc
    a) **For Additional Fusionbase Data**:
       - Use **relation_search** to find connections and statistical data about the target entity
       - Use **relation_detail** and **relation_resolve** for specific relationship data and metrics
+      - Use **person_search** and **person_detail** for information about key people (executives, board members, etc.)
       - **Skip organization_search/organization_detail** - this is already done
 
    b) **For Web-Available Information**:

@@ -14,6 +14,8 @@ from fusionbase.ai.tools import network
 from fusionbase.ai.tools import news
 from fusionbase.ai.tools import organization_detail
 from fusionbase.ai.tools import organization_search
+from fusionbase.ai.tools import person_detail
+from fusionbase.ai.tools import person_search
 from fusionbase.ai.tools import profit_and_loss_account
 from fusionbase.ai.tools import publications
 from fusionbase.ai.tools import related_persons
@@ -57,6 +59,8 @@ class ToolPresets:
             # Essential search
             organization_search,
             organization_detail,
+            person_search,
+            person_detail,
 
             # Basic relations
             network,
@@ -107,6 +111,10 @@ class ToolPresets:
             # Organization tools
             organization_search,
             organization_detail,
+
+            # Person tools
+            person_search,
+            person_detail,
 
             # All relation tools
             relation_search,

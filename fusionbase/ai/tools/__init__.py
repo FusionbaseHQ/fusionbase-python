@@ -5,6 +5,10 @@ try:
     from .entity.organization import async_organization_search
     from .entity.organization import organization_detail
     from .entity.organization import organization_search
+    from .entity.person import async_person_detail
+    from .entity.person import async_person_search
+    from .entity.person import person_detail
+    from .entity.person import person_search
     from .entity.relation import async_relation_detail
     from .entity.relation import async_relation_resolve
     from .entity.relation import async_relation_search
@@ -30,6 +34,10 @@ try:
         "organization_detail",
         "async_organization_search",
         "async_organization_detail",
+        "person_search",
+        "person_detail",
+        "async_person_search",
+        "async_person_detail",
         "relation_search",
         "relation_detail",
         "relation_resolve",

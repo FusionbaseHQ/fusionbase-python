@@ -18,6 +18,8 @@ from pydantic import Field
 from fusionbase import Fusionbase
 from fusionbase.ai.tools.entity.organization import organization_detail
 from fusionbase.ai.tools.entity.organization import organization_search
+from fusionbase.ai.tools.entity.person import person_detail
+from fusionbase.ai.tools.entity.person import person_search
 from fusionbase.ai.tools.entity.relation import relation_detail
 from fusionbase.ai.tools.entity.relation import relation_resolve
 from fusionbase.ai.tools.entity.relation import relation_search
@@ -361,6 +363,10 @@ def create_company_research_agent(
             # Organization tools
             organization_search,
             organization_detail,
+
+            # Person tools
+            person_search,
+            person_detail,
 
             # Relation tools
             relation_search,
@@ -1007,11 +1013,13 @@ You have up to {max_iterations} iterations to find comprehensive information. Us
                                     tool_args["client"] = fb_client
                             # Fallback: check by tool name for backward compatibility
                             elif tool_name in ("organization_search", "organization_detail",
+                                             "person_search", "person_detail",
                                              "relation_search", "relation_detail", "relation_resolve",
                                              "financial_kpi", "network", "related_persons",
                                              "profit_and_loss_account", "publications", "balance_sheet_accounts",
                                              "insolvency_publications", "annual_financial_statements", "news"):
                                 tool_args["client"] = fb_client
+                            # Google search specific handling
                             elif tool_name == "google_search":
                                 tool_args["api_key"] = serp_api_key
                                 # Google search doesn't need domain-specific proxies since it goes to ValueSERP API

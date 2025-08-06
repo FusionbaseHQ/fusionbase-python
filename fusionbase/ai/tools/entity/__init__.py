@@ -10,6 +10,10 @@ from .organization import async_organization_detail
 from .organization import async_organization_search
 from .organization import organization_detail
 from .organization import organization_search
+from .person import async_person_detail
+from .person import async_person_search
+from .person import person_detail
+from .person import person_search
 from .relation import async_relation_detail
 from .relation import async_relation_resolve
 from .relation import async_relation_search
@@ -22,6 +26,10 @@ __all__ = [
     "organization_detail",
     "async_organization_search",
     "async_organization_detail",
+    "person_search",
+    "person_detail",
+    "async_person_search",
+    "async_person_detail",
     "relation_search",
     "relation_detail",
     "relation_resolve",
