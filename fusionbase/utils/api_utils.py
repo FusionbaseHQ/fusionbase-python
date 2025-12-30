@@ -1,17 +1,21 @@
 """Utility functions for API requests."""
 
+from __future__ import annotations
+
 import asyncio
 import inspect
-from typing import Any, Dict, Type, TypeVar
+from typing import Any, Dict, Type, TypeVar, TYPE_CHECKING
 
 import httpx
 
-from fusionbase.entities.base import Entity
 from fusionbase.exceptions import APIError
 from fusionbase.exceptions import parse_error_response
 from fusionbase.exceptions import ResourceNotFoundError
 
-T = TypeVar('T', bound=Entity)
+if TYPE_CHECKING:
+    from fusionbase.entities.base import Entity
+
+T = TypeVar('T', bound='Entity')
 
 
 def make_entity_request(
