@@ -61,13 +61,21 @@ class OrganizationSearch(BaseSearch[Organization]):
         self._endpoint = "search/entities/organization"
 
     def search(self,
+               q: str,
                params: Optional[OrganizationSearchParams] = None,
                **kwargs) -> SearchResult[LazyReference[Organization]]:
-        """Search for organizations with given parameters."""
+        """Search for organizations with given parameters.
+
+        Args:
+            q: Search query string (required)
+            params: Search parameters as OrganizationSearchParams object
+            **kwargs: Additional parameters as keyword arguments
+        """
         # Prepare parameters
         params, query_params = prepare_search_params(params,
                                                      OrganizationSearchParams,
                                                      require_query=True,
+                                                     q=q,
                                                      **kwargs)
 
         # Make the request and get response data
@@ -79,18 +87,26 @@ class OrganizationSearch(BaseSearch[Organization]):
                                       params)
 
     async def asearch(self,
+                      q: str,
                       params: Optional[OrganizationSearchParams] = None,
                       **kwargs) -> SearchResult[LazyReference[Organization]]:
-        """Search for organizations asynchronously."""
+        """Search for organizations asynchronously.
+
+        Args:
+            q: Search query string (required)
+            params: Search parameters as OrganizationSearchParams object
+            **kwargs: Additional parameters as keyword arguments
+        """
         # Prepare parameters
         params, query_params = prepare_search_params(params,
                                                      OrganizationSearchParams,
                                                      require_query=True,
+                                                     q=q,
                                                      **kwargs)
 
         # Create a closure for the fallback sync method
         def fallback_sync():
-            return self.search(params)
+            return self.search(q, params)
 
         # Make the async request
         response_data = await make_search_request_async(self.client,

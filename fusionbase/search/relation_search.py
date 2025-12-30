@@ -30,13 +30,21 @@ class RelationSearch(BaseSearch[Relation]):
         self._endpoint = "search/relation"
 
     def search(self,
+               q: str,
                params: Optional[RelationSearchParams] = None,
                **kwargs) -> SearchResult[LazyReference[Relation]]:
-        """Search for relations."""
+        """Search for relations.
+
+        Args:
+            q: Search query string (required)
+            params: Search parameters as RelationSearchParams object
+            **kwargs: Additional parameters as keyword arguments
+        """
         # Prepare parameters
         params, query_params = prepare_search_params(params,
                                                      RelationSearchParams,
                                                      require_query=True,
+                                                     q=q,
                                                      **kwargs)
 
         # Make the request and get response data
@@ -51,18 +59,26 @@ class RelationSearch(BaseSearch[Relation]):
                                       entity_id_field="id")
 
     async def asearch(self,
+                      q: str,
                       params: Optional[RelationSearchParams] = None,
                       **kwargs) -> SearchResult[LazyReference[Relation]]:
-        """Search for relations asynchronously."""
+        """Search for relations asynchronously.
+
+        Args:
+            q: Search query string (required)
+            params: Search parameters as RelationSearchParams object
+            **kwargs: Additional parameters as keyword arguments
+        """
         # Prepare parameters
         params, query_params = prepare_search_params(params,
                                                      RelationSearchParams,
                                                      require_query=True,
+                                                     q=q,
                                                      **kwargs)
 
         # Create a closure for the fallback sync method
         def fallback_sync():
-            return self.search(params)
+            return self.search(q, params)
 
         # Make the async request
         response_data = await make_search_request_async(self.client,

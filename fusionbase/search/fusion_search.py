@@ -50,12 +50,13 @@ class FusionSearch(BaseSearch):
         super().__init__(client, None)
         self._endpoint = "search/fusion"
 
-    def search(self, params=None, **kwargs) -> FusionSearchResult:
+    def search(self, q: str, params=None, **kwargs) -> FusionSearchResult:
         """Search across all entity types.
 
         Args:
+            q: Search query string (required)
             params: Search parameters as FusionSearchParams object
-            **kwargs: Parameters as keyword arguments
+            **kwargs: Additional parameters as keyword arguments
 
         Returns:
             FusionSearchResult containing results for different entity types
@@ -63,11 +64,7 @@ class FusionSearch(BaseSearch):
         Example:
             ```python
             # Search by query string
-            result = client.search.fusion.search(q="health insurance")
-
-            # Using parameters object
-            params = FusionSearchParams(q="health insurance")
-            result = client.search.fusion.search(params)
+            result = client.search.fusion.search("health insurance")
 
             # Access results by entity type
             organizations = result.results.get("organizations", [])
@@ -78,6 +75,7 @@ class FusionSearch(BaseSearch):
         search_params, query_params = prepare_search_params(params,
                                                             FusionSearchParams,
                                                             require_query=True,
+                                                            q=q,
                                                             **kwargs)
 
         # Make the search request
@@ -94,12 +92,13 @@ class FusionSearch(BaseSearch):
 
         return result
 
-    async def asearch(self, params=None, **kwargs) -> FusionSearchResult:
+    async def asearch(self, q: str, params=None, **kwargs) -> FusionSearchResult:
         """Asynchronously search across all entity types.
 
         Args:
+            q: Search query string (required)
             params: Search parameters
-            **kwargs: Parameters as keyword arguments
+            **kwargs: Additional parameters as keyword arguments
 
         Returns:
             FusionSearchResult containing results for different entity types
@@ -107,7 +106,7 @@ class FusionSearch(BaseSearch):
         Example:
             ```python
             # Async search
-            result = await client.search.fusion.asearch(q="health insurance")
+            result = await client.search.fusion.asearch("health insurance")
 
             # Access results by entity type
             organizations = result.results.get("organizations", [])
@@ -118,6 +117,7 @@ class FusionSearch(BaseSearch):
         search_params, query_params = prepare_search_params(params,
                                                             FusionSearchParams,
                                                             require_query=True,
+                                                            q=q,
                                                             **kwargs)
 
         # Make the async search request
@@ -125,7 +125,7 @@ class FusionSearch(BaseSearch):
             self.client,
             self._endpoint,
             query_params,
-            fallback_sync_method=lambda: self.search(params, **kwargs))
+            fallback_sync_method=lambda: self.search(q, params, **kwargs))
 
         # Convert the response to a FusionSearchResult
         result = FusionSearchResult(

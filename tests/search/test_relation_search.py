@@ -9,7 +9,6 @@ from conftest import get_api_key
 from fusionbase import Fusionbase
 from fusionbase.entities.lazy_reference import LazyReference
 from fusionbase.entities.relation import Relation
-from fusionbase.search.relation_search import RelationSearchParams
 
 
 class TestRelationSearch(unittest.TestCase):
@@ -35,9 +34,8 @@ class TestRelationSearch(unittest.TestCase):
         if not self.api_key:
             self.skipTest("FUSIONBASE_API_KEY environment variable not set")
 
-        # Search for a relation
-        params = RelationSearchParams(q="network")
-        results = self.client.search.relations.search(params)
+        # Search for a relation - q is now a required positional argument
+        results = self.client.search.relations.search("network")
 
         # Verify we have results
         self.assertGreater(len(results.items), 0)
@@ -62,8 +60,7 @@ class TestRelationSearch(unittest.TestCase):
             self.skipTest("FUSIONBASE_API_KEY environment variable not set")
 
         # Search with a limit of 2
-        params = RelationSearchParams(q="network", limit=2)
-        results = self.client.search.relations.search(params)
+        results = self.client.search.relations.search("network", limit=2)
 
         # Verify result count respects the limit
         self.assertLessEqual(len(results.items), 2)
@@ -73,8 +70,8 @@ class TestRelationSearch(unittest.TestCase):
         if not self.api_key:
             self.skipTest("FUSIONBASE_API_KEY environment variable not set")
 
-        # Search using kwargs directly
-        results = self.client.search.relations.search(q="network", limit=3)
+        # Search using positional q and kwargs for other params
+        results = self.client.search.relations.search("network", limit=3)
 
         # Verify results
         self.assertIsNotNone(results)
@@ -85,11 +82,10 @@ class TestRelationSearch(unittest.TestCase):
         if not self.api_key:
             self.skipTest("FUSIONBASE_API_KEY environment variable not set")
 
-        # Try to search without required query
+        # Try to search with empty query
         with self.assertRaises(ValueError):
             # Empty query should raise ValueError
-            params = RelationSearchParams(q="")
-            self.client.search.relations.search(params)
+            self.client.search.relations.search("")
 
 
 @pytest.mark.asyncio
@@ -103,12 +99,9 @@ async def test_relation_search_async():
     client = Fusionbase(api_key=api_key)
 
     try:
-        # Search for relations asynchronously
-        params = RelationSearchParams(q="network")
-
         try:
             # Use direct async method on search manager
-            results = await client.search.relations.asearch(params)
+            results = await client.search.relations.asearch("network")
 
             # Verify we have results
             assert len(results.items) > 0
@@ -153,8 +146,7 @@ async def test_relation_search_async_with_limit():
 
     try:
         # Search with limit parameter
-        params = RelationSearchParams(q="network", limit=2)
-        results = await client.search.relations.asearch(params)
+        results = await client.search.relations.asearch("network", limit=2)
 
         # Verify limit is respected
         assert len(results.items) <= 2
@@ -176,10 +168,10 @@ async def test_relation_search_async_with_missing_required_params():
     client = Fusionbase(api_key=api_key)
 
     try:
-        # Try to search without required query
+        # Try to search with empty query
         with pytest.raises(ValueError):
             # Empty query should raise ValueError
-            await client.search.relations.asearch(q="")
+            await client.search.relations.asearch("")
 
     finally:
         # Close client

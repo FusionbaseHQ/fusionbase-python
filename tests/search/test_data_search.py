@@ -8,7 +8,6 @@ from conftest import get_api_key
 
 from fusionbase import Fusionbase
 from fusionbase.entities.lazy_reference import LazyReference
-from fusionbase.search.data_search import DataSearchParams
 
 
 class TestDataSearch(unittest.TestCase):
@@ -64,9 +63,8 @@ class TestDataSearch(unittest.TestCase):
         # Create a mock for the client.request method instead
         with patch.object(self.client, 'request',
                           return_value=mock_response) as mock_request:
-            # Search for data
-            params = DataSearchParams(q="financial")
-            results = self.client.search.data.search(params)
+            # Search for data - q is now a required positional argument
+            results = self.client.search.data.search("financial")
 
             # Verify the mock was called
             mock_request.assert_called_once()
@@ -92,8 +90,7 @@ class TestDataSearch(unittest.TestCase):
             self.skipTest("FUSIONBASE_API_KEY environment variable not set")
 
         # Search for a generic term that should match some data
-        params = DataSearchParams(q="test")
-        results = self.client.search.data.search(params)
+        results = self.client.search.data.search("test")
 
         # Verify we have results or at least no errors
         self.assertIsInstance(results.items, list)
@@ -118,12 +115,9 @@ async def test_data_search_async():
     client = Fusionbase(api_key=api_key)
 
     try:
-        # Search for data asynchronously
-        params = DataSearchParams(q="test")
-
         try:
             # Use async methods directly on the client
-            results = await client.search.data.asearch(params)
+            results = await client.search.data.asearch("test")
 
             # Verify we have results (or at least the call succeeded)
             assert isinstance(results.items, list)

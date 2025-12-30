@@ -78,14 +78,16 @@ class DataSearch(BaseSearch):
 
     def search(
         self,
-        params=None,
+        q: str,
+        params: Optional[DataSearchParams] = None,
         **kwargs
     ) -> SearchResult[LazyReference[Union[DataStream, DataService]]]:
         """Search for data streams and services.
 
         Args:
+            q: Search query string (required)
             params: Search parameters as DataSearchParams object
-            **kwargs: Parameters as keyword arguments
+            **kwargs: Additional parameters as keyword arguments
 
         Returns:
             SearchResult containing LazyReferences to DataStream or DataService objects
@@ -93,11 +95,10 @@ class DataSearch(BaseSearch):
         Example:
             ```python
             # Search by query string
-            result = client.search.data.search(q="financial")
+            result = client.search.data.search("financial")
 
-            # Using parameters object
-            params = DataSearchParams(q="financial", limit=20)
-            result = client.search.data.search(params)
+            # With additional parameters
+            result = client.search.data.search("financial", limit=20)
 
             # Iterate through results
             for item_ref in result.items:
@@ -108,10 +109,11 @@ class DataSearch(BaseSearch):
                     print(f"Found service: {item.name}")
             ```
         """
-        # Prepare search parameters
+        # Prepare search parameters - require a query to avoid empty searches
         search_params, query_params = prepare_search_params(params,
                                                             DataSearchParams,
-                                                            require_query=False,
+                                                            require_query=True,
+                                                            q=q,
                                                             **kwargs)
 
         # Make the search request - Use self.client (NOT self._client)
@@ -123,14 +125,16 @@ class DataSearch(BaseSearch):
 
     async def asearch(
         self,
-        params=None,
+        q: str,
+        params: Optional[DataSearchParams] = None,
         **kwargs
     ) -> SearchResult[LazyReference[Union[DataStream, DataService]]]:
         """Asynchronously search for data streams and services.
 
         Args:
+            q: Search query string (required)
             params: Search parameters
-            **kwargs: Parameters as keyword arguments
+            **kwargs: Additional parameters as keyword arguments
 
         Returns:
             SearchResult containing LazyReferences to DataStream or DataService objects
@@ -138,7 +142,7 @@ class DataSearch(BaseSearch):
         Example:
             ```python
             # Async search
-            result = await client.search.data.asearch(q="financial")
+            result = await client.search.data.asearch("financial")
 
             # Process results asynchronously
             for item_ref in result.items:
@@ -149,10 +153,11 @@ class DataSearch(BaseSearch):
                     print(f"Found service: {item.name}")
             ```
         """
-        # Prepare search parameters
+        # Prepare search parameters - require a query to avoid empty searches
         search_params, query_params = prepare_search_params(params,
                                                             DataSearchParams,
-                                                            require_query=False,
+                                                            require_query=True,
+                                                            q=q,
                                                             **kwargs)
 
         # Make the async search request - Use self.client (NOT self._client)
@@ -160,7 +165,7 @@ class DataSearch(BaseSearch):
             self.client,
             self._endpoint,
             query_params,
-            fallback_sync_method=lambda: self.search(params, **kwargs))
+            fallback_sync_method=lambda: self.search(q, params, **kwargs))
 
         # Use our custom processing method to handle both streams and services
         return self._process_search_results(response_data, search_params)

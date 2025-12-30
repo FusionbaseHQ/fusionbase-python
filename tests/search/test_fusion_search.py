@@ -7,7 +7,6 @@ import pytest
 from conftest import get_api_key
 
 from fusionbase import Fusionbase
-from fusionbase.search.fusion_search import FusionSearchParams
 
 
 class TestFusionSearch(unittest.TestCase):
@@ -105,9 +104,8 @@ class TestFusionSearch(unittest.TestCase):
         # Create a mock for the client.request method
         with patch.object(self.client, 'request',
                           return_value=mock_response) as mock_request:
-            # Search with fusion search
-            params = FusionSearchParams(q="health insurance")
-            results = self.client.search.fusion.search(params)
+            # Search with fusion search - q is now a required positional argument
+            results = self.client.search.fusion.search("health insurance")
 
             # Verify the mock was called
             mock_request.assert_called_once()
@@ -147,9 +145,8 @@ class TestFusionSearch(unittest.TestCase):
         if not self.api_key:
             self.skipTest("FUSIONBASE_API_KEY environment variable not set")
 
-        # Search for a generic term
-        params = FusionSearchParams(q="health insurance")
-        results = self.client.search.fusion.search(params)
+        # Search for a generic term - q is now a required positional argument
+        results = self.client.search.fusion.search("health insurance")
 
         # Verify we have results structure
         self.assertIsNotNone(results)
@@ -176,12 +173,9 @@ async def test_fusion_search_async():
     client = Fusionbase(api_key=api_key)
 
     try:
-        # Search asynchronously
-        params = FusionSearchParams(q="health insurance")
-
         try:
             # Use async methods directly on the client
-            results = await client.search.fusion.asearch(params)
+            results = await client.search.fusion.asearch("health insurance")
 
             # Verify we have results structure
             assert results is not None

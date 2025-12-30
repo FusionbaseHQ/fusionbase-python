@@ -35,9 +35,8 @@ class TestOrganizationSearch(unittest.TestCase):
         if not self.api_key:
             self.skipTest("FUSIONBASE_API_KEY environment variable not set")
 
-        # Search for an organization
-        params = OrganizationSearchParams(q="GmbH")
-        results = self.client.search.organizations.search(params)
+        # Search for an organization - q is now a required positional argument
+        results = self.client.search.organizations.search("GmbH")
 
         # Verify we have results
         self.assertGreater(len(results.items), 0)
@@ -61,9 +60,8 @@ class TestOrganizationSearch(unittest.TestCase):
 
         # Search with postal code filter using FilterKey enum
         # TODO: Add more comprehensive tests for all available filters
-        params = OrganizationSearchParams(
-            q="GmbH", filters={FilterKey.POSTAL_CODE: "80992"})
-        results = self.client.search.organizations.search(params)
+        results = self.client.search.organizations.search(
+            "GmbH", filters={FilterKey.POSTAL_CODE: "80992"})
 
         # We don't assert on result count as it depends on the data
         self.assertIsNotNone(results)
@@ -87,8 +85,8 @@ class TestOrganizationSearch(unittest.TestCase):
         if not self.api_key:
             self.skipTest("FUSIONBASE_API_KEY environment variable not set")
 
-        # Search using kwargs directly
-        results = self.client.search.organizations.search(q="Tech", limit=5)
+        # Search using positional q and kwargs for other params
+        results = self.client.search.organizations.search("Tech", limit=5)
 
         # Verify results
         self.assertIsNotNone(results)
@@ -100,12 +98,10 @@ class TestOrganizationSearch(unittest.TestCase):
         if not self.api_key:
             self.skipTest("FUSIONBASE_API_KEY environment variable not set")
 
-        # Try to search without required query
+        # Try to search with empty query
         with self.assertRaises(ValueError):
-            # We need to initialize OrganizationSearchParams with default empty
-            # data to properly test validation
-            params = OrganizationSearchParams(q="")
-            self.client.search.organizations.search(params)
+            # Empty query should raise ValueError
+            self.client.search.organizations.search("")
 
 
 @pytest.mark.asyncio
@@ -119,11 +115,8 @@ async def test_organization_search_async():
     client = Fusionbase(api_key=api_key)
 
     try:
-        # Search for organizations asynchronously
-        params = OrganizationSearchParams(q="OroraTech")
-
         # Use direct async method on the search manager
-        results = await client.search.organizations.asearch(params)
+        results = await client.search.organizations.asearch("OroraTech")
 
         # Verify we have results
         assert len(results.items) > 0
@@ -156,9 +149,8 @@ async def test_organization_search_async_with_postal_code():
 
     try:
         # Search with postal code filter
-        params = OrganizationSearchParams(
-            q="GmbH", filters={FilterKey.POSTAL_CODE: "80992"})
-        results = await client.search.organizations.asearch(params)
+        results = await client.search.organizations.asearch(
+            "GmbH", filters={FilterKey.POSTAL_CODE: "80992"})
 
         # We don't assert on result count as it depends on the data
         assert results is not None
@@ -180,10 +172,10 @@ async def test_organization_search_async_with_missing_required_params():
     client = Fusionbase(api_key=api_key)
 
     try:
-        # Try to search without required query
+        # Try to search with empty query
         with pytest.raises(ValueError):
             # Empty query should raise ValueError
-            await client.search.organizations.asearch(q="")
+            await client.search.organizations.asearch("")
 
     finally:
         # Close client

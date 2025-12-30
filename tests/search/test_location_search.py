@@ -9,7 +9,6 @@ from conftest import get_api_key
 from fusionbase import Fusionbase
 from fusionbase.entities.lazy_reference import LazyReference
 from fusionbase.entities.location import Location
-from fusionbase.search.location_search import LocationSearchParams
 
 
 class TestLocationSearch(unittest.TestCase):
@@ -35,9 +34,8 @@ class TestLocationSearch(unittest.TestCase):
         if not self.api_key:
             self.skipTest("FUSIONBASE_API_KEY environment variable not set")
 
-        # Search for a location
-        params = LocationSearchParams(q="München")
-        results = self.client.search.locations.search(params)
+        # Search for a location - q is now a required positional argument
+        results = self.client.search.locations.search("München")
 
         # Verify we have results
         self.assertGreater(len(results.items), 0)
@@ -66,12 +64,9 @@ async def test_location_search_async():
     client = Fusionbase(api_key=api_key)
 
     try:
-        # Search for locations asynchronously
-        params = LocationSearchParams(q="Berlin")
-
         try:
             # Use direct async method on search manager
-            results = await client.search.locations.asearch(params)
+            results = await client.search.locations.asearch("Berlin")
 
             # Verify we have results
             assert len(results.items) > 0

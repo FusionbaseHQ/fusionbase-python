@@ -17,13 +17,13 @@ class PersonSearchParams(SearchParams):
     """Parameters for person search.
 
     Attributes:
-        q: Query string for searching persons
+        q: Query string for searching persons (required)
         source_key: Data source identifier for filtering results
         skip: Number of results to skip (for pagination)
         limit: Maximum number of results to return
     """
 
-    q: Optional[str] = None
+    q: str  # Required
     source_key: Optional[str] = None
     skip: int = 0
     limit: int = 10
@@ -43,13 +43,21 @@ class PersonSearch(BaseSearch[Person]):
         self._endpoint = "search/entities/person"
 
     def search(self,
+               q: str,
                params: Optional[PersonSearchParams] = None,
                **kwargs) -> SearchResult[LazyReference[Person]]:
-        """Search for persons with given parameters."""
+        """Search for persons with given parameters.
+
+        Args:
+            q: Search query string (required)
+            params: Search parameters as PersonSearchParams object
+            **kwargs: Additional parameters as keyword arguments
+        """
         # Prepare parameters
         params, query_params = prepare_search_params(params,
                                                      PersonSearchParams,
-                                                     require_query=False,
+                                                     require_query=True,
+                                                     q=q,
                                                      **kwargs)
 
         # Make the request and get response data
@@ -61,18 +69,26 @@ class PersonSearch(BaseSearch[Person]):
                                       params)
 
     async def asearch(self,
+                      q: str,
                       params: Optional[PersonSearchParams] = None,
                       **kwargs) -> SearchResult[LazyReference[Person]]:
-        """Search for persons asynchronously with given parameters."""
+        """Search for persons asynchronously with given parameters.
+
+        Args:
+            q: Search query string (required)
+            params: Search parameters as PersonSearchParams object
+            **kwargs: Additional parameters as keyword arguments
+        """
         # Prepare parameters
         params, query_params = prepare_search_params(params,
                                                      PersonSearchParams,
-                                                     require_query=False,
+                                                     require_query=True,
+                                                     q=q,
                                                      **kwargs)
 
         # Create a closure for the fallback sync method
         def fallback_sync():
-            return self.search(params)
+            return self.search(q, params)
 
         # Make the async request
         response_data = await make_search_request_async(self.client,
