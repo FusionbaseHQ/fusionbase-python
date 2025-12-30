@@ -23,7 +23,8 @@ class IntentBasedTokenHandler:
             return True
         return False
 
-    def extract_placeholder_data(self, tool_response: Dict[str, Any]) -> Tuple[str, Any]:
+    def extract_placeholder_data(
+            self, tool_response: Dict[str, Any]) -> Tuple[str, Any]:
         """Extract placeholder ID and store any embedded data.
 
         Args:
@@ -38,7 +39,8 @@ class IntentBasedTokenHandler:
         # The actual data retrieval will happen during post-processing
         return placeholder, tool_response
 
-    def create_contextual_response(self, tool_name: str, tool_response: Any) -> str:
+    def create_contextual_response(self, tool_name: str,
+                                   tool_response: Any) -> str:
         """Create an appropriate response based on whether it's a placeholder or full data.
 
         Args:
@@ -57,7 +59,7 @@ class IntentBasedTokenHandler:
             self.placeholder_data[placeholder] = tool_response
 
             return (f"{summary}. "
-                   f"Data reference: {placeholder}")
+                    f"Data reference: {placeholder}")
         else:
             # Tool returned full data - return as normal
             return str(tool_response)
@@ -79,11 +81,14 @@ class IntentBasedTokenHandler:
 
         # Handle both string and structured outputs
         if isinstance(text, str):
-            return self._replace_placeholders_in_string(text, get_placeholder_data)
+            return self._replace_placeholders_in_string(text,
+                                                        get_placeholder_data)
         elif isinstance(text, dict):
-            return self._replace_placeholders_in_dict(text, get_placeholder_data)
+            return self._replace_placeholders_in_dict(text,
+                                                      get_placeholder_data)
         elif isinstance(text, list):
-            return self._replace_placeholders_in_list(text, get_placeholder_data)
+            return self._replace_placeholders_in_list(text,
+                                                      get_placeholder_data)
         else:
             return text
 
@@ -103,7 +108,9 @@ class IntentBasedTokenHandler:
                 # Convert data to appropriate string format
                 if isinstance(full_data, (dict, list)):
                     # For JSON-like data, pretty print it
-                    data_str = json.dumps(full_data, indent=2, ensure_ascii=False)
+                    data_str = json.dumps(full_data,
+                                          indent=2,
+                                          ensure_ascii=False)
                 else:
                     data_str = str(full_data)
 
@@ -112,7 +119,8 @@ class IntentBasedTokenHandler:
 
         return result
 
-    def _replace_placeholders_in_dict(self, obj: Dict[str, Any], data_retriever) -> Dict[str, Any]:
+    def _replace_placeholders_in_dict(self, obj: Dict[str, Any],
+                                      data_retriever) -> Dict[str, Any]:
         """Recursively replace placeholders in a dictionary."""
         result = {}
         for key, value in obj.items():
@@ -125,19 +133,24 @@ class IntentBasedTokenHandler:
                         result[key] = full_data
                     else:
                         # Try string replacement
-                        result[key] = self._replace_placeholders_in_string(value, data_retriever)
+                        result[key] = self._replace_placeholders_in_string(
+                            value, data_retriever)
                 else:
                     # Check for embedded placeholders
-                    result[key] = self._replace_placeholders_in_string(value, data_retriever)
+                    result[key] = self._replace_placeholders_in_string(
+                        value, data_retriever)
             elif isinstance(value, dict):
-                result[key] = self._replace_placeholders_in_dict(value, data_retriever)
+                result[key] = self._replace_placeholders_in_dict(
+                    value, data_retriever)
             elif isinstance(value, list):
-                result[key] = self._replace_placeholders_in_list(value, data_retriever)
+                result[key] = self._replace_placeholders_in_list(
+                    value, data_retriever)
             else:
                 result[key] = value
         return result
 
-    def _replace_placeholders_in_list(self, obj: List[Any], data_retriever) -> List[Any]:
+    def _replace_placeholders_in_list(self, obj: List[Any],
+                                      data_retriever) -> List[Any]:
         """Recursively replace placeholders in a list."""
         result = []
         for item in obj:
@@ -149,13 +162,19 @@ class IntentBasedTokenHandler:
                     if full_data:
                         result.append(full_data)
                     else:
-                        result.append(self._replace_placeholders_in_string(item, data_retriever))
+                        result.append(
+                            self._replace_placeholders_in_string(
+                                item, data_retriever))
                 else:
-                    result.append(self._replace_placeholders_in_string(item, data_retriever))
+                    result.append(
+                        self._replace_placeholders_in_string(
+                            item, data_retriever))
             elif isinstance(item, dict):
-                result.append(self._replace_placeholders_in_dict(item, data_retriever))
+                result.append(
+                    self._replace_placeholders_in_dict(item, data_retriever))
             elif isinstance(item, list):
-                result.append(self._replace_placeholders_in_list(item, data_retriever))
+                result.append(
+                    self._replace_placeholders_in_list(item, data_retriever))
             else:
                 result.append(item)
         return result

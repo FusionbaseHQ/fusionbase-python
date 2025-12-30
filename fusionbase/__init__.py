@@ -77,10 +77,10 @@ class Fusionbase(CoreFusionbase):
 
 
 __all__ = [
-    '__version__',
-    'Fusionbase', 'FusionbaseConfig', 'APIError', 'AuthenticationError',
-    'AuthorizationError', 'FusionbaseError', 'ResourceNotFoundError',
-    'ValidationError', 'LocationSearch', 'LocationSearchParams',
-    'OrganizationSearch', 'OrganizationSearchParams', 'PersonSearch',
-    'PersonSearchParams', 'RelationSearch', 'RelationSearchParams', 'DataStream'
+    '__version__', 'Fusionbase', 'FusionbaseConfig', 'APIError',
+    'AuthenticationError', 'AuthorizationError', 'FusionbaseError',
+    'ResourceNotFoundError', 'ValidationError', 'LocationSearch',
+    'LocationSearchParams', 'OrganizationSearch', 'OrganizationSearchParams',
+    'PersonSearch', 'PersonSearchParams', 'RelationSearch',
+    'RelationSearchParams', 'DataStream'
 ]

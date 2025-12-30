@@ -93,7 +93,8 @@ class TestDataServiceManagerGetService(unittest.TestCase):
         mock_client = MagicMock()
         manager = DataServiceManager(mock_client)
 
-        with patch('fusionbase.managers.dataservice_manager.DataService') as MockDataService:
+        with patch('fusionbase.managers.dataservice_manager.DataService'
+                  ) as MockDataService:
             mock_service = MagicMock()
             MockDataService.return_value = mock_service
 
@@ -107,7 +108,8 @@ class TestDataServiceManagerGetService(unittest.TestCase):
         mock_client = MagicMock()
         manager = DataServiceManager(mock_client)
 
-        with patch('fusionbase.managers.dataservice_manager.DataService') as MockDataService:
+        with patch('fusionbase.managers.dataservice_manager.DataService'
+                  ) as MockDataService:
             mock_service = MagicMock()
             MockDataService.return_value = mock_service
 
@@ -123,7 +125,8 @@ class TestDataServiceManagerGetService(unittest.TestCase):
         mock_client = MagicMock()
         manager = DataServiceManager(mock_client)
 
-        with patch('fusionbase.managers.dataservice_manager.DataService') as MockDataService:
+        with patch('fusionbase.managers.dataservice_manager.DataService'
+                  ) as MockDataService:
             mock_service = MagicMock()
             MockDataService.return_value = mock_service
 
@@ -143,7 +146,8 @@ class TestDataServiceManagerFromId(unittest.TestCase):
         mock_client = MagicMock()
         manager = DataServiceManager(mock_client)
 
-        with patch('fusionbase.managers.dataservice_manager.DataService') as MockDataService:
+        with patch('fusionbase.managers.dataservice_manager.DataService'
+                  ) as MockDataService:
             mock_service = MagicMock()
             mock_service.get_metadata.return_value = {"name": "test"}
             MockDataService.return_value = mock_service
@@ -158,7 +162,8 @@ class TestDataServiceManagerFromId(unittest.TestCase):
         mock_client = MagicMock()
         manager = DataServiceManager(mock_client)
 
-        with patch('fusionbase.managers.dataservice_manager.DataService') as MockDataService:
+        with patch('fusionbase.managers.dataservice_manager.DataService'
+                  ) as MockDataService:
             mock_service = MagicMock()
             MockDataService.return_value = mock_service
 
@@ -172,7 +177,8 @@ class TestDataServiceManagerFromId(unittest.TestCase):
         mock_client = MagicMock()
         manager = DataServiceManager(mock_client)
 
-        with patch('fusionbase.managers.dataservice_manager.DataService') as MockDataService:
+        with patch('fusionbase.managers.dataservice_manager.DataService'
+                  ) as MockDataService:
             mock_service = MagicMock()
             mock_service.get_metadata.side_effect = APIError("Not found")
             MockDataService.return_value = mock_service
@@ -187,7 +193,8 @@ class TestDataServiceManagerFromId(unittest.TestCase):
         mock_client = MagicMock()
         manager = DataServiceManager(mock_client)
 
-        with patch('fusionbase.managers.dataservice_manager.DataService') as MockDataService:
+        with patch('fusionbase.managers.dataservice_manager.DataService'
+                  ) as MockDataService:
             mock_service = MagicMock()
             mock_service.get_metadata.side_effect = APIError("Not found")
             MockDataService.return_value = mock_service
@@ -209,7 +216,8 @@ class TestDataServiceManagerFromKey(unittest.TestCase):
         mock_client = MagicMock()
         manager = DataServiceManager(mock_client)
 
-        with patch('fusionbase.managers.dataservice_manager.DataService') as MockDataService:
+        with patch('fusionbase.managers.dataservice_manager.DataService'
+                  ) as MockDataService:
             mock_service = MagicMock()
             mock_service.get_metadata.return_value = {}
             MockDataService.return_value = mock_service
@@ -223,7 +231,8 @@ class TestDataServiceManagerFromKey(unittest.TestCase):
         mock_client = MagicMock()
         manager = DataServiceManager(mock_client)
 
-        with patch('fusionbase.managers.dataservice_manager.DataService') as MockDataService:
+        with patch('fusionbase.managers.dataservice_manager.DataService'
+                  ) as MockDataService:
             mock_service = MagicMock()
             MockDataService.return_value = mock_service
 
@@ -238,7 +247,8 @@ async def test_afrom_id_validates_async():
     mock_client = MagicMock()
     manager = DataServiceManager(mock_client)
 
-    with patch('fusionbase.managers.dataservice_manager.DataService') as MockDataService:
+    with patch('fusionbase.managers.dataservice_manager.DataService'
+              ) as MockDataService:
         mock_service = MagicMock()
         mock_service.aget_metadata = AsyncMock(return_value={"name": "test"})
         MockDataService.return_value = mock_service
@@ -255,7 +265,8 @@ async def test_afrom_id_skips_validation():
     mock_client = MagicMock()
     manager = DataServiceManager(mock_client)
 
-    with patch('fusionbase.managers.dataservice_manager.DataService') as MockDataService:
+    with patch('fusionbase.managers.dataservice_manager.DataService'
+              ) as MockDataService:
         mock_service = MagicMock()
         mock_service.aget_metadata = AsyncMock()
         MockDataService.return_value = mock_service
@@ -271,9 +282,11 @@ async def test_afrom_id_raises_resource_not_found():
     mock_client = MagicMock()
     manager = DataServiceManager(mock_client)
 
-    with patch('fusionbase.managers.dataservice_manager.DataService') as MockDataService:
+    with patch('fusionbase.managers.dataservice_manager.DataService'
+              ) as MockDataService:
         mock_service = MagicMock()
-        mock_service.aget_metadata = AsyncMock(side_effect=APIError("Not found"))
+        mock_service.aget_metadata = AsyncMock(
+            side_effect=APIError("Not found"))
         MockDataService.return_value = mock_service
 
         with pytest.raises(ResourceNotFoundError):
@@ -286,7 +299,8 @@ async def test_afrom_key_is_alias():
     mock_client = MagicMock()
     manager = DataServiceManager(mock_client)
 
-    with patch('fusionbase.managers.dataservice_manager.DataService') as MockDataService:
+    with patch('fusionbase.managers.dataservice_manager.DataService'
+              ) as MockDataService:
         mock_service = MagicMock()
         mock_service.aget_metadata = AsyncMock(return_value={})
         MockDataService.return_value = mock_service
@@ -304,7 +318,8 @@ class TestDataServiceManagerInvoke(unittest.TestCase):
         mock_client = MagicMock()
         manager = DataServiceManager(mock_client)
 
-        with patch('fusionbase.managers.dataservice_manager.DataService') as MockDataService:
+        with patch('fusionbase.managers.dataservice_manager.DataService'
+                  ) as MockDataService:
             mock_service = MagicMock()
             mock_service.invoke.return_value = {"result": "data"}
             MockDataService.return_value = mock_service
@@ -319,7 +334,8 @@ class TestDataServiceManagerInvoke(unittest.TestCase):
         mock_client = MagicMock()
         manager = DataServiceManager(mock_client)
 
-        with patch('fusionbase.managers.dataservice_manager.DataService') as MockDataService:
+        with patch('fusionbase.managers.dataservice_manager.DataService'
+                  ) as MockDataService:
             mock_service = MagicMock()
             mock_service.invoke.return_value = {}
             MockDataService.return_value = mock_service
@@ -334,7 +350,8 @@ class TestDataServiceManagerInvoke(unittest.TestCase):
         mock_client = MagicMock()
         manager = DataServiceManager(mock_client)
 
-        with patch('fusionbase.managers.dataservice_manager.DataService') as MockDataService:
+        with patch('fusionbase.managers.dataservice_manager.DataService'
+                  ) as MockDataService:
             mock_service = MagicMock()
             mock_service.invoke.return_value = {}
             MockDataService.return_value = mock_service
@@ -351,7 +368,8 @@ async def test_ainvoke_calls_service_ainvoke():
     mock_client = MagicMock()
     manager = DataServiceManager(mock_client)
 
-    with patch('fusionbase.managers.dataservice_manager.DataService') as MockDataService:
+    with patch('fusionbase.managers.dataservice_manager.DataService'
+              ) as MockDataService:
         mock_service = MagicMock()
         mock_service.aget_metadata = AsyncMock(return_value={})
         mock_service.ainvoke = AsyncMock(return_value={"async_result": "data"})
@@ -371,18 +389,28 @@ class TestDataServiceManagerBatchInvoke(unittest.TestCase):
         mock_client = MagicMock()
         manager = DataServiceManager(mock_client)
 
-        with patch('fusionbase.managers.dataservice_manager.DataService') as MockDataService:
+        with patch('fusionbase.managers.dataservice_manager.DataService'
+                  ) as MockDataService:
             mock_service = MagicMock()
-            mock_service.invoke.side_effect = lambda x: {"result": x["value"] * 2}
+            mock_service.invoke.side_effect = lambda x: {
+                "result": x["value"] * 2
+            }
             MockDataService.return_value = mock_service
 
             batch_inputs = [
-                {"value": 1},
-                {"value": 2},
-                {"value": 3},
+                {
+                    "value": 1
+                },
+                {
+                    "value": 2
+                },
+                {
+                    "value": 3
+                },
             ]
 
-            results = manager.batch_invoke_parallel("test_service", batch_inputs)
+            results = manager.batch_invoke_parallel("test_service",
+                                                    batch_inputs)
 
             self.assertEqual(len(results), 3)
             self.assertEqual(mock_service.invoke.call_count, 3)
@@ -392,18 +420,26 @@ class TestDataServiceManagerBatchInvoke(unittest.TestCase):
         mock_client = MagicMock()
         manager = DataServiceManager(mock_client)
 
-        with patch('fusionbase.managers.dataservice_manager.DataService') as MockDataService:
+        with patch('fusionbase.managers.dataservice_manager.DataService'
+                  ) as MockDataService:
             mock_service = MagicMock()
             mock_service.invoke.side_effect = lambda x: {"index": x["idx"]}
             MockDataService.return_value = mock_service
 
             batch_inputs = [
-                {"idx": 0},
-                {"idx": 1},
-                {"idx": 2},
+                {
+                    "idx": 0
+                },
+                {
+                    "idx": 1
+                },
+                {
+                    "idx": 2
+                },
             ]
 
-            results = manager.batch_invoke_parallel("test_service", batch_inputs)
+            results = manager.batch_invoke_parallel("test_service",
+                                                    batch_inputs)
 
             for i, result in enumerate(results):
                 self.assertEqual(result["index"], i)
@@ -415,15 +451,18 @@ async def test_abatch_invoke_parallel_processes_all():
     mock_client = MagicMock()
     manager = DataServiceManager(mock_client)
 
-    with patch('fusionbase.managers.dataservice_manager.DataService') as MockDataService:
+    with patch('fusionbase.managers.dataservice_manager.DataService'
+              ) as MockDataService:
         mock_service = MagicMock()
         mock_service.aget_metadata = AsyncMock(return_value={})
-        mock_service.ainvoke = AsyncMock(side_effect=lambda x: {"result": x["value"]})
+        mock_service.ainvoke = AsyncMock(
+            side_effect=lambda x: {"result": x["value"]})
         MockDataService.return_value = mock_service
 
         batch_inputs = [{"value": 1}, {"value": 2}]
 
-        results = await manager.abatch_invoke_parallel("test_service", batch_inputs)
+        results = await manager.abatch_invoke_parallel("test_service",
+                                                       batch_inputs)
 
         assert len(results) == 2
 
@@ -434,16 +473,18 @@ async def test_abatch_invoke_parallel_with_concurrency_limit():
     mock_client = MagicMock()
     manager = DataServiceManager(mock_client)
 
-    with patch('fusionbase.managers.dataservice_manager.DataService') as MockDataService:
+    with patch('fusionbase.managers.dataservice_manager.DataService'
+              ) as MockDataService:
         mock_service = MagicMock()
         mock_service.aget_metadata = AsyncMock(return_value={})
-        mock_service.ainvoke = AsyncMock(side_effect=lambda x: {"result": x["value"]})
+        mock_service.ainvoke = AsyncMock(
+            side_effect=lambda x: {"result": x["value"]})
         MockDataService.return_value = mock_service
 
         batch_inputs = [{"value": i} for i in range(5)]
 
-        results = await manager.abatch_invoke_parallel(
-            "test_service", batch_inputs, max_concurrency=2
-        )
+        results = await manager.abatch_invoke_parallel("test_service",
+                                                       batch_inputs,
+                                                       max_concurrency=2)
 
         assert len(results) == 5

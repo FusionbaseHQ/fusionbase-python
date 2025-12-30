@@ -977,22 +977,21 @@ class DataStream:
                 break
 
     def get_data(
-        self,
-        skip: int = 0,
-        limit: int = None,
-        sort_keys: List[str] = None,
-        sort_order: List[str] = None,
-        query_parameters: Dict[str, Any] = None,
-        filters: List[Dict[str, Any]] = None,
-        project_fields: List[str] = None,
-        version_boundary: Optional[str] = None,
-        force_live: bool = False,
-        use_chunking: bool = True,
-        max_data_size: int = 10000,
-        return_type: Union[str, ReturnType] = ReturnType.DICT,
-        pandas_kwargs: Dict[str, Any] = None,
-        _format: str = None
-    ) -> Union[List[Dict[str, Any]], "pd.DataFrame"]:
+            self,
+            skip: int = 0,
+            limit: int = None,
+            sort_keys: List[str] = None,
+            sort_order: List[str] = None,
+            query_parameters: Dict[str, Any] = None,
+            filters: List[Dict[str, Any]] = None,
+            project_fields: List[str] = None,
+            version_boundary: Optional[str] = None,
+            force_live: bool = False,
+            use_chunking: bool = True,
+            max_data_size: int = 10000,
+            return_type: Union[str, ReturnType] = ReturnType.DICT,
+            pandas_kwargs: Dict[str, Any] = None,
+            _format: str = None) -> Union[List[Dict[str, Any]], "pd.DataFrame"]:
         """Get data from the stream with pagination, sorting, filtering, and projection options.
 
         Args:
@@ -1049,22 +1048,21 @@ class DataStream:
         return data
 
     async def aget_data(
-        self,
-        skip: int = 0,
-        limit: int = None,
-        sort_keys: List[str] = None,
-        sort_order: List[str] = None,
-        query_parameters: Dict[str, Any] = None,
-        filters: List[Dict[str, Any]] = None,
-        project_fields: List[str] = None,
-        version_boundary: Optional[str] = None,
-        force_live: bool = False,
-        use_chunking: bool = True,
-        max_data_size: int = 10000,
-        return_type: Union[str, ReturnType] = ReturnType.DICT,
-        pandas_kwargs: Dict[str, Any] = None,
-        _format: str = None
-    ) -> Union[List[Dict[str, Any]], "pd.DataFrame"]:
+            self,
+            skip: int = 0,
+            limit: int = None,
+            sort_keys: List[str] = None,
+            sort_order: List[str] = None,
+            query_parameters: Dict[str, Any] = None,
+            filters: List[Dict[str, Any]] = None,
+            project_fields: List[str] = None,
+            version_boundary: Optional[str] = None,
+            force_live: bool = False,
+            use_chunking: bool = True,
+            max_data_size: int = 10000,
+            return_type: Union[str, ReturnType] = ReturnType.DICT,
+            pandas_kwargs: Dict[str, Any] = None,
+            _format: str = None) -> Union[List[Dict[str, Any]], "pd.DataFrame"]:
         """Asynchronously get data from the stream with pagination, sorting, filtering, and projection options.
 
         Args:
@@ -1357,12 +1355,15 @@ class DataStream:
             # Use the appropriate async method based on client capabilities
             if hasattr(self._client, "arequest"):
                 response = await self._client.arequest(
-                    "GET", f"stream/data/{self._stream_key}",
-                    response_format=response_format, params=params)
+                    "GET",
+                    f"stream/data/{self._stream_key}",
+                    response_format=response_format,
+                    params=params)
             elif hasattr(self._client, "aget"):
                 response = await self._client.aget(
                     f"stream/data/{self._stream_key}",
-                    response_format=response_format, params=params)
+                    response_format=response_format,
+                    params=params)
             else:
                 # Fallback to sync method in a threadpool
                 response = await asyncio.to_thread(
@@ -1534,12 +1535,13 @@ class DataStream:
 
         # Validate file format
         file_format = file_format.lower()
-        supported_formats = ['json', 'jsonl', 'csv', 'pickle', 'xlsx', 'parquet']
+        supported_formats = [
+            'json', 'jsonl', 'csv', 'pickle', 'xlsx', 'parquet'
+        ]
         if file_format not in supported_formats:
             raise ValueError(
                 f"Unsupported file format: {file_format}. "
-                f"Supported formats: {', '.join(supported_formats)}"
-            )
+                f"Supported formats: {', '.join(supported_formats)}")
 
         # For pickle format, ensure we have the module
         if file_format == 'pickle':
@@ -1550,17 +1552,13 @@ class DataStream:
 
         # For xlsx format, ensure openpyxl is available
         if file_format == 'xlsx' and not OPENPYXL_AVAILABLE:
-            raise ImportError(
-                "openpyxl is required for XLSX export. "
-                "Install it with: pip install openpyxl"
-            )
+            raise ImportError("openpyxl is required for XLSX export. "
+                              "Install it with: pip install openpyxl")
 
         # For parquet format, ensure pyarrow is available
         if file_format == 'parquet' and not PYARROW_AVAILABLE:
-            raise ImportError(
-                "pyarrow is required for Parquet export. "
-                "Install it with: pip install pyarrow"
-            )
+            raise ImportError("pyarrow is required for Parquet export. "
+                              "Install it with: pip install pyarrow")
 
         # Get metadata if requested
         metadata = None
@@ -1685,11 +1683,13 @@ class DataStream:
                             metadata, "model_dump") else metadata
                         # Flatten metadata for Excel
                         flat_metadata = self._flatten_dict(metadata_dict)
-                        meta_df = pd.DataFrame([
-                            {"Field": k, "Value": str(v)}
-                            for k, v in flat_metadata.items()
-                        ])
-                        meta_df.to_excel(writer, sheet_name='Metadata', index=False)
+                        meta_df = pd.DataFrame([{
+                            "Field": k,
+                            "Value": str(v)
+                        } for k, v in flat_metadata.items()])
+                        meta_df.to_excel(writer,
+                                         sheet_name='Metadata',
+                                         index=False)
             else:
                 # Manual openpyxl export without pandas
                 wb = Workbook()
@@ -1720,7 +1720,8 @@ class DataStream:
                     meta_ws.cell(row=1, column=1, value="Field")
                     meta_ws.cell(row=1, column=2, value="Value")
 
-                    for row_idx, (key, value) in enumerate(flat_metadata.items(), 2):
+                    for row_idx, (key,
+                                  value) in enumerate(flat_metadata.items(), 2):
                         meta_ws.cell(row=row_idx, column=1, value=key)
                         meta_ws.cell(row=row_idx, column=2, value=str(value))
 
@@ -1746,8 +1747,8 @@ class DataStream:
                         metadata, "model_dump") else metadata
                     existing_meta = table.schema.metadata or {}
                     new_meta = {
-                        **existing_meta,
-                        b'fusionbase_metadata': json.dumps(metadata_dict, default=str).encode()
+                        **existing_meta, b'fusionbase_metadata':
+                            json.dumps(metadata_dict, default=str).encode()
                     }
                     table = table.replace_schema_metadata(new_meta)
 
@@ -1763,8 +1764,8 @@ class DataStream:
                         values = [row.get(field) for row in data]
                         # Convert complex types to strings
                         values = [
-                            json.dumps(v, default=str) if isinstance(v, (dict, list)) else v
-                            for v in values
+                            json.dumps(v, default=str) if isinstance(
+                                v, (dict, list)) else v for v in values
                         ]
                         columns[field] = values
 
@@ -1776,8 +1777,8 @@ class DataStream:
                             metadata, "model_dump") else metadata
                         existing_meta = table.schema.metadata or {}
                         new_meta = {
-                            **existing_meta,
-                            b'fusionbase_metadata': json.dumps(metadata_dict, default=str).encode()
+                            **existing_meta, b'fusionbase_metadata':
+                                json.dumps(metadata_dict, default=str).encode()
                         }
                         table = table.replace_schema_metadata(new_meta)
 
@@ -1785,7 +1786,10 @@ class DataStream:
 
         return file_path
 
-    def _flatten_dict(self, d: Dict[str, Any], parent_key: str = '', sep: str = '.') -> Dict[str, Any]:
+    def _flatten_dict(self,
+                      d: Dict[str, Any],
+                      parent_key: str = '',
+                      sep: str = '.') -> Dict[str, Any]:
         """Flatten a nested dictionary for export.
 
         Args:
@@ -2052,12 +2056,13 @@ class DataStream:
 
         # Validate file format
         file_format = file_format.lower()
-        supported_formats = ['json', 'jsonl', 'csv', 'pickle', 'xlsx', 'parquet']
+        supported_formats = [
+            'json', 'jsonl', 'csv', 'pickle', 'xlsx', 'parquet'
+        ]
         if file_format not in supported_formats:
             raise ValueError(
                 f"Unsupported file format: {file_format}. "
-                f"Supported formats: {', '.join(supported_formats)}"
-            )
+                f"Supported formats: {', '.join(supported_formats)}")
 
         # For pickle format, ensure we have the module
         if file_format == 'pickle':
@@ -2068,17 +2073,13 @@ class DataStream:
 
         # For xlsx format, ensure openpyxl is available
         if file_format == 'xlsx' and not OPENPYXL_AVAILABLE:
-            raise ImportError(
-                "openpyxl is required for XLSX export. "
-                "Install it with: pip install openpyxl"
-            )
+            raise ImportError("openpyxl is required for XLSX export. "
+                              "Install it with: pip install openpyxl")
 
         # For parquet format, ensure pyarrow is available
         if file_format == 'parquet' and not PYARROW_AVAILABLE:
-            raise ImportError(
-                "pyarrow is required for Parquet export. "
-                "Install it with: pip install pyarrow"
-            )
+            raise ImportError("pyarrow is required for Parquet export. "
+                              "Install it with: pip install pyarrow")
 
         # Get metadata if requested
         metadata = None
@@ -2205,11 +2206,13 @@ class DataStream:
                                 metadata, "model_dump") else metadata
                             # Flatten metadata for Excel
                             flat_metadata = self._flatten_dict(metadata_dict)
-                            meta_df = pd.DataFrame([
-                                {"Field": k, "Value": str(v)}
-                                for k, v in flat_metadata.items()
-                            ])
-                            meta_df.to_excel(writer, sheet_name='Metadata', index=False)
+                            meta_df = pd.DataFrame([{
+                                "Field": k,
+                                "Value": str(v)
+                            } for k, v in flat_metadata.items()])
+                            meta_df.to_excel(writer,
+                                             sheet_name='Metadata',
+                                             index=False)
                 else:
                     # Manual openpyxl export without pandas
                     wb = Workbook()
@@ -2240,9 +2243,12 @@ class DataStream:
                         meta_ws.cell(row=1, column=1, value="Field")
                         meta_ws.cell(row=1, column=2, value="Value")
 
-                        for row_idx, (key, value) in enumerate(flat_metadata.items(), 2):
+                        for row_idx, (key, value) in enumerate(
+                                flat_metadata.items(), 2):
                             meta_ws.cell(row=row_idx, column=1, value=key)
-                            meta_ws.cell(row=row_idx, column=2, value=str(value))
+                            meta_ws.cell(row=row_idx,
+                                         column=2,
+                                         value=str(value))
 
                     wb.save(file_path)
 
@@ -2266,8 +2272,8 @@ class DataStream:
                             metadata, "model_dump") else metadata
                         existing_meta = table.schema.metadata or {}
                         new_meta = {
-                            **existing_meta,
-                            b'fusionbase_metadata': json.dumps(metadata_dict, default=str).encode()
+                            **existing_meta, b'fusionbase_metadata':
+                                json.dumps(metadata_dict, default=str).encode()
                         }
                         table = table.replace_schema_metadata(new_meta)
 
@@ -2282,8 +2288,8 @@ class DataStream:
                         values = [row.get(field) for row in data]
                         # Convert complex types to strings
                         values = [
-                            json.dumps(v, default=str) if isinstance(v, (dict, list)) else v
-                            for v in values
+                            json.dumps(v, default=str) if isinstance(
+                                v, (dict, list)) else v for v in values
                         ]
                         columns[field] = values
 
@@ -2295,8 +2301,8 @@ class DataStream:
                             metadata, "model_dump") else metadata
                         existing_meta = table.schema.metadata or {}
                         new_meta = {
-                            **existing_meta,
-                            b'fusionbase_metadata': json.dumps(metadata_dict, default=str).encode()
+                            **existing_meta, b'fusionbase_metadata':
+                                json.dumps(metadata_dict, default=str).encode()
                         }
                         table = table.replace_schema_metadata(new_meta)
 
@@ -2440,14 +2446,13 @@ class DataStream:
             yield df
 
     def search_data(
-        self,
-        q: str,
-        skip: int = 0,
-        limit: int = 10,
-        return_type: Union[str, ReturnType] = ReturnType.DICT,
-        pandas_kwargs: Dict[str, Any] = None,
-        _format: str = None
-    ) -> Union[List[Dict[str, Any]], "pd.DataFrame"]:
+            self,
+            q: str,
+            skip: int = 0,
+            limit: int = 10,
+            return_type: Union[str, ReturnType] = ReturnType.DICT,
+            pandas_kwargs: Dict[str, Any] = None,
+            _format: str = None) -> Union[List[Dict[str, Any]], "pd.DataFrame"]:
         """Search for data rows containing the specified query string.
 
         Args:
@@ -2490,8 +2495,10 @@ class DataStream:
         # Make the API request
         try:
             response = self._client.request(
-                "GET", f"stream/data/search/{self._stream_key}",
-                response_format=response_format, params=params)
+                "GET",
+                f"stream/data/search/{self._stream_key}",
+                response_format=response_format,
+                params=params)
 
             # Convert to DataFrame if requested
             if return_type in (ReturnType.DATAFRAME, ReturnType.DF, "dataframe",
@@ -2510,14 +2517,13 @@ class DataStream:
             raise
 
     async def asearch_data(
-        self,
-        q: str,
-        skip: int = 0,
-        limit: int = 10,
-        return_type: Union[str, ReturnType] = ReturnType.DICT,
-        pandas_kwargs: Dict[str, Any] = None,
-        _format: str = None
-    ) -> Union[List[Dict[str, Any]], "pd.DataFrame"]:
+            self,
+            q: str,
+            skip: int = 0,
+            limit: int = 10,
+            return_type: Union[str, ReturnType] = ReturnType.DICT,
+            pandas_kwargs: Dict[str, Any] = None,
+            _format: str = None) -> Union[List[Dict[str, Any]], "pd.DataFrame"]:
         """Asynchronously search for data rows containing the specified query string.
 
         Args:
@@ -2569,7 +2575,8 @@ class DataStream:
             elif hasattr(self._client, "aget"):
                 response = await self._client.aget(
                     f"stream/data/search/{self._stream_key}",
-                    response_format=response_format, params=params)
+                    response_format=response_format,
+                    params=params)
             else:
                 # Fallback to sync method in a threadpool
                 response = await asyncio.to_thread(
@@ -2625,23 +2632,36 @@ class DataStream:
 
         # Get the display name for the table title
         title = metadata.name.en if metadata.name and metadata.name.en else (
-            metadata.name.de if metadata.name and metadata.name.de else self._stream_key or "DataStream"
-        )
+            metadata.name.de if metadata.name and metadata.name.de else
+            self._stream_key or "DataStream")
 
         if RICH_AVAILABLE:
             # Use rich table for pretty output
             table = Table(title=title)
-            table.add_column("Property", justify="right", style="magenta", no_wrap=True)
+            table.add_column("Property",
+                             justify="right",
+                             style="magenta",
+                             no_wrap=True)
             table.add_column("Value", style="cyan")
 
             # Add rows for each metadata property
             table.add_row("Key", get_value(metadata, "key"))
             table.add_row("ID", get_value(metadata, "id"))
-            table.add_row("# Entries", get_value(metadata.meta, "entry_count") if metadata.meta else "N/A")
-            table.add_row("# Properties", get_value(metadata.meta, "main_property_count") if metadata.meta else "N/A")
-            table.add_row("Is Active", get_value(metadata.meta, "is_active") if metadata.meta else "N/A")
+            table.add_row(
+                "# Entries",
+                get_value(metadata.meta, "entry_count")
+                if metadata.meta else "N/A")
+            table.add_row(
+                "# Properties",
+                get_value(metadata.meta, "main_property_count")
+                if metadata.meta else "N/A")
+            table.add_row(
+                "Is Active",
+                get_value(metadata.meta, "is_active")
+                if metadata.meta else "N/A")
             table.add_row("Data Version", get_value(metadata, "data_version"))
-            table.add_row("Data Updated At", get_value(metadata, "data_updated_at"))
+            table.add_row("Data Updated At",
+                          get_value(metadata, "data_updated_at"))
             table.add_row("Created At", get_value(metadata, "created_at"))
             table.add_row("Updated At", get_value(metadata, "updated_at"))
 
@@ -2671,16 +2691,27 @@ class DataStream:
             print("=" * 60)
             print(f"  {'Key:':<20} {get_value(metadata, 'key')}")
             print(f"  {'ID:':<20} {get_value(metadata, 'id')}")
-            print(f"  {'# Entries:':<20} {get_value(metadata.meta, 'entry_count') if metadata.meta else 'N/A'}")
-            print(f"  {'# Properties:':<20} {get_value(metadata.meta, 'main_property_count') if metadata.meta else 'N/A'}")
-            print(f"  {'Is Active:':<20} {get_value(metadata.meta, 'is_active') if metadata.meta else 'N/A'}")
-            print(f"  {'Data Version:':<20} {get_value(metadata, 'data_version')}")
-            print(f"  {'Data Updated At:':<20} {get_value(metadata, 'data_updated_at')}")
+            print(
+                f"  {'# Entries:':<20} {get_value(metadata.meta, 'entry_count') if metadata.meta else 'N/A'}"
+            )
+            print(
+                f"  {'# Properties:':<20} {get_value(metadata.meta, 'main_property_count') if metadata.meta else 'N/A'}"
+            )
+            print(
+                f"  {'Is Active:':<20} {get_value(metadata.meta, 'is_active') if metadata.meta else 'N/A'}"
+            )
+            print(
+                f"  {'Data Version:':<20} {get_value(metadata, 'data_version')}"
+            )
+            print(
+                f"  {'Data Updated At:':<20} {get_value(metadata, 'data_updated_at')}"
+            )
             print(f"  {'Created At:':<20} {get_value(metadata, 'created_at')}")
             print(f"  {'Updated At:':<20} {get_value(metadata, 'updated_at')}")
 
             if metadata.source:
-                print(f"  {'Source ID:':<20} {get_value(metadata.source, '_id')}")
+                print(
+                    f"  {'Source ID:':<20} {get_value(metadata.source, '_id')}")
 
             if metadata.description:
                 desc = metadata.description.en or metadata.description.de

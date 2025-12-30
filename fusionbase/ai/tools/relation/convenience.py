@@ -19,17 +19,17 @@ except ImportError as exc:
         "Please install the required dependencies: "
         "pip install fusionbase[ai] "
         "or "
-        "pip install langchain>=0.3.0 langchain-core>=0.3.0"
-    ) from exc
+        "pip install langchain>=0.3.0 langchain-core>=0.3.0") from exc
 
 from fusionbase import Fusionbase
 
 
 @tool
 def financial_kpi(
-    fb_entity_id: Annotated[str, "The Fusionbase entity ID of the organization"],
-    client: Annotated[Fusionbase, InjectedToolArg] = None
-) -> Dict[str, Any]:
+        fb_entity_id: Annotated[str,
+                                "The Fusionbase entity ID of the organization"],
+        client: Annotated[Fusionbase,
+                          InjectedToolArg] = None) -> Dict[str, Any]:
     """Get financial KPIs for an organization.
 
     This tool provides an extensive overview of key financial metrics including:
@@ -63,9 +63,10 @@ def financial_kpi(
 
 @tool
 def network(
-    fb_entity_id: Annotated[str, "The Fusionbase entity ID of the organization"],
-    client: Annotated[Fusionbase, InjectedToolArg] = None
-) -> Dict[str, Any]:
+        fb_entity_id: Annotated[str,
+                                "The Fusionbase entity ID of the organization"],
+        client: Annotated[Fusionbase,
+                          InjectedToolArg] = None) -> Dict[str, Any]:
     """Get the network of connected entities for an organization.
 
     A network relation refers to the connected entities that are related to a given root entity,
@@ -98,9 +99,10 @@ def network(
 
 @tool
 def related_persons(
-    fb_entity_id: Annotated[str, "The Fusionbase entity ID of the organization"],
-    client: Annotated[Fusionbase, InjectedToolArg] = None
-) -> Dict[str, Any]:
+        fb_entity_id: Annotated[str,
+                                "The Fusionbase entity ID of the organization"],
+        client: Annotated[Fusionbase,
+                          InjectedToolArg] = None) -> Dict[str, Any]:
     """Get management positions and related persons for an organization.
 
     This includes current and former members of the executive team, such as:
@@ -132,9 +134,10 @@ def related_persons(
 
 @tool
 def profit_and_loss_account(
-    fb_entity_id: Annotated[str, "The Fusionbase entity ID of the organization"],
-    client: Annotated[Fusionbase, InjectedToolArg] = None
-) -> Dict[str, Any]:
+        fb_entity_id: Annotated[str,
+                                "The Fusionbase entity ID of the organization"],
+        client: Annotated[Fusionbase,
+                          InjectedToolArg] = None) -> Dict[str, Any]:
     """Get profit and loss account information for an organization.
 
     This overview provides a detailed account of a company's financial results, including:
@@ -168,9 +171,10 @@ def profit_and_loss_account(
 
 @tool
 def publications(
-    fb_entity_id: Annotated[str, "The Fusionbase entity ID of the organization"],
-    client: Annotated[Fusionbase, InjectedToolArg] = None
-) -> Dict[str, Any]:
+        fb_entity_id: Annotated[str,
+                                "The Fusionbase entity ID of the organization"],
+        client: Annotated[Fusionbase,
+                          InjectedToolArg] = None) -> Dict[str, Any]:
     """Get publications from the German Handelsregister for an organization.
 
     Announcements from the German Handelsregister include details on:
@@ -202,9 +206,10 @@ def publications(
 
 @tool
 def balance_sheet_accounts(
-    fb_entity_id: Annotated[str, "The Fusionbase entity ID of the organization"],
-    client: Annotated[Fusionbase, InjectedToolArg] = None
-) -> Dict[str, Any]:
+        fb_entity_id: Annotated[str,
+                                "The Fusionbase entity ID of the organization"],
+        client: Annotated[Fusionbase,
+                          InjectedToolArg] = None) -> Dict[str, Any]:
     """Get balance sheet accounts information for an organization.
 
     This overview provides a detailed breakdown of a company's balance sheet, covering:
@@ -237,9 +242,10 @@ def balance_sheet_accounts(
 
 @tool
 def insolvency_publications(
-    fb_entity_id: Annotated[str, "The Fusionbase entity ID of the organization"],
-    client: Annotated[Fusionbase, InjectedToolArg] = None
-) -> Dict[str, Any]:
+        fb_entity_id: Annotated[str,
+                                "The Fusionbase entity ID of the organization"],
+        client: Annotated[Fusionbase,
+                          InjectedToolArg] = None) -> Dict[str, Any]:
     """Get insolvency publications for an organization.
 
     Real-time queries from insolvency courts providing:
@@ -271,9 +277,10 @@ def insolvency_publications(
 
 @tool
 def annual_financial_statements(
-    fb_entity_id: Annotated[str, "The Fusionbase entity ID of the organization"],
-    client: Annotated[Fusionbase, InjectedToolArg] = None
-) -> Dict[str, Any]:
+        fb_entity_id: Annotated[str,
+                                "The Fusionbase entity ID of the organization"],
+        client: Annotated[Fusionbase,
+                          InjectedToolArg] = None) -> Dict[str, Any]:
     """Get annual financial statements for an organization.
 
     Published annual financial statements and additional reports of companies in the Federal Gazette,
@@ -301,14 +308,17 @@ def annual_financial_statements(
             "result": result
         }
     except Exception as e:
-        return {"error": f"Error retrieving annual financial statements: {str(e)}"}
+        return {
+            "error": f"Error retrieving annual financial statements: {str(e)}"
+        }
 
 
 @tool
 def news(
-    fb_entity_id: Annotated[str, "The Fusionbase entity ID of the organization"],
-    client: Annotated[Fusionbase, InjectedToolArg] = None
-) -> Dict[str, Any]:
+        fb_entity_id: Annotated[str,
+                                "The Fusionbase entity ID of the organization"],
+        client: Annotated[Fusionbase,
+                          InjectedToolArg] = None) -> Dict[str, Any]:
     """Get news articles about an organization.
 
     News articles and reports published by news providers, including:

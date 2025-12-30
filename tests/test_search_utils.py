@@ -32,11 +32,9 @@ class TestPrepareSearchParams(unittest.TestCase):
 
     def test_prepare_with_kwargs(self):
         """Test prepare_search_params with keyword arguments."""
-        params, query_dict = prepare_search_params(
-            param_class=TestSearchParams,
-            q="test query",
-            limit=20
-        )
+        params, query_dict = prepare_search_params(param_class=TestSearchParams,
+                                                   q="test query",
+                                                   limit=20)
 
         self.assertIsInstance(params, TestSearchParams)
         self.assertEqual(params.q, "test query")
@@ -48,10 +46,8 @@ class TestPrepareSearchParams(unittest.TestCase):
         """Test prepare_search_params with params object."""
         input_params = TestSearchParams(q="search term", skip=5)
 
-        params, query_dict = prepare_search_params(
-            params=input_params,
-            param_class=TestSearchParams
-        )
+        params, query_dict = prepare_search_params(params=input_params,
+                                                   param_class=TestSearchParams)
 
         self.assertEqual(params.q, "search term")
         self.assertEqual(params.skip, 5)
@@ -60,10 +56,8 @@ class TestPrepareSearchParams(unittest.TestCase):
 
     def test_prepare_with_no_params_creates_default(self):
         """Test prepare_search_params creates default when no params."""
-        params, query_dict = prepare_search_params(
-            param_class=TestSearchParams,
-            require_query=False
-        )
+        params, query_dict = prepare_search_params(param_class=TestSearchParams,
+                                                   require_query=False)
 
         self.assertIsInstance(params, TestSearchParams)
         self.assertEqual(params.q, "")
@@ -71,29 +65,23 @@ class TestPrepareSearchParams(unittest.TestCase):
     def test_prepare_raises_when_query_required_but_missing(self):
         """Test ValueError when query is required but not provided."""
         with self.assertRaises(ValueError) as context:
-            prepare_search_params(
-                param_class=TestSearchParams,
-                require_query=True
-            )
+            prepare_search_params(param_class=TestSearchParams,
+                                  require_query=True)
 
         self.assertIn("query", str(context.exception).lower())
 
     def test_prepare_does_not_raise_when_query_not_required(self):
         """Test no error when query not required."""
-        params, query_dict = prepare_search_params(
-            param_class=TestSearchParams,
-            require_query=False
-        )
+        params, query_dict = prepare_search_params(param_class=TestSearchParams,
+                                                   require_query=False)
 
         self.assertIsInstance(params, TestSearchParams)
 
     def test_prepare_excludes_none_values(self):
         """Test that None values are excluded from query dict."""
-        params, query_dict = prepare_search_params(
-            param_class=TestSearchParams,
-            q="test",
-            require_query=True
-        )
+        params, query_dict = prepare_search_params(param_class=TestSearchParams,
+                                                   q="test",
+                                                   require_query=True)
 
         # filters is None by default, should be excluded
         self.assertNotIn("filters", query_dict)
@@ -103,10 +91,8 @@ class TestPrepareSearchParams(unittest.TestCase):
         filters = {"status": "active", "country": "DE"}
         input_params = TestSearchParams(q="test", filters=filters)
 
-        params, query_dict = prepare_search_params(
-            params=input_params,
-            param_class=TestSearchParams
-        )
+        params, query_dict = prepare_search_params(params=input_params,
+                                                   param_class=TestSearchParams)
 
         self.assertIsInstance(query_dict["filters"], str)
         parsed_filters = json.loads(query_dict["filters"])
@@ -126,12 +112,10 @@ class TestProcessSearchResults(unittest.TestCase):
         """Test processing response with no results key."""
         response_data = {}
 
-        result = process_search_results(
-            response_data=response_data,
-            entity_class=Person,
-            client=self.mock_client,
-            params=self.params
-        )
+        result = process_search_results(response_data=response_data,
+                                        entity_class=Person,
+                                        client=self.mock_client,
+                                        params=self.params)
 
         self.assertIsInstance(result, SearchResult)
         self.assertEqual(len(result.items), 0)
@@ -141,12 +125,10 @@ class TestProcessSearchResults(unittest.TestCase):
         """Test processing response with empty results list."""
         response_data = {"results": [], "total": 0}
 
-        result = process_search_results(
-            response_data=response_data,
-            entity_class=Person,
-            client=self.mock_client,
-            params=self.params
-        )
+        result = process_search_results(response_data=response_data,
+                                        entity_class=Person,
+                                        client=self.mock_client,
+                                        params=self.params)
 
         self.assertEqual(len(result.items), 0)
         self.assertEqual(result.total, 0)
@@ -155,18 +137,24 @@ class TestProcessSearchResults(unittest.TestCase):
         """Test that results are converted to LazyReference objects."""
         response_data = {
             "results": [
-                {"entity": {"fb_entity_id": "person_123"}},
-                {"entity": {"fb_entity_id": "person_456"}},
+                {
+                    "entity": {
+                        "fb_entity_id": "person_123"
+                    }
+                },
+                {
+                    "entity": {
+                        "fb_entity_id": "person_456"
+                    }
+                },
             ],
             "total": 2
         }
 
-        result = process_search_results(
-            response_data=response_data,
-            entity_class=Person,
-            client=self.mock_client,
-            params=self.params
-        )
+        result = process_search_results(response_data=response_data,
+                                        entity_class=Person,
+                                        client=self.mock_client,
+                                        params=self.params)
 
         self.assertEqual(len(result.items), 2)
         self.assertIsInstance(result.items[0], LazyReference)
@@ -177,18 +165,18 @@ class TestProcessSearchResults(unittest.TestCase):
     def test_process_results_preserves_total(self):
         """Test that total count is preserved from response."""
         response_data = {
-            "results": [
-                {"entity": {"fb_entity_id": "org_1"}},
-            ],
+            "results": [{
+                "entity": {
+                    "fb_entity_id": "org_1"
+                }
+            },],
             "total": 100  # More results available than returned
         }
 
-        result = process_search_results(
-            response_data=response_data,
-            entity_class=Organization,
-            client=self.mock_client,
-            params=self.params
-        )
+        result = process_search_results(response_data=response_data,
+                                        entity_class=Organization,
+                                        client=self.mock_client,
+                                        params=self.params)
 
         self.assertEqual(len(result.items), 1)
         self.assertEqual(result.total, 100)
@@ -198,12 +186,10 @@ class TestProcessSearchResults(unittest.TestCase):
         params = TestSearchParams(q="test", limit=25, skip=50)
         response_data = {"results": [], "total": 0}
 
-        result = process_search_results(
-            response_data=response_data,
-            entity_class=Person,
-            client=self.mock_client,
-            params=params
-        )
+        result = process_search_results(response_data=response_data,
+                                        entity_class=Person,
+                                        client=self.mock_client,
+                                        params=params)
 
         self.assertEqual(result.limit, 25)
         self.assertEqual(result.skip, 50)
@@ -212,21 +198,31 @@ class TestProcessSearchResults(unittest.TestCase):
         """Test that invalid result entries are skipped."""
         response_data = {
             "results": [
-                {"entity": {"fb_entity_id": "valid_1"}},
-                {"not_entity": "invalid"},  # Missing 'entity' key
+                {
+                    "entity": {
+                        "fb_entity_id": "valid_1"
+                    }
+                },
+                {
+                    "not_entity": "invalid"
+                },  # Missing 'entity' key
                 "not_a_dict",  # Not a dict
-                {"entity": {}},  # Missing fb_entity_id
-                {"entity": {"fb_entity_id": "valid_2"}},
+                {
+                    "entity": {}
+                },  # Missing fb_entity_id
+                {
+                    "entity": {
+                        "fb_entity_id": "valid_2"
+                    }
+                },
             ],
             "total": 5
         }
 
-        result = process_search_results(
-            response_data=response_data,
-            entity_class=Person,
-            client=self.mock_client,
-            params=self.params
-        )
+        result = process_search_results(response_data=response_data,
+                                        entity_class=Person,
+                                        client=self.mock_client,
+                                        params=self.params)
 
         # Only valid entries should be processed
         self.assertEqual(len(result.items), 2)
@@ -235,12 +231,10 @@ class TestProcessSearchResults(unittest.TestCase):
 
     def test_process_preserves_params_in_result(self):
         """Test that params are preserved in result."""
-        result = process_search_results(
-            response_data={"results": []},
-            entity_class=Person,
-            client=self.mock_client,
-            params=self.params
-        )
+        result = process_search_results(response_data={"results": []},
+                                        entity_class=Person,
+                                        client=self.mock_client,
+                                        params=self.params)
 
         self.assertEqual(result.params, self.params)
 
@@ -253,15 +247,13 @@ class TestMakeSearchRequest(unittest.TestCase):
         mock_client = MagicMock()
         mock_client.request.return_value = {"results": [], "total": 0}
 
-        result = make_search_request(
-            client=mock_client,
-            endpoint="search/persons",
-            params={"q": "test"}
-        )
+        result = make_search_request(client=mock_client,
+                                     endpoint="search/persons",
+                                     params={"q": "test"})
 
-        mock_client.request.assert_called_once_with(
-            "GET", "search/persons", params={"q": "test"}
-        )
+        mock_client.request.assert_called_once_with("GET",
+                                                    "search/persons",
+                                                    params={"q": "test"})
         self.assertEqual(result, {"results": [], "total": 0})
 
     def test_make_request_with_http_client_fallback(self):
@@ -272,11 +264,9 @@ class TestMakeSearchRequest(unittest.TestCase):
         mock_client.http_client = MagicMock()
         mock_client.http_client.get.return_value = mock_response
 
-        result = make_search_request(
-            client=mock_client,
-            endpoint="search/organizations",
-            params={"q": "company"}
-        )
+        result = make_search_request(client=mock_client,
+                                     endpoint="search/organizations",
+                                     params={"q": "company"})
 
         mock_client.http_client.get.assert_called_once()
         self.assertEqual(result, {"results": [], "total": 0})
@@ -287,11 +277,9 @@ class TestMakeSearchRequest(unittest.TestCase):
         mock_client.request.side_effect = OSError("Connection failed")
 
         with self.assertRaises(APIError) as context:
-            make_search_request(
-                client=mock_client,
-                endpoint="search/persons",
-                params={"q": "test"}
-            )
+            make_search_request(client=mock_client,
+                                endpoint="search/persons",
+                                params={"q": "test"})
 
         self.assertIn("Search failed", str(context.exception))
         self.assertEqual(context.exception.status_code, 500)
@@ -303,15 +291,13 @@ async def test_make_search_request_async_with_arequest():
     mock_client = MagicMock()
     mock_client.arequest = AsyncMock(return_value={"results": [], "total": 0})
 
-    result = await make_search_request_async(
-        client=mock_client,
-        endpoint="search/persons",
-        params={"q": "async test"}
-    )
+    result = await make_search_request_async(client=mock_client,
+                                             endpoint="search/persons",
+                                             params={"q": "async test"})
 
-    mock_client.arequest.assert_called_once_with(
-        "GET", "search/persons", params={"q": "async test"}
-    )
+    mock_client.arequest.assert_called_once_with("GET",
+                                                 "search/persons",
+                                                 params={"q": "async test"})
     assert result == {"results": [], "total": 0}
 
 
@@ -321,11 +307,9 @@ async def test_make_search_request_async_with_aget():
     mock_client = MagicMock(spec=[])
     mock_client.aget = AsyncMock(return_value={"results": [], "total": 0})
 
-    result = await make_search_request_async(
-        client=mock_client,
-        endpoint="search/locations",
-        params={"q": "Berlin"}
-    )
+    result = await make_search_request_async(client=mock_client,
+                                             endpoint="search/locations",
+                                             params={"q": "Berlin"})
 
     mock_client.aget.assert_called_once()
     assert result == {"results": [], "total": 0}
@@ -340,11 +324,9 @@ async def test_make_search_request_async_with_async_http_client():
     mock_client._async_http_client = MagicMock()
     mock_client._async_http_client.get = AsyncMock(return_value=mock_response)
 
-    result = await make_search_request_async(
-        client=mock_client,
-        endpoint="search/organizations",
-        params={"q": "GmbH"}
-    )
+    result = await make_search_request_async(client=mock_client,
+                                             endpoint="search/organizations",
+                                             params={"q": "GmbH"})
 
     mock_client._async_http_client.get.assert_called_once()
     assert result == {"results": [], "total": 0}
@@ -356,11 +338,9 @@ async def test_make_search_request_async_raises_when_no_method():
     mock_client = MagicMock(spec=[])  # No async methods
 
     with pytest.raises(APIError) as exc_info:
-        await make_search_request_async(
-            client=mock_client,
-            endpoint="search/persons",
-            params={"q": "test"}
-        )
+        await make_search_request_async(client=mock_client,
+                                        endpoint="search/persons",
+                                        params={"q": "test"})
 
     assert "No suitable async method found" in str(exc_info.value)
 
@@ -372,11 +352,9 @@ async def test_make_search_request_async_raises_on_io_error():
     mock_client.arequest = AsyncMock(side_effect=IOError("Network error"))
 
     with pytest.raises(APIError) as exc_info:
-        await make_search_request_async(
-            client=mock_client,
-            endpoint="search/persons",
-            params={"q": "test"}
-        )
+        await make_search_request_async(client=mock_client,
+                                        endpoint="search/persons",
+                                        params={"q": "test"})
 
     assert "Async search failed" in str(exc_info.value)
 
@@ -389,33 +367,35 @@ class TestSearchUtilsIntegration(unittest.TestCase):
         mock_client = MagicMock()
         mock_client.request.return_value = {
             "results": [
-                {"entity": {"fb_entity_id": "person_1"}},
-                {"entity": {"fb_entity_id": "person_2"}},
+                {
+                    "entity": {
+                        "fb_entity_id": "person_1"
+                    }
+                },
+                {
+                    "entity": {
+                        "fb_entity_id": "person_2"
+                    }
+                },
             ],
             "total": 2
         }
 
         # Prepare params
-        params, query_dict = prepare_search_params(
-            param_class=TestSearchParams,
-            q="John",
-            limit=10
-        )
+        params, query_dict = prepare_search_params(param_class=TestSearchParams,
+                                                   q="John",
+                                                   limit=10)
 
         # Make request
-        response = make_search_request(
-            client=mock_client,
-            endpoint="search/persons",
-            params=query_dict
-        )
+        response = make_search_request(client=mock_client,
+                                       endpoint="search/persons",
+                                       params=query_dict)
 
         # Process results
-        result = process_search_results(
-            response_data=response,
-            entity_class=Person,
-            client=mock_client,
-            params=params
-        )
+        result = process_search_results(response_data=response,
+                                        entity_class=Person,
+                                        client=mock_client,
+                                        params=params)
 
         self.assertEqual(len(result), 2)
         self.assertEqual(result.total, 2)

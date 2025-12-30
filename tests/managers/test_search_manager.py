@@ -265,7 +265,10 @@ async def test_asearch_persons():
     manager = SearchManager(mock_client)
 
     mock_result = MagicMock()
-    with patch.object(PersonSearch, 'asearch', new_callable=AsyncMock, return_value=mock_result):
+    with patch.object(PersonSearch,
+                      'asearch',
+                      new_callable=AsyncMock,
+                      return_value=mock_result):
         result = await manager.asearch_persons(query="John")
 
         assert result == mock_result
@@ -279,7 +282,10 @@ async def test_asearch_persons_caches_search_instance():
 
     assert manager._async_person_search is None
 
-    with patch.object(PersonSearch, 'asearch', new_callable=AsyncMock, return_value=MagicMock()):
+    with patch.object(PersonSearch,
+                      'asearch',
+                      new_callable=AsyncMock,
+                      return_value=MagicMock()):
         await manager.asearch_persons(query="Test")
 
         assert manager._async_person_search is not None
@@ -292,7 +298,10 @@ async def test_asearch_organizations():
     manager = SearchManager(mock_client)
 
     mock_result = MagicMock()
-    with patch.object(OrganizationSearch, 'asearch', new_callable=AsyncMock, return_value=mock_result):
+    with patch.object(OrganizationSearch,
+                      'asearch',
+                      new_callable=AsyncMock,
+                      return_value=mock_result):
         result = await manager.asearch_organizations(query="Acme")
 
         assert result == mock_result
@@ -305,7 +314,10 @@ async def test_asearch_locations():
     manager = SearchManager(mock_client)
 
     mock_result = MagicMock()
-    with patch.object(LocationSearch, 'asearch', new_callable=AsyncMock, return_value=mock_result):
+    with patch.object(LocationSearch,
+                      'asearch',
+                      new_callable=AsyncMock,
+                      return_value=mock_result):
         result = await manager.asearch_locations(query="New York")
 
         assert result == mock_result
@@ -318,7 +330,10 @@ async def test_asearch_relations():
     manager = SearchManager(mock_client)
 
     mock_result = MagicMock()
-    with patch.object(RelationSearch, 'asearch', new_callable=AsyncMock, return_value=mock_result):
+    with patch.object(RelationSearch,
+                      'asearch',
+                      new_callable=AsyncMock,
+                      return_value=mock_result):
         result = await manager.asearch_relations(query="director")
 
         assert result == mock_result
@@ -331,7 +346,10 @@ async def test_asearch_data():
     manager = SearchManager(mock_client)
 
     mock_result = MagicMock()
-    with patch.object(DataSearch, 'asearch', new_callable=AsyncMock, return_value=mock_result):
+    with patch.object(DataSearch,
+                      'asearch',
+                      new_callable=AsyncMock,
+                      return_value=mock_result):
         result = await manager.asearch_data(query="dataset")
 
         assert result == mock_result
@@ -344,7 +362,10 @@ async def test_asearch_fusion():
     manager = SearchManager(mock_client)
 
     mock_result = MagicMock()
-    with patch.object(FusionSearch, 'asearch', new_callable=AsyncMock, return_value=mock_result):
+    with patch.object(FusionSearch,
+                      'asearch',
+                      new_callable=AsyncMock,
+                      return_value=mock_result):
         result = await manager.asearch_fusion(query="everything")
 
         assert result == mock_result
@@ -356,10 +377,16 @@ async def test_async_methods_cache_independently():
     mock_client = MagicMock()
     manager = SearchManager(mock_client)
 
-    with patch.object(PersonSearch, 'asearch', new_callable=AsyncMock, return_value=MagicMock()):
+    with patch.object(PersonSearch,
+                      'asearch',
+                      new_callable=AsyncMock,
+                      return_value=MagicMock()):
         await manager.asearch_persons(query="Test")
 
-    with patch.object(OrganizationSearch, 'asearch', new_callable=AsyncMock, return_value=MagicMock()):
+    with patch.object(OrganizationSearch,
+                      'asearch',
+                      new_callable=AsyncMock,
+                      return_value=MagicMock()):
         await manager.asearch_organizations(query="Test")
 
     # Both should be cached independently

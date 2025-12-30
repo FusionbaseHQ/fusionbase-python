@@ -92,7 +92,10 @@ class FusionSearch(BaseSearch):
 
         return result
 
-    async def asearch(self, q: str, params=None, **kwargs) -> FusionSearchResult:
+    async def asearch(self,
+                      q: str,
+                      params=None,
+                      **kwargs) -> FusionSearchResult:
         """Asynchronously search across all entity types.
 
         Args:

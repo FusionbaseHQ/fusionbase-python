@@ -178,7 +178,6 @@ class Relation(Entity):
     # to suppress pydantic < 2.10 warnings
     model_config = ConfigDict(protected_namespaces=())
 
-
     @model_validator(mode='before')
     @classmethod
     def process_entity_types(cls, data):

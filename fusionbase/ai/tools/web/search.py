@@ -10,23 +10,28 @@ try:
     from langchain_core.tools import InjectedToolArg
     from langchain_core.tools import tool
 except ImportError:
-    raise ImportError(
-        "Could not import langchain package. "
-        "Please install the required dependencies: "
-        "pip install fusionbase[ai] "
-        "or "
-        "pip install langchain>=0.3.0 langchain-core>=0.3.0"
-    )
+    raise ImportError("Could not import langchain package. "
+                      "Please install the required dependencies: "
+                      "pip install fusionbase[ai] "
+                      "or "
+                      "pip install langchain>=0.3.0 langchain-core>=0.3.0")
 
 
 @tool
 def google_search(
     query: Annotated[str, "The search query to execute on Google"],
-    hl: Annotated[Optional[str], "The language parameter for the UI (e.g., 'en', 'de', 'fr')"] = None,
-    gl: Annotated[Optional[str], "The country parameter to limit results (e.g., 'us', 'de', 'uk')"] = None,
-    page: Annotated[Optional[int], "Page number for pagination (1 for first page, 2 for second, etc.). Default is 1"] = 1,
+    hl: Annotated[
+        Optional[str],
+        "The language parameter for the UI (e.g., 'en', 'de', 'fr')"] = None,
+    gl: Annotated[
+        Optional[str],
+        "The country parameter to limit results (e.g., 'us', 'de', 'uk')"] = None,
+    page: Annotated[
+        Optional[int],
+        "Page number for pagination (1 for first page, 2 for second, etc.). Default is 1"] = 1,
     api_key: Annotated[str, InjectedToolArg] = None,
-    verify_ssl: Annotated[Optional[bool], "Whether to verify SSL certificates"] = True,
+    verify_ssl: Annotated[Optional[bool],
+                          "Whether to verify SSL certificates"] = True,
 ) -> Dict[str, Any]:
     """Search Google and get relevant search results with pagination support.
 
@@ -50,16 +55,14 @@ def google_search(
 
     if not api_key:
         return {
-            "error": "SERP API key is required. Please provide it via api_key parameter or set the SERP_API_KEY environment variable."
+            "error":
+                "SERP API key is required. Please provide it via api_key parameter or set the SERP_API_KEY environment variable."
         }
 
     base_url = "https://api.valueserp.com/search"
 
     # Build parameters for the API request
-    params = {
-        "api_key": api_key,
-        "q": query
-    }
+    params = {"api_key": api_key, "q": query}
 
     if hl:
         params["hl"] = hl
@@ -86,26 +89,20 @@ def google_search(
             "details": e.response.text
         }
     except httpx.RequestError as e:
-        return {
-            "error": f"Request failed: {str(e)}"
-        }
+        return {"error": f"Request failed: {str(e)}"}
     except Exception as e:
-        return {
-            "error": f"Unexpected error: {str(e)}"
-        }
+        return {"error": f"Unexpected error: {str(e)}"}
 
     # Check if request was successful based on request_info
-    if 'request_info' in data and not data['request_info'].get('success', False):
+    if 'request_info' in data and not data['request_info'].get(
+            'success', False):
         return {
             "error": "API request unsuccessful",
             "details": data.get('request_info', {})
         }
 
     # Process and format the results
-    results = {
-        "query": query,
-        "page": page
-    }
+    results = {"query": query, "page": page}
 
     # Include knowledge graph and organic results directly as they come from the API
     if 'knowledge_graph' in data:
@@ -120,11 +117,18 @@ def google_search(
 @tool
 async def async_google_search(
     query: Annotated[str, "The search query to execute on Google"],
-    hl: Annotated[Optional[str], "The language parameter for the UI (e.g., 'en', 'de', 'fr')"] = None,
-    gl: Annotated[Optional[str], "The country parameter to limit results (e.g., 'us', 'de', 'uk')"] = None,
-    page: Annotated[Optional[int], "Page number for pagination (1 for first page, 2 for second, etc.). Default is 1"] = 1,
+    hl: Annotated[
+        Optional[str],
+        "The language parameter for the UI (e.g., 'en', 'de', 'fr')"] = None,
+    gl: Annotated[
+        Optional[str],
+        "The country parameter to limit results (e.g., 'us', 'de', 'uk')"] = None,
+    page: Annotated[
+        Optional[int],
+        "Page number for pagination (1 for first page, 2 for second, etc.). Default is 1"] = 1,
     api_key: Annotated[str, InjectedToolArg] = None,
-    verify_ssl: Annotated[Optional[bool], "Whether to verify SSL certificates"] = True,
+    verify_ssl: Annotated[Optional[bool],
+                          "Whether to verify SSL certificates"] = True,
 ) -> Dict[str, Any]:
     """Search Google asynchronously and get relevant search results with pagination support.
 
@@ -148,16 +152,14 @@ async def async_google_search(
 
     if not api_key:
         return {
-            "error": "SERP API key is required. Please provide it via api_key parameter or set the SERP_API_KEY environment variable."
+            "error":
+                "SERP API key is required. Please provide it via api_key parameter or set the SERP_API_KEY environment variable."
         }
 
     base_url = "https://api.valueserp.com/search"
 
     # Build parameters for the API request
-    params = {
-        "api_key": api_key,
-        "q": query
-    }
+    params = {"api_key": api_key, "q": query}
 
     if hl:
         params["hl"] = hl
@@ -184,26 +186,20 @@ async def async_google_search(
             "details": e.response.text
         }
     except httpx.RequestError as e:
-        return {
-            "error": f"Request failed: {str(e)}"
-        }
+        return {"error": f"Request failed: {str(e)}"}
     except Exception as e:
-        return {
-            "error": f"Unexpected error: {str(e)}"
-        }
+        return {"error": f"Unexpected error: {str(e)}"}
 
     # Check if request was successful based on request_info
-    if 'request_info' in data and not data['request_info'].get('success', False):
+    if 'request_info' in data and not data['request_info'].get(
+            'success', False):
         return {
             "error": "API request unsuccessful",
             "details": data.get('request_info', {})
         }
 
     # Process and format the results
-    results = {
-        "query": query,
-        "page": page
-    }
+    results = {"query": query, "page": page}
 
     # Include knowledge graph and organic results directly as they come from the API
     if 'knowledge_graph' in data:

@@ -197,8 +197,7 @@ class BaseEntityManager(Generic[T]):
         with ThreadPoolExecutor(max_workers=actual_workers) as executor:
             # Submit all fetch tasks
             futures = {
-                executor.submit(fetch_entity, eid): eid
-                for eid in unique_ids
+                executor.submit(fetch_entity, eid): eid for eid in unique_ids
             }
 
             # Collect results as they complete

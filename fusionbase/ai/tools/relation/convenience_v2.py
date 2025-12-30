@@ -16,11 +16,9 @@ try:
     from langchain_core.tools import InjectedToolArg
     from langchain_core.tools import tool
 except ImportError as exc:
-    raise ImportError(
-        "Could not import langchain package. "
-        "Please install the required dependencies: "
-        "pip install fusionbase[ai]"
-    ) from exc
+    raise ImportError("Could not import langchain package. "
+                      "Please install the required dependencies: "
+                      "pip install fusionbase[ai]") from exc
 
 from fusionbase import Fusionbase
 
@@ -54,14 +52,15 @@ def clear_placeholder_store() -> None:
 
 @tool
 def financial_kpi(
-    fb_entity_id: Annotated[str, "The Fusionbase entity ID of the organization"],
-    return_mode: Annotated[
+        fb_entity_id: Annotated[str,
+                                "The Fusionbase entity ID of the organization"],
+        return_mode:
+    Annotated[
         Literal["full", "placeholder"],
         "How to return data: 'full' for complete data when you need to analyze/interpret it, "
-        "'placeholder' for efficient pass-through when you just need to fetch and include the data"
-    ] = "full",
-    client: Annotated[Fusionbase, InjectedToolArg] = None
-) -> Dict[str, Any]:
+        "'placeholder' for efficient pass-through when you just need to fetch and include the data"] = "full",
+        client: Annotated[Fusionbase,
+                          InjectedToolArg] = None) -> Dict[str, Any]:
     """Get financial KPIs for an organization.
 
     This tool provides an extensive overview of key financial metrics including:
@@ -83,7 +82,8 @@ def financial_kpi(
 
         if return_mode == "placeholder":
             # Create placeholder and store data
-            placeholder_id = _create_placeholder_id("financial_kpi", fb_entity_id)
+            placeholder_id = _create_placeholder_id("financial_kpi",
+                                                    fb_entity_id)
             full_data = {
                 "relation_id": "5601746763",
                 "entity_id": fb_entity_id,
@@ -114,14 +114,15 @@ def financial_kpi(
 
 @tool
 def balance_sheet_accounts(
-    fb_entity_id: Annotated[str, "The Fusionbase entity ID of the organization"],
-    return_mode: Annotated[
+        fb_entity_id: Annotated[str,
+                                "The Fusionbase entity ID of the organization"],
+        return_mode:
+    Annotated[
         Literal["full", "placeholder"],
         "How to return data: 'full' for complete data when you need to analyze/interpret it, "
-        "'placeholder' for efficient pass-through when you just need to fetch and include the data"
-    ] = "full",
-    client: Annotated[Fusionbase, InjectedToolArg] = None
-) -> Dict[str, Any]:
+        "'placeholder' for efficient pass-through when you just need to fetch and include the data"] = "full",
+        client: Annotated[Fusionbase,
+                          InjectedToolArg] = None) -> Dict[str, Any]:
     """Get balance sheet accounts for an organization.
 
     The balance sheet provides a snapshot of the company's financial position including:
@@ -142,7 +143,8 @@ def balance_sheet_accounts(
 
         if return_mode == "placeholder":
             # Create placeholder and store data
-            placeholder_id = _create_placeholder_id("balance_sheet", fb_entity_id)
+            placeholder_id = _create_placeholder_id("balance_sheet",
+                                                    fb_entity_id)
             full_data = {
                 "relation_id": "3867665248",
                 "entity_id": fb_entity_id,
@@ -173,14 +175,15 @@ def balance_sheet_accounts(
 
 @tool
 def profit_and_loss_account(
-    fb_entity_id: Annotated[str, "The Fusionbase entity ID of the organization"],
-    return_mode: Annotated[
+        fb_entity_id: Annotated[str,
+                                "The Fusionbase entity ID of the organization"],
+        return_mode:
+    Annotated[
         Literal["full", "placeholder"],
         "How to return data: 'full' for complete data when you need to analyze/interpret it, "
-        "'placeholder' for efficient pass-through when you just need to fetch and include the data"
-    ] = "full",
-    client: Annotated[Fusionbase, InjectedToolArg] = None
-) -> Dict[str, Any]:
+        "'placeholder' for efficient pass-through when you just need to fetch and include the data"] = "full",
+        client: Annotated[Fusionbase,
+                          InjectedToolArg] = None) -> Dict[str, Any]:
     """Get profit and loss statement for an organization.
 
     The P&L statement shows the company's revenues, costs, and expenses during a period:
@@ -214,10 +217,14 @@ def profit_and_loss_account(
             # Return summary with placeholder
             record_count = len(result) if isinstance(result, list) else 1
             return {
-                "placeholder": f"<{placeholder_id}>",
-                "summary": f"P&L statement retrieved: {record_count} line items",
-                "entity_id": fb_entity_id,
-                "relation_name": relation.relation_name
+                "placeholder":
+                    f"<{placeholder_id}>",
+                "summary":
+                    f"P&L statement retrieved: {record_count} line items",
+                "entity_id":
+                    fb_entity_id,
+                "relation_name":
+                    relation.relation_name
             }
         else:
             # Return full data for analysis
@@ -233,14 +240,15 @@ def profit_and_loss_account(
 
 @tool
 def annual_financial_statements(
-    fb_entity_id: Annotated[str, "The Fusionbase entity ID of the organization"],
-    return_mode: Annotated[
+        fb_entity_id: Annotated[str,
+                                "The Fusionbase entity ID of the organization"],
+        return_mode:
+    Annotated[
         Literal["full", "placeholder"],
         "How to return data: 'full' for complete data when you need to analyze/interpret it, "
-        "'placeholder' for efficient pass-through when you just need to fetch and include the data"
-    ] = "full",
-    client: Annotated[Fusionbase, InjectedToolArg] = None
-) -> Dict[str, Any]:
+        "'placeholder' for efficient pass-through when you just need to fetch and include the data"] = "full",
+        client: Annotated[Fusionbase,
+                          InjectedToolArg] = None) -> Dict[str, Any]:
     """Get annual financial statements/reports for an organization.
 
     Comprehensive annual reports including:
@@ -262,7 +270,8 @@ def annual_financial_statements(
 
         if return_mode == "placeholder":
             # Create placeholder and store data
-            placeholder_id = _create_placeholder_id("annual_statements", fb_entity_id)
+            placeholder_id = _create_placeholder_id("annual_statements",
+                                                    fb_entity_id)
             full_data = {
                 "relation_id": "890549372",
                 "entity_id": fb_entity_id,
@@ -274,10 +283,14 @@ def annual_financial_statements(
             # Return summary with placeholder
             record_count = len(result) if isinstance(result, list) else 1
             return {
-                "placeholder": f"<{placeholder_id}>",
-                "summary": f"Annual statements retrieved: {record_count} documents",
-                "entity_id": fb_entity_id,
-                "relation_name": relation.relation_name
+                "placeholder":
+                    f"<{placeholder_id}>",
+                "summary":
+                    f"Annual statements retrieved: {record_count} documents",
+                "entity_id":
+                    fb_entity_id,
+                "relation_name":
+                    relation.relation_name
             }
         else:
             # Return full data for analysis
@@ -293,10 +306,7 @@ def annual_financial_statements(
 
 # Export the placeholder retrieval function for the agent to use
 __all__ = [
-    'financial_kpi',
-    'balance_sheet_accounts',
-    'profit_and_loss_account',
-    'annual_financial_statements',
-    'get_placeholder_data',
+    'financial_kpi', 'balance_sheet_accounts', 'profit_and_loss_account',
+    'annual_financial_statements', 'get_placeholder_data',
     'clear_placeholder_store'
 ]

@@ -22,21 +22,17 @@ class TestRetryConfig(unittest.TestCase):
         self.assertEqual(config.min_wait_seconds, 1.0)
         self.assertEqual(config.max_wait_seconds, 60.0)
         self.assertEqual(config.retry_statuses, [429, 500, 502, 503, 504])
-        self.assertEqual(
-            config.retry_exceptions,
-            ["ConnectionError", "TimeoutError", "ReadTimeout"]
-        )
+        self.assertEqual(config.retry_exceptions,
+                         ["ConnectionError", "TimeoutError", "ReadTimeout"])
 
     def test_retry_config_custom_values(self):
         """Test RetryConfig with custom values."""
-        config = RetryConfig(
-            enabled=False,
-            max_attempts=3,
-            min_wait_seconds=0.5,
-            max_wait_seconds=30.0,
-            retry_statuses=[500, 503],
-            retry_exceptions=["TimeoutError"]
-        )
+        config = RetryConfig(enabled=False,
+                             max_attempts=3,
+                             min_wait_seconds=0.5,
+                             max_wait_seconds=30.0,
+                             retry_statuses=[500, 503],
+                             retry_exceptions=["TimeoutError"])
 
         self.assertFalse(config.enabled)
         self.assertEqual(config.max_attempts, 3)
@@ -47,11 +43,7 @@ class TestRetryConfig(unittest.TestCase):
 
     def test_retry_config_model_validation(self):
         """Test RetryConfig creation from dict."""
-        data = {
-            "enabled": True,
-            "max_attempts": 10,
-            "min_wait_seconds": 2.0
-        }
+        data = {"enabled": True, "max_attempts": 10, "min_wait_seconds": 2.0}
         config = RetryConfig.model_validate(data)
 
         self.assertTrue(config.enabled)
@@ -172,8 +164,7 @@ class TestFusionbaseConfig(unittest.TestCase):
     def test_fusionbase_config_nested_cache_config(self):
         """Test FusionbaseConfig with nested cache config."""
         config = FusionbaseConfig(
-            cache=CacheConfig(enabled=False, ttl_seconds=1800)
-        )
+            cache=CacheConfig(enabled=False, ttl_seconds=1800))
 
         self.assertFalse(config.cache.enabled)
         self.assertEqual(config.cache.ttl_seconds, 1800)
@@ -181,19 +172,19 @@ class TestFusionbaseConfig(unittest.TestCase):
     def test_fusionbase_config_nested_retry_config(self):
         """Test FusionbaseConfig with nested retry config."""
         config = FusionbaseConfig(
-            retry=RetryConfig(enabled=False, max_attempts=3)
-        )
+            retry=RetryConfig(enabled=False, max_attempts=3))
 
         self.assertFalse(config.retry.enabled)
         self.assertEqual(config.retry.max_attempts, 3)
 
     def test_fusionbase_config_from_dict(self):
         """Test FusionbaseConfig with dict values for nested configs."""
-        config = FusionbaseConfig(
-            timeout=30.0,
-            cache={"enabled": False, "ttl_seconds": 600},
-            retry={"max_attempts": 2}
-        )
+        config = FusionbaseConfig(timeout=30.0,
+                                  cache={
+                                      "enabled": False,
+                                      "ttl_seconds": 600
+                                  },
+                                  retry={"max_attempts": 2})
 
         self.assertEqual(config.timeout, 30.0)
         self.assertFalse(config.cache.enabled)
@@ -257,8 +248,7 @@ class TestFusionbaseConfigUpdate(unittest.TestCase):
     def test_update_partial_nested_config(self):
         """Test that partial nested update preserves other values."""
         config = FusionbaseConfig(
-            cache=CacheConfig(enabled=True, ttl_seconds=3600)
-        )
+            cache=CacheConfig(enabled=True, ttl_seconds=3600))
 
         # Update only enabled, ttl_seconds should remain
         config.update(cache={"enabled": False})
@@ -272,28 +262,21 @@ class TestConfigIntegration(unittest.TestCase):
 
     def test_full_config_creation(self):
         """Test creating a fully customized config."""
-        config = FusionbaseConfig(
-            timeout=30.0,
-            async_mode=True,
-            max_connections=5,
-            cache=CacheConfig(
-                enabled=True,
-                ttl_seconds=1800,
-                size_limit=100_000_000
-            ),
-            retry=RetryConfig(
-                enabled=True,
-                max_attempts=3,
-                min_wait_seconds=0.5,
-                max_wait_seconds=10.0
-            ),
-            logging=LoggingConfig(
-                level="INFO",
-                log_requests=True,
-                log_responses=True,
-                hide_sensitive_data=True
-            )
-        )
+        config = FusionbaseConfig(timeout=30.0,
+                                  async_mode=True,
+                                  max_connections=5,
+                                  cache=CacheConfig(enabled=True,
+                                                    ttl_seconds=1800,
+                                                    size_limit=100_000_000),
+                                  retry=RetryConfig(enabled=True,
+                                                    max_attempts=3,
+                                                    min_wait_seconds=0.5,
+                                                    max_wait_seconds=10.0),
+                                  logging=LoggingConfig(
+                                      level="INFO",
+                                      log_requests=True,
+                                      log_responses=True,
+                                      hide_sensitive_data=True))
 
         # Verify all settings
         self.assertEqual(config.timeout, 30.0)

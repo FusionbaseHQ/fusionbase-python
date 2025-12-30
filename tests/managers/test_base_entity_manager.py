@@ -48,7 +48,8 @@ class TestBaseEntityManagerGet(unittest.TestCase):
         manager = BaseEntityManager(mock_client, Person)
 
         mock_person = MagicMock(spec=Person)
-        with patch.object(Person, '_from_id', return_value=mock_person) as mock_from_id:
+        with patch.object(Person, '_from_id',
+                          return_value=mock_person) as mock_from_id:
             result = manager.get("person_123")
 
             mock_from_id.assert_called_once_with(mock_client, "person_123")
@@ -59,7 +60,10 @@ class TestBaseEntityManagerGet(unittest.TestCase):
         mock_client = MagicMock()
         manager = BaseEntityManager(mock_client, Person)
 
-        with patch.object(Person, '_from_id', side_effect=ResourceNotFoundError("person", "missing")):
+        with patch.object(Person,
+                          '_from_id',
+                          side_effect=ResourceNotFoundError(
+                              "person", "missing")):
             with self.assertRaises(ResourceNotFoundError):
                 manager.get("missing")
 
@@ -68,7 +72,9 @@ class TestBaseEntityManagerGet(unittest.TestCase):
         mock_client = MagicMock()
         manager = BaseEntityManager(mock_client, Person)
 
-        with patch.object(Person, '_from_id', side_effect=APIError("API failed")):
+        with patch.object(Person,
+                          '_from_id',
+                          side_effect=APIError("API failed")):
             with self.assertRaises(APIError):
                 manager.get("test_id")
 
@@ -110,10 +116,14 @@ async def test_aget_with_afrom_id_method():
 
     mock_person = MagicMock(spec=Person)
 
-    with patch.object(Person, '_afrom_id', new_callable=AsyncMock, return_value=mock_person):
+    with patch.object(Person,
+                      '_afrom_id',
+                      new_callable=AsyncMock,
+                      return_value=mock_person):
         result = await manager.aget("async_person_123")
 
-        Person._afrom_id.assert_called_once_with(mock_client, "async_person_123")
+        Person._afrom_id.assert_called_once_with(mock_client,
+                                                 "async_person_123")
         assert result == mock_person
 
 
@@ -124,6 +134,7 @@ async def test_aget_falls_back_to_sync():
 
     # Create a mock entity class without _afrom_id
     class MockEntity:
+
         @classmethod
         def _from_id(cls, client, entity_id):
             return MagicMock(fb_entity_id=entity_id)
@@ -143,7 +154,10 @@ async def test_afrom_id_is_alias_for_aget():
 
     mock_person = MagicMock(spec=Person)
 
-    with patch.object(Person, '_afrom_id', new_callable=AsyncMock, return_value=mock_person):
+    with patch.object(Person,
+                      '_afrom_id',
+                      new_callable=AsyncMock,
+                      return_value=mock_person):
         result = await manager.afrom_id("async_456")
 
         assert result == mock_person
@@ -155,7 +169,9 @@ async def test_aget_propagates_resource_not_found_error():
     mock_client = MagicMock()
     manager = BaseEntityManager(mock_client, Person)
 
-    with patch.object(Person, '_afrom_id', new_callable=AsyncMock,
+    with patch.object(Person,
+                      '_afrom_id',
+                      new_callable=AsyncMock,
                       side_effect=ResourceNotFoundError("person", "missing")):
         with pytest.raises(ResourceNotFoundError):
             await manager.aget("missing")
@@ -218,7 +234,8 @@ class TestBaseEntityManagerMakeRequest(unittest.TestCase):
     def test_make_request_re_raises_resource_not_found_error(self):
         """Test _make_request re-raises ResourceNotFoundError."""
         mock_client = MagicMock()
-        mock_client._http_client.request.side_effect = ResourceNotFoundError("entity", "id")
+        mock_client._http_client.request.side_effect = ResourceNotFoundError(
+            "entity", "id")
 
         manager = BaseEntityManager(mock_client, Person)
 
@@ -228,7 +245,8 @@ class TestBaseEntityManagerMakeRequest(unittest.TestCase):
     def test_make_request_wraps_generic_exception(self):
         """Test _make_request wraps generic exceptions in APIError."""
         mock_client = MagicMock()
-        mock_client._http_client.request.side_effect = Exception("Network error")
+        mock_client._http_client.request.side_effect = Exception(
+            "Network error")
 
         manager = BaseEntityManager(mock_client, Person)
 
@@ -261,8 +279,10 @@ class TestBaseEntityManagerGenericType(unittest.TestCase):
         mock_client = MagicMock()
 
         # Create managers with specific types
-        person_manager: BaseEntityManager[Person] = BaseEntityManager(mock_client, Person)
-        org_manager: BaseEntityManager[Organization] = BaseEntityManager(mock_client, Organization)
+        person_manager: BaseEntityManager[Person] = BaseEntityManager(
+            mock_client, Person)
+        org_manager: BaseEntityManager[Organization] = BaseEntityManager(
+            mock_client, Organization)
 
         # Type hints should work correctly
         self.assertEqual(person_manager.entity_class, Person)

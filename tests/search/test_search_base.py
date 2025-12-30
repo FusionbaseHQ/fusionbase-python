@@ -40,6 +40,7 @@ class TestSearchParams(unittest.TestCase):
 
     def test_search_params_subclass(self):
         """Test creating SearchParams subclass."""
+
         class CustomSearchParams(SearchParams):
             q: str = ""
             limit: int = 10
@@ -53,6 +54,7 @@ class TestSearchParams(unittest.TestCase):
 
     def test_search_params_subclass_model_dump(self):
         """Test subclass serialization includes all fields."""
+
         class CustomSearchParams(SearchParams):
             q: str = ""
             custom_field: str = "default"
@@ -69,12 +71,7 @@ class TestSearchResult(unittest.TestCase):
 
     def test_search_result_creation(self):
         """Test creating SearchResult instance."""
-        result = SearchResult(
-            items=["a", "b", "c"],
-            total=3,
-            limit=10,
-            skip=0
-        )
+        result = SearchResult(items=["a", "b", "c"], total=3, limit=10, skip=0)
 
         self.assertEqual(len(result.items), 3)
         self.assertEqual(result.total, 3)
@@ -84,24 +81,17 @@ class TestSearchResult(unittest.TestCase):
     def test_search_result_with_params(self):
         """Test SearchResult with params."""
         params = SearchParams()
-        result = SearchResult(
-            items=[],
-            total=0,
-            limit=10,
-            skip=0,
-            params=params
-        )
+        result = SearchResult(items=[],
+                              total=0,
+                              limit=10,
+                              skip=0,
+                              params=params)
 
         self.assertEqual(result.params, params)
 
     def test_search_result_len(self):
         """Test SearchResult __len__ method."""
-        result = SearchResult(
-            items=[1, 2, 3, 4, 5],
-            total=100,
-            limit=5,
-            skip=0
-        )
+        result = SearchResult(items=[1, 2, 3, 4, 5], total=100, limit=5, skip=0)
 
         self.assertEqual(len(result), 5)
         # len returns items count, not total
@@ -110,12 +100,7 @@ class TestSearchResult(unittest.TestCase):
     def test_search_result_getitem(self):
         """Test SearchResult __getitem__ method."""
         items = ["first", "second", "third"]
-        result = SearchResult(
-            items=items,
-            total=3,
-            limit=10,
-            skip=0
-        )
+        result = SearchResult(items=items, total=3, limit=10, skip=0)
 
         self.assertEqual(result[0], "first")
         self.assertEqual(result[1], "second")
@@ -124,12 +109,7 @@ class TestSearchResult(unittest.TestCase):
     def test_search_result_getitem_negative_index(self):
         """Test SearchResult with negative index."""
         items = ["a", "b", "c"]
-        result = SearchResult(
-            items=items,
-            total=3,
-            limit=10,
-            skip=0
-        )
+        result = SearchResult(items=items, total=3, limit=10, skip=0)
 
         self.assertEqual(result[-1], "c")
         self.assertEqual(result[-2], "b")
@@ -137,12 +117,7 @@ class TestSearchResult(unittest.TestCase):
     def test_search_result_getitem_slice(self):
         """Test SearchResult with slice."""
         items = [1, 2, 3, 4, 5]
-        result = SearchResult(
-            items=items,
-            total=5,
-            limit=10,
-            skip=0
-        )
+        result = SearchResult(items=items, total=5, limit=10, skip=0)
 
         self.assertEqual(result[1:3], [2, 3])
         self.assertEqual(result[:2], [1, 2])
@@ -151,12 +126,7 @@ class TestSearchResult(unittest.TestCase):
     def test_search_result_iter(self):
         """Test SearchResult __iter__ method."""
         items = ["x", "y", "z"]
-        result = SearchResult(
-            items=items,
-            total=3,
-            limit=10,
-            skip=0
-        )
+        result = SearchResult(items=items, total=3, limit=10, skip=0)
 
         collected = list(result)
 
@@ -165,12 +135,7 @@ class TestSearchResult(unittest.TestCase):
     def test_search_result_in_for_loop(self):
         """Test using SearchResult in for loop."""
         items = [10, 20, 30]
-        result = SearchResult(
-            items=items,
-            total=3,
-            limit=10,
-            skip=0
-        )
+        result = SearchResult(items=items, total=3, limit=10, skip=0)
 
         total = 0
         for item in result:
@@ -180,12 +145,7 @@ class TestSearchResult(unittest.TestCase):
 
     def test_search_result_empty(self):
         """Test empty SearchResult."""
-        result = SearchResult(
-            items=[],
-            total=0,
-            limit=10,
-            skip=0
-        )
+        result = SearchResult(items=[], total=0, limit=10, skip=0)
 
         self.assertEqual(len(result), 0)
         self.assertEqual(list(result), [])
@@ -262,12 +222,7 @@ class TestSearchResultGenericType(unittest.TestCase):
             MagicMock(fb_entity_id="2"),
         ]
 
-        result = SearchResult(
-            items=mock_entities,
-            total=2,
-            limit=10,
-            skip=0
-        )
+        result = SearchResult(items=mock_entities, total=2, limit=10, skip=0)
 
         self.assertEqual(result[0].fb_entity_id, "1")
         self.assertEqual(result[1].fb_entity_id, "2")
@@ -282,12 +237,7 @@ class TestSearchResultGenericType(unittest.TestCase):
             LazyReference("id2", Person, mock_client),
         ]
 
-        result = SearchResult(
-            items=refs,
-            total=2,
-            limit=10,
-            skip=0
-        )
+        result = SearchResult(items=refs, total=2, limit=10, skip=0)
 
         self.assertEqual(result[0].entity_id, "id1")
         self.assertEqual(result[1].entity_id, "id2")
@@ -310,8 +260,7 @@ class TestSearchResultUsagePatterns(unittest.TestCase):
             items=["a", "b"],
             total=10,  # 10 total, but only 2 returned
             limit=2,
-            skip=0
-        )
+            skip=0)
 
         has_more = result.total > (result.skip + len(result))
 
@@ -319,12 +268,7 @@ class TestSearchResultUsagePatterns(unittest.TestCase):
 
     def test_calculate_next_skip(self):
         """Test calculating skip for next page."""
-        result = SearchResult(
-            items=list(range(10)),
-            total=50,
-            limit=10,
-            skip=0
-        )
+        result = SearchResult(items=list(range(10)), total=50, limit=10, skip=0)
 
         next_skip = result.skip + len(result)
 
@@ -332,12 +276,7 @@ class TestSearchResultUsagePatterns(unittest.TestCase):
 
     def test_iterate_with_enumerate(self):
         """Test iterating with enumerate."""
-        result = SearchResult(
-            items=["a", "b", "c"],
-            total=3,
-            limit=10,
-            skip=0
-        )
+        result = SearchResult(items=["a", "b", "c"], total=3, limit=10, skip=0)
 
         indexed = list(enumerate(result))
 
@@ -350,12 +289,7 @@ class TestSearchResultUsagePatterns(unittest.TestCase):
             MagicMock(name="Item2"),
             MagicMock(name="Item3"),
         ]
-        result = SearchResult(
-            items=mock_items,
-            total=3,
-            limit=10,
-            skip=0
-        )
+        result = SearchResult(items=mock_items, total=3, limit=10, skip=0)
 
         names = [item.name for item in result]
 

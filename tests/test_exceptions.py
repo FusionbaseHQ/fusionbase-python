@@ -66,10 +66,8 @@ class TestResourceNotFoundError(unittest.TestCase):
 
     def test_resource_not_found_with_type_and_id(self):
         """Test ResourceNotFoundError with resource type and ID."""
-        error = ResourceNotFoundError(
-            resource_type="organization",
-            resource_id="org_123"
-        )
+        error = ResourceNotFoundError(resource_type="organization",
+                                      resource_id="org_123")
 
         self.assertEqual(error.resource_type, "organization")
         self.assertEqual(error.resource_id, "org_123")
@@ -173,45 +171,37 @@ class TestAPIError(unittest.TestCase):
 
     def test_api_error_with_request_id(self):
         """Test APIError with request_id."""
-        error = APIError(
-            "API call failed",
-            status_code=500,
-            request_id="req_abc123"
-        )
+        error = APIError("API call failed",
+                         status_code=500,
+                         request_id="req_abc123")
 
         self.assertEqual(error.request_id, "req_abc123")
 
     def test_api_error_with_operation_id(self):
         """Test APIError with operation_id."""
-        error = APIError(
-            "API call failed",
-            status_code=500,
-            operation_id="op_xyz789"
-        )
+        error = APIError("API call failed",
+                         status_code=500,
+                         operation_id="op_xyz789")
 
         self.assertEqual(error.operation_id, "op_xyz789")
 
     def test_api_error_with_response(self):
         """Test APIError with response object."""
         mock_response = MagicMock()
-        error = APIError(
-            "API call failed",
-            status_code=500,
-            response=mock_response
-        )
+        error = APIError("API call failed",
+                         status_code=500,
+                         response=mock_response)
 
         self.assertEqual(error.response, mock_response)
 
     def test_api_error_all_parameters(self):
         """Test APIError with all parameters."""
         mock_response = MagicMock()
-        error = APIError(
-            "Complete error",
-            status_code=502,
-            request_id="req_123",
-            operation_id="op_456",
-            response=mock_response
-        )
+        error = APIError("Complete error",
+                         status_code=502,
+                         request_id="req_123",
+                         operation_id="op_456",
+                         response=mock_response)
 
         self.assertEqual(error.message, "Complete error")
         self.assertEqual(error.status_code, 502)
@@ -287,7 +277,9 @@ class TestHandleHttpError(unittest.TestCase):
         mock_error = MagicMock()
         mock_error.status_code = 429
         mock_error.response = MagicMock()
-        mock_error.response.json.return_value = {"message": "Rate limit exceeded"}
+        mock_error.response.json.return_value = {
+            "message": "Rate limit exceeded"
+        }
 
         result = handle_http_error(mock_error)
 
@@ -482,8 +474,7 @@ class TestExceptionInheritance(unittest.TestCase):
         for exc in exceptions:
             self.assertIsInstance(
                 exc, FusionbaseError,
-                f"{type(exc).__name__} should inherit from FusionbaseError"
-            )
+                f"{type(exc).__name__} should inherit from FusionbaseError")
 
     def test_exceptions_can_be_caught_by_base(self):
         """Test catching all exceptions by base class."""
@@ -500,4 +491,5 @@ class TestExceptionInheritance(unittest.TestCase):
             except FusionbaseError:
                 pass  # Expected
             except Exception:
-                self.fail(f"{type(exc).__name__} was not caught by FusionbaseError")
+                self.fail(
+                    f"{type(exc).__name__} was not caught by FusionbaseError")

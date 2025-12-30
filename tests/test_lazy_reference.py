@@ -38,39 +38,31 @@ class TestLazyReference(unittest.TestCase):
 
     def test_lazy_reference_creation(self):
         """Test creating a LazyReference."""
-        ref = LazyReference(
-            entity_id=self.entity_id,
-            entity_cls=MockEntity,
-            client=self.mock_client
-        )
+        ref = LazyReference(entity_id=self.entity_id,
+                            entity_cls=MockEntity,
+                            client=self.mock_client)
         self.assertEqual(ref.entity_id, self.entity_id)
         self.assertFalse(ref.is_loaded)
 
     def test_lazy_reference_entity_id_property(self):
         """Test entity_id property returns correct ID."""
-        ref = LazyReference(
-            entity_id="my_id_123",
-            entity_cls=MockEntity,
-            client=self.mock_client
-        )
+        ref = LazyReference(entity_id="my_id_123",
+                            entity_cls=MockEntity,
+                            client=self.mock_client)
         self.assertEqual(ref.entity_id, "my_id_123")
 
     def test_lazy_reference_is_loaded_before_get(self):
         """Test is_loaded is False before calling get()."""
-        ref = LazyReference(
-            entity_id=self.entity_id,
-            entity_cls=MockEntity,
-            client=self.mock_client
-        )
+        ref = LazyReference(entity_id=self.entity_id,
+                            entity_cls=MockEntity,
+                            client=self.mock_client)
         self.assertFalse(ref.is_loaded)
 
     def test_lazy_reference_get_loads_entity(self):
         """Test get() loads and returns the entity."""
-        ref = LazyReference(
-            entity_id=self.entity_id,
-            entity_cls=MockEntity,
-            client=self.mock_client
-        )
+        ref = LazyReference(entity_id=self.entity_id,
+                            entity_cls=MockEntity,
+                            client=self.mock_client)
 
         entity = ref.get()
 
@@ -80,11 +72,9 @@ class TestLazyReference(unittest.TestCase):
 
     def test_lazy_reference_get_caches_entity(self):
         """Test get() caches the entity and doesn't reload."""
-        ref = LazyReference(
-            entity_id=self.entity_id,
-            entity_cls=MockEntity,
-            client=self.mock_client
-        )
+        ref = LazyReference(entity_id=self.entity_id,
+                            entity_cls=MockEntity,
+                            client=self.mock_client)
 
         # First call loads the entity
         entity1 = ref.get()
@@ -100,12 +90,10 @@ class TestLazyReference(unittest.TestCase):
         def custom_loader(client, entity_id):
             return custom_entity
 
-        ref = LazyReference(
-            entity_id=self.entity_id,
-            entity_cls=MockEntity,
-            client=self.mock_client,
-            loader_func=custom_loader
-        )
+        ref = LazyReference(entity_id=self.entity_id,
+                            entity_cls=MockEntity,
+                            client=self.mock_client,
+                            loader_func=custom_loader)
 
         entity = ref.get()
 
@@ -114,11 +102,9 @@ class TestLazyReference(unittest.TestCase):
 
     def test_lazy_reference_getattr_passes_through(self):
         """Test __getattr__ transparently passes to loaded entity."""
-        ref = LazyReference(
-            entity_id=self.entity_id,
-            entity_cls=MockEntity,
-            client=self.mock_client
-        )
+        ref = LazyReference(entity_id=self.entity_id,
+                            entity_cls=MockEntity,
+                            client=self.mock_client)
 
         # Accessing attribute should trigger load and return entity's attribute
         name = ref.name
@@ -128,11 +114,9 @@ class TestLazyReference(unittest.TestCase):
 
     def test_lazy_reference_str_unloaded(self):
         """Test string representation when unloaded."""
-        ref = LazyReference(
-            entity_id=self.entity_id,
-            entity_cls=MockEntity,
-            client=self.mock_client
-        )
+        ref = LazyReference(entity_id=self.entity_id,
+                            entity_cls=MockEntity,
+                            client=self.mock_client)
 
         str_repr = str(ref)
 
@@ -142,11 +126,9 @@ class TestLazyReference(unittest.TestCase):
 
     def test_lazy_reference_str_loaded(self):
         """Test string representation when loaded."""
-        ref = LazyReference(
-            entity_id=self.entity_id,
-            entity_cls=MockEntity,
-            client=self.mock_client
-        )
+        ref = LazyReference(entity_id=self.entity_id,
+                            entity_cls=MockEntity,
+                            client=self.mock_client)
         ref.get()  # Load the entity
 
         str_repr = str(ref)
@@ -155,11 +137,9 @@ class TestLazyReference(unittest.TestCase):
 
     def test_lazy_reference_repr_unloaded(self):
         """Test repr when unloaded."""
-        ref = LazyReference(
-            entity_id=self.entity_id,
-            entity_cls=MockEntity,
-            client=self.mock_client
-        )
+        ref = LazyReference(entity_id=self.entity_id,
+                            entity_cls=MockEntity,
+                            client=self.mock_client)
 
         repr_str = repr(ref)
 
@@ -168,11 +148,9 @@ class TestLazyReference(unittest.TestCase):
 
     def test_lazy_reference_repr_loaded(self):
         """Test repr when loaded."""
-        ref = LazyReference(
-            entity_id=self.entity_id,
-            entity_cls=MockEntity,
-            client=self.mock_client
-        )
+        ref = LazyReference(entity_id=self.entity_id,
+                            entity_cls=MockEntity,
+                            client=self.mock_client)
         ref.get()
 
         repr_str = repr(ref)
@@ -181,15 +159,14 @@ class TestLazyReference(unittest.TestCase):
 
     def test_lazy_reference_load_error_cached(self):
         """Test that load errors are cached and re-raised."""
+
         def failing_loader(client, entity_id):
             raise ValueError("Load failed")
 
-        ref = LazyReference(
-            entity_id=self.entity_id,
-            entity_cls=MockEntity,
-            client=self.mock_client,
-            loader_func=failing_loader
-        )
+        ref = LazyReference(entity_id=self.entity_id,
+                            entity_cls=MockEntity,
+                            client=self.mock_client,
+                            loader_func=failing_loader)
 
         # First call raises the error
         with self.assertRaises(ValueError):
@@ -206,11 +183,9 @@ async def test_lazy_reference_aget():
     mock_client = MagicMock()
     entity_id = "async_test_123"
 
-    ref = LazyReference(
-        entity_id=entity_id,
-        entity_cls=MockEntity,
-        client=mock_client
-    )
+    ref = LazyReference(entity_id=entity_id,
+                        entity_cls=MockEntity,
+                        client=mock_client)
 
     entity = await ref.aget()
 
@@ -225,11 +200,9 @@ async def test_lazy_reference_aget_caches_entity():
     mock_client = MagicMock()
     entity_id = "async_cache_test"
 
-    ref = LazyReference(
-        entity_id=entity_id,
-        entity_cls=MockEntity,
-        client=mock_client
-    )
+    ref = LazyReference(entity_id=entity_id,
+                        entity_cls=MockEntity,
+                        client=mock_client)
 
     entity1 = await ref.aget()
     entity2 = await ref.aget()
@@ -246,12 +219,10 @@ async def test_lazy_reference_custom_async_loader():
     async def custom_async_loader(client, entity_id):
         return custom_entity
 
-    ref = LazyReference(
-        entity_id="any_id",
-        entity_cls=MockEntity,
-        client=mock_client,
-        async_loader_func=custom_async_loader
-    )
+    ref = LazyReference(entity_id="any_id",
+                        entity_cls=MockEntity,
+                        client=mock_client,
+                        async_loader_func=custom_async_loader)
 
     entity = await ref.aget()
 
@@ -267,12 +238,10 @@ async def test_lazy_reference_async_load_error_cached():
     async def failing_async_loader(client, entity_id):
         raise RuntimeError("Async load failed")
 
-    ref = LazyReference(
-        entity_id="error_test",
-        entity_cls=MockEntity,
-        client=mock_client,
-        async_loader_func=failing_async_loader
-    )
+    ref = LazyReference(entity_id="error_test",
+                        entity_cls=MockEntity,
+                        client=mock_client,
+                        async_loader_func=failing_async_loader)
 
     with pytest.raises(RuntimeError, match="Async load failed"):
         await ref.aget()
@@ -289,11 +258,9 @@ class TestLazyReferenceWithRealEntity(unittest.TestCase):
         """Test LazyReference works with real Person entity class."""
         mock_client = MagicMock()
 
-        ref = LazyReference(
-            entity_id="person_123",
-            entity_cls=Person,
-            client=mock_client
-        )
+        ref = LazyReference(entity_id="person_123",
+                            entity_cls=Person,
+                            client=mock_client)
 
         self.assertEqual(ref.entity_id, "person_123")
         self.assertFalse(ref.is_loaded)

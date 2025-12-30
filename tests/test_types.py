@@ -100,8 +100,8 @@ class TestOrganizationStatus(unittest.TestCase):
             "UNKNOWN", "INACTIVE", "ACTIVE", "LIQUIDATED", "DISSOLVED",
             "LIQUIDATION", "RECEIVER_ACTION", "CONVERTED_CLOSED",
             "VOLUNTARY_ARRANGEMENT", "INSOLVENCY_PROCEEDINGS",
-            "IN_ADMINISTRATION", "CLOSED", "OPEN", "REGISTERED",
-            "OPERATIONAL", "CLOSED_TEMPORARILY", "CLOSED_PERMANENTLY"
+            "IN_ADMINISTRATION", "CLOSED", "OPEN", "REGISTERED", "OPERATIONAL",
+            "CLOSED_TEMPORARILY", "CLOSED_PERMANENTLY"
         ]
         actual_values = [s.value for s in OrganizationStatus]
         for expected in expected_statuses:
@@ -119,12 +119,9 @@ class TestOrganizationStatusDetail(unittest.TestCase):
         """Test OrganizationStatusDetail values."""
         self.assertEqual(
             OrganizationStatusDetail.ACTIVE_PROPOSAL_TO_STRIKE_OFF.value,
-            "ACTIVE_PROPOSAL_TO_STRIKE_OFF"
-        )
-        self.assertEqual(
-            OrganizationStatusDetail.CONVERTED_TO_PLC.value,
-            "CONVERTED_TO_PLC"
-        )
+            "ACTIVE_PROPOSAL_TO_STRIKE_OFF")
+        self.assertEqual(OrganizationStatusDetail.CONVERTED_TO_PLC.value,
+                         "CONVERTED_TO_PLC")
 
     def test_organization_status_detail_count(self):
         """Test OrganizationStatusDetail has expected count."""
@@ -136,8 +133,10 @@ class TestLocationSubtype(unittest.TestCase):
 
     def test_location_subtype_values(self):
         """Test LocationSubtype values."""
-        self.assertEqual(LocationSubtype.POINT_OF_INTEREST.value, "POINT_OF_INTEREST")
-        self.assertEqual(LocationSubtype.CITY_POSTAL_CODE.value, "CITY_POSTAL_CODE")
+        self.assertEqual(LocationSubtype.POINT_OF_INTEREST.value,
+                         "POINT_OF_INTEREST")
+        self.assertEqual(LocationSubtype.CITY_POSTAL_CODE.value,
+                         "CITY_POSTAL_CODE")
         self.assertEqual(LocationSubtype.COUNTRY.value, "COUNTRY")
         self.assertEqual(LocationSubtype.ANY.value, "ANY")
 
@@ -252,9 +251,8 @@ class TestNaturalEventCategory(unittest.TestCase):
     def test_natural_event_category_all_disasters(self):
         """Test all natural disaster types exist."""
         disaster_types = [
-            "FLOODING", "EARTHQUAKE", "WILDFIRE", "TORNADO",
-            "HURRICANE", "TSUNAMI", "DROUGHT", "LANDSLIDE",
-            "AVALANCHE", "VOLCANIC_ERUPTION"
+            "FLOODING", "EARTHQUAKE", "WILDFIRE", "TORNADO", "HURRICANE",
+            "TSUNAMI", "DROUGHT", "LANDSLIDE", "AVALANCHE", "VOLCANIC_ERUPTION"
         ]
         actual_values = [c.value for c in NaturalEventCategory]
         for disaster in disaster_types:
@@ -273,7 +271,8 @@ class TestCyberSecurityEventCategory(unittest.TestCase):
         self.assertEqual(CyberSecurityEventCategory.PHISHING.value, "PHISHING")
         self.assertEqual(CyberSecurityEventCategory.MALWARE.value, "MALWARE")
         self.assertEqual(CyberSecurityEventCategory.DDOS.value, "DDOS")
-        self.assertEqual(CyberSecurityEventCategory.RANSOMWARE.value, "RANSOMWARE")
+        self.assertEqual(CyberSecurityEventCategory.RANSOMWARE.value,
+                         "RANSOMWARE")
 
     def test_cyber_security_category_count(self):
         """Test CyberSecurityEventCategory has expected count."""
@@ -285,12 +284,11 @@ class TestConflictEventCategory(unittest.TestCase):
 
     def test_conflict_event_category_values(self):
         """Test ConflictEventCategory values."""
-        self.assertEqual(
-            ConflictEventCategory.POLITICAL_VIOLENCE.value,
-            "POLITICAL_VIOLENCE"
-        )
+        self.assertEqual(ConflictEventCategory.POLITICAL_VIOLENCE.value,
+                         "POLITICAL_VIOLENCE")
         self.assertEqual(ConflictEventCategory.ARMED.value, "ARMED")
-        self.assertEqual(ConflictEventCategory.CIVIL_UNREST.value, "CIVIL_UNREST")
+        self.assertEqual(ConflictEventCategory.CIVIL_UNREST.value,
+                         "CIVIL_UNREST")
         self.assertEqual(ConflictEventCategory.TERRORISM.value, "TERRORISM")
 
     def test_conflict_event_category_count(self):
@@ -372,7 +370,5 @@ class TestEnumInteroperability(unittest.TestCase):
         self.assertEqual(EntityType.ORGANIZATION.value, "organization")
 
         # Name is uppercase, value is lowercase for EntityType
-        self.assertNotEqual(
-            EntityType.ORGANIZATION.name,
-            EntityType.ORGANIZATION.value
-        )
+        self.assertNotEqual(EntityType.ORGANIZATION.name,
+                            EntityType.ORGANIZATION.value)

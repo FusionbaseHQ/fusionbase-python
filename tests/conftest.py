@@ -25,7 +25,8 @@ def get_api_key():
     Checks FUSIONBASE_API_KEY first, then FUSIONBASE_API_KEY_COM as fallback.
     Returns None if neither is set.
     """
-    return os.environ.get("FUSIONBASE_API_KEY_COM") or os.environ.get("FUSIONBASE_API_KEY")
+    return os.environ.get("FUSIONBASE_API_KEY_COM") or os.environ.get(
+        "FUSIONBASE_API_KEY")
 
 
 @pytest.fixture

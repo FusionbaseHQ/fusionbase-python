@@ -7,9 +7,7 @@ try:
     from .search import google_search
 
     __all__ = [
-        "google_search",
-        "async_google_search",
-        "web_content",
+        "google_search", "async_google_search", "web_content",
         "async_web_content"
     ]
 except ImportError:

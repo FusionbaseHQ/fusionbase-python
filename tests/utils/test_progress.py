@@ -70,7 +70,8 @@ class TestCreateChunkIterator(unittest.TestCase):
         """Test iterator yields all chunks when progress is disabled."""
         chunks = [[1, 2], [3, 4], [5, 6]]
 
-        with patch('fusionbase.utils.progress.should_show_progress', return_value=False):
+        with patch('fusionbase.utils.progress.should_show_progress',
+                   return_value=False):
             result = list(create_chunk_iterator(iter(chunks)))
 
             self.assertEqual(result, chunks)
@@ -88,7 +89,8 @@ class TestCreateChunkIterator(unittest.TestCase):
         """Test iterator preserves chunk contents exactly."""
         chunks = [["a", "b"], ["c", "d", "e"]]
 
-        with patch('fusionbase.utils.progress.should_show_progress', return_value=False):
+        with patch('fusionbase.utils.progress.should_show_progress',
+                   return_value=False):
             result = list(create_chunk_iterator(iter(chunks)))
 
             self.assertEqual(result[0], ["a", "b"])
@@ -96,7 +98,8 @@ class TestCreateChunkIterator(unittest.TestCase):
 
     def test_handles_empty_iterable(self):
         """Test iterator handles empty iterable."""
-        with patch('fusionbase.utils.progress.should_show_progress', return_value=False):
+        with patch('fusionbase.utils.progress.should_show_progress',
+                   return_value=False):
             result = list(create_chunk_iterator(iter([])))
 
             self.assertEqual(result, [])
@@ -105,12 +108,12 @@ class TestCreateChunkIterator(unittest.TestCase):
         """Test iterator accepts description parameter."""
         chunks = [[1, 2]]
 
-        with patch('fusionbase.utils.progress.should_show_progress', return_value=False):
+        with patch('fusionbase.utils.progress.should_show_progress',
+                   return_value=False):
             # Should not raise
-            result = list(create_chunk_iterator(
-                iter(chunks),
-                description="Custom description"
-            ))
+            result = list(
+                create_chunk_iterator(iter(chunks),
+                                      description="Custom description"))
 
             self.assertEqual(result, chunks)
 
@@ -118,12 +121,10 @@ class TestCreateChunkIterator(unittest.TestCase):
         """Test iterator accepts total parameter."""
         chunks = [[1, 2], [3, 4]]
 
-        with patch('fusionbase.utils.progress.should_show_progress', return_value=False):
+        with patch('fusionbase.utils.progress.should_show_progress',
+                   return_value=False):
             # Should not raise
-            result = list(create_chunk_iterator(
-                iter(chunks),
-                total=4
-            ))
+            result = list(create_chunk_iterator(iter(chunks), total=4))
 
             self.assertEqual(result, chunks)
 
@@ -135,7 +136,8 @@ class TestCreateItemIterator(unittest.TestCase):
         """Test iterator yields all items when progress is disabled."""
         items = [1, 2, 3, 4, 5]
 
-        with patch('fusionbase.utils.progress.should_show_progress', return_value=False):
+        with patch('fusionbase.utils.progress.should_show_progress',
+                   return_value=False):
             result = list(create_item_iterator(iter(items)))
 
             self.assertEqual(result, items)
@@ -153,7 +155,8 @@ class TestCreateItemIterator(unittest.TestCase):
         """Test iterator preserves item values exactly."""
         items = [{"id": 1}, {"id": 2}]
 
-        with patch('fusionbase.utils.progress.should_show_progress', return_value=False):
+        with patch('fusionbase.utils.progress.should_show_progress',
+                   return_value=False):
             result = list(create_item_iterator(iter(items)))
 
             self.assertEqual(result[0]["id"], 1)
@@ -161,7 +164,8 @@ class TestCreateItemIterator(unittest.TestCase):
 
     def test_handles_empty_iterable(self):
         """Test iterator handles empty iterable."""
-        with patch('fusionbase.utils.progress.should_show_progress', return_value=False):
+        with patch('fusionbase.utils.progress.should_show_progress',
+                   return_value=False):
             result = list(create_item_iterator(iter([])))
 
             self.assertEqual(result, [])
@@ -170,11 +174,11 @@ class TestCreateItemIterator(unittest.TestCase):
         """Test iterator accepts description parameter."""
         items = [1, 2, 3]
 
-        with patch('fusionbase.utils.progress.should_show_progress', return_value=False):
-            result = list(create_item_iterator(
-                iter(items),
-                description="Processing items"
-            ))
+        with patch('fusionbase.utils.progress.should_show_progress',
+                   return_value=False):
+            result = list(
+                create_item_iterator(iter(items),
+                                     description="Processing items"))
 
             self.assertEqual(result, items)
 
@@ -182,11 +186,9 @@ class TestCreateItemIterator(unittest.TestCase):
         """Test iterator accepts total parameter."""
         items = [1, 2, 3]
 
-        with patch('fusionbase.utils.progress.should_show_progress', return_value=False):
-            result = list(create_item_iterator(
-                iter(items),
-                total=3
-            ))
+        with patch('fusionbase.utils.progress.should_show_progress',
+                   return_value=False):
+            result = list(create_item_iterator(iter(items), total=3))
 
             self.assertEqual(result, items)
 
@@ -207,7 +209,8 @@ class TestProgressIteratorIntegration(unittest.TestCase):
         chunks = [[1, 2], [3, 4], [5, 6]]
         processed = []
 
-        with patch('fusionbase.utils.progress.should_show_progress', return_value=False):
+        with patch('fusionbase.utils.progress.should_show_progress',
+                   return_value=False):
             for chunk in create_chunk_iterator(iter(chunks)):
                 processed.extend(chunk)
 
@@ -218,7 +221,8 @@ class TestProgressIteratorIntegration(unittest.TestCase):
         items = [1, 2, 3, 4, 5]
         total = 0
 
-        with patch('fusionbase.utils.progress.should_show_progress', return_value=False):
+        with patch('fusionbase.utils.progress.should_show_progress',
+                   return_value=False):
             for item in create_item_iterator(iter(items)):
                 total += item
 
@@ -229,7 +233,8 @@ class TestProgressIteratorIntegration(unittest.TestCase):
         chunks = [[1, 2], [3, 4]]
         all_items = []
 
-        with patch('fusionbase.utils.progress.should_show_progress', return_value=False):
+        with patch('fusionbase.utils.progress.should_show_progress',
+                   return_value=False):
             for chunk in create_chunk_iterator(iter(chunks)):
                 for item in create_item_iterator(iter(chunk)):
                     all_items.append(item)
@@ -245,7 +250,8 @@ class TestProgressWithRichMocked(unittest.TestCase):
         """Test chunk iterator when rich available but progress disabled."""
         chunks = [[1, 2], [3, 4]]
 
-        with patch('fusionbase.utils.progress.should_show_progress', return_value=False):
+        with patch('fusionbase.utils.progress.should_show_progress',
+                   return_value=False):
             result = list(create_chunk_iterator(iter(chunks)))
 
             self.assertEqual(result, chunks)
@@ -255,7 +261,8 @@ class TestProgressWithRichMocked(unittest.TestCase):
         """Test item iterator when rich available but progress disabled."""
         items = [1, 2, 3]
 
-        with patch('fusionbase.utils.progress.should_show_progress', return_value=False):
+        with patch('fusionbase.utils.progress.should_show_progress',
+                   return_value=False):
             result = list(create_item_iterator(iter(items)))
 
             self.assertEqual(result, items)

@@ -24,29 +24,28 @@ class TestMakeEntityRequest(unittest.TestCase):
     def test_make_request_with_request_method(self):
         """Test make_entity_request using client.request method."""
         mock_client = MagicMock()
-        mock_client.request.return_value = {"fb_entity_id": "123", "name": "Test"}
+        mock_client.request.return_value = {
+            "fb_entity_id": "123",
+            "name": "Test"
+        }
 
-        result = make_entity_request(
-            client=mock_client,
-            entity_type="organization",
-            entity_id="123"
-        )
+        result = make_entity_request(client=mock_client,
+                                     entity_type="organization",
+                                     entity_id="123")
 
         mock_client.request.assert_called_once_with(
-            "GET", "entities/organization/get/123"
-        )
+            "GET", "entities/organization/get/123")
         self.assertEqual(result["fb_entity_id"], "123")
 
     def test_make_request_with_make_request_method(self):
         """Test make_entity_request using client.make_request method."""
         mock_client = MagicMock(spec=[])
-        mock_client.make_request = MagicMock(return_value={"fb_entity_id": "456"})
+        mock_client.make_request = MagicMock(
+            return_value={"fb_entity_id": "456"})
 
-        result = make_entity_request(
-            client=mock_client,
-            entity_type="person",
-            entity_id="456"
-        )
+        result = make_entity_request(client=mock_client,
+                                     entity_type="person",
+                                     entity_id="456")
 
         mock_client.make_request.assert_called_once()
         self.assertEqual(result["fb_entity_id"], "456")
@@ -59,11 +58,9 @@ class TestMakeEntityRequest(unittest.TestCase):
         mock_client.http_client = MagicMock()
         mock_client.http_client.get.return_value = mock_response
 
-        result = make_entity_request(
-            client=mock_client,
-            entity_type="location",
-            entity_id="789"
-        )
+        result = make_entity_request(client=mock_client,
+                                     entity_type="location",
+                                     entity_id="789")
 
         mock_client.http_client.get.assert_called_once()
         self.assertEqual(result["fb_entity_id"], "789")
@@ -73,15 +70,14 @@ class TestMakeEntityRequest(unittest.TestCase):
         mock_client = MagicMock()
         mock_client.request.return_value = {"fb_entity_id": "rel_1"}
 
-        result = make_entity_request(
-            client=mock_client,
-            entity_type="relation",
-            entity_id="rel_1",
-            endpoint_format="relation/get/{}"
-        )
+        result = make_entity_request(client=mock_client,
+                                     entity_type="relation",
+                                     entity_id="rel_1",
+                                     endpoint_format="relation/get/{}")
 
         mock_client.request.assert_called_once_with(
-            "GET", "relation/get/relation"  # First {} gets entity_type
+            "GET",
+            "relation/get/relation"  # First {} gets entity_type
         )
 
     def test_make_request_raises_resource_not_found(self):
@@ -90,11 +86,9 @@ class TestMakeEntityRequest(unittest.TestCase):
         mock_client.request.side_effect = ResourceNotFoundError()
 
         with self.assertRaises(ResourceNotFoundError) as context:
-            make_entity_request(
-                client=mock_client,
-                entity_type="organization",
-                entity_id="nonexistent"
-            )
+            make_entity_request(client=mock_client,
+                                entity_type="organization",
+                                entity_id="nonexistent")
 
         self.assertEqual(context.exception.resource_type, "organization")
         self.assertEqual(context.exception.resource_id, "nonexistent")
@@ -105,15 +99,12 @@ class TestMakeEntityRequest(unittest.TestCase):
         mock_response = MagicMock()
         mock_response.status_code = 404
         mock_client.request.side_effect = httpx.HTTPStatusError(
-            "Not Found", request=MagicMock(), response=mock_response
-        )
+            "Not Found", request=MagicMock(), response=mock_response)
 
         with self.assertRaises(ResourceNotFoundError):
-            make_entity_request(
-                client=mock_client,
-                entity_type="person",
-                entity_id="missing"
-            )
+            make_entity_request(client=mock_client,
+                                entity_type="person",
+                                entity_id="missing")
 
 
 @pytest.mark.asyncio
@@ -122,11 +113,9 @@ async def test_make_entity_request_async_with_aget():
     mock_client = MagicMock()
     mock_client.aget = AsyncMock(return_value={"fb_entity_id": "async_1"})
 
-    result = await make_entity_request_async(
-        client=mock_client,
-        entity_type="organization",
-        entity_id="async_1"
-    )
+    result = await make_entity_request_async(client=mock_client,
+                                             entity_type="organization",
+                                             entity_id="async_1")
 
     mock_client.aget.assert_called_once()
     assert result["fb_entity_id"] == "async_1"
@@ -138,11 +127,9 @@ async def test_make_entity_request_async_with_arequest():
     mock_client = MagicMock(spec=[])
     mock_client.arequest = AsyncMock(return_value={"fb_entity_id": "async_2"})
 
-    result = await make_entity_request_async(
-        client=mock_client,
-        entity_type="person",
-        entity_id="async_2"
-    )
+    result = await make_entity_request_async(client=mock_client,
+                                             entity_type="person",
+                                             entity_id="async_2")
 
     mock_client.arequest.assert_called_once()
     assert result["fb_entity_id"] == "async_2"
@@ -157,11 +144,9 @@ async def test_make_entity_request_async_with_async_http_client():
     mock_client._async_http_client = MagicMock()
     mock_client._async_http_client.get = AsyncMock(return_value=mock_response)
 
-    result = await make_entity_request_async(
-        client=mock_client,
-        entity_type="location",
-        entity_id="async_3"
-    )
+    result = await make_entity_request_async(client=mock_client,
+                                             entity_type="location",
+                                             entity_id="async_3")
 
     mock_client._async_http_client.get.assert_called_once()
     assert result["fb_entity_id"] == "async_3"
@@ -173,11 +158,9 @@ async def test_make_entity_request_async_raises_when_no_method():
     mock_client = MagicMock(spec=[])
 
     with pytest.raises(APIError) as exc_info:
-        await make_entity_request_async(
-            client=mock_client,
-            entity_type="organization",
-            entity_id="test"
-        )
+        await make_entity_request_async(client=mock_client,
+                                        entity_type="organization",
+                                        entity_id="test")
 
     assert "No suitable async method found" in str(exc_info.value)
 
@@ -189,11 +172,9 @@ async def test_make_entity_request_async_raises_resource_not_found():
     mock_client.aget = AsyncMock(side_effect=ResourceNotFoundError())
 
     with pytest.raises(ResourceNotFoundError) as exc_info:
-        await make_entity_request_async(
-            client=mock_client,
-            entity_type="person",
-            entity_id="missing"
-        )
+        await make_entity_request_async(client=mock_client,
+                                        entity_type="person",
+                                        entity_id="missing")
 
     assert exc_info.value.resource_type == "person"
     assert exc_info.value.resource_id == "missing"
@@ -231,8 +212,7 @@ class TestFetchEntitySync(unittest.TestCase):
         fetch_entity_sync(Person, mock_client, "person_123")
 
         mock_client.request.assert_called_once_with(
-            "GET", "entities/person/get/person_123"
-        )
+            "GET", "entities/person/get/person_123")
 
     def test_fetch_entity_sync_stores_client_reference(self):
         """Test fetch_entity_sync stores client reference if available."""
@@ -258,14 +238,15 @@ class TestFetchEntitySync(unittest.TestCase):
 async def test_fetch_entity_async_creates_entity():
     """Test fetch_entity_async creates entity instance."""
     mock_client = MagicMock()
-    mock_client.aget = AsyncMock(return_value={
-        "fb_entity_id": "async_person",
-        "fb_entity_version": "v1",
-        "name": {
-            "given": "Jane",
-            "family": "Smith"
-        }
-    })
+    mock_client.aget = AsyncMock(
+        return_value={
+            "fb_entity_id": "async_person",
+            "fb_entity_version": "v1",
+            "name": {
+                "given": "Jane",
+                "family": "Smith"
+            }
+        })
 
     result = await fetch_entity_async(Person, mock_client, "async_person")
 
@@ -330,11 +311,9 @@ class TestErrorHandling(unittest.TestCase):
         mock_client.http_client.get.side_effect = Exception("Network error")
 
         with self.assertRaises(APIError) as context:
-            make_entity_request(
-                client=mock_client,
-                entity_type="organization",
-                entity_id="test"
-            )
+            make_entity_request(client=mock_client,
+                                entity_type="organization",
+                                entity_id="test")
 
         self.assertIn("Failed to retrieve", str(context.exception))
 
@@ -344,11 +323,9 @@ class TestErrorHandling(unittest.TestCase):
         mock_client.request.side_effect = ResourceNotFoundError()
 
         with self.assertRaises(ResourceNotFoundError) as context:
-            make_entity_request(
-                client=mock_client,
-                entity_type="person",
-                entity_id="missing_id"
-            )
+            make_entity_request(client=mock_client,
+                                entity_type="person",
+                                entity_id="missing_id")
 
         error = context.exception
         self.assertEqual(error.resource_type, "person")

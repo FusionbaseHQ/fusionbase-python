@@ -76,12 +76,11 @@ class DataSearch(BaseSearch):
             params=search_params,
         )
 
-    def search(
-        self,
-        q: str,
-        params: Optional[DataSearchParams] = None,
-        **kwargs
-    ) -> SearchResult[LazyReference[Union[DataStream, DataService]]]:
+    def search(self,
+               q: str,
+               params: Optional[DataSearchParams] = None,
+               **kwargs
+              ) -> SearchResult[LazyReference[Union[DataStream, DataService]]]:
         """Search for data streams and services.
 
         Args:

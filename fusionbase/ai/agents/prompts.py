@@ -1,7 +1,6 @@
 # fusionbase/ai/agents/prompts.py
 
 # pylint: disable=line-too-long
-
 """
 Prompts for Fusionbase AI agents.
 

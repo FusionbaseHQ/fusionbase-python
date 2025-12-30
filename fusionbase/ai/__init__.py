@@ -13,13 +13,11 @@ except ImportError as e:
     if "html2text" in str(e):
         raise ImportError(
             "To use Fusionbase AI web content tools, please install the html2text package: "
-            "pip install fusionbase[ai]"
-        ) from e
+            "pip install fusionbase[ai]") from e
     else:
         raise ImportError(
             "To use Fusionbase AI tools, please install the required dependencies: "
-            "pip install fusionbase[ai]"
-        )
+            "pip install fusionbase[ai]")
 
 # Import the tools module directly
 from .tools import async_google_search

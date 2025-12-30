@@ -143,7 +143,8 @@ class TestDataStreamBasic(unittest.TestCase):
         # Test with plain ID
         stream1 = DataStream(self.client, self.test_stream_id)
         self.assertEqual(stream1.stream_key, self.test_stream_id)
-        self.assertIsNone(stream1.stream_id)  # None initially, populated after get_metadata()
+        self.assertIsNone(
+            stream1.stream_id)  # None initially, populated after get_metadata()
 
         # Test with collection prefix
         full_id = f"data_streams/{self.test_stream_id}"

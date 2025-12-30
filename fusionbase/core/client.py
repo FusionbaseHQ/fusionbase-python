@@ -74,7 +74,8 @@ class Fusionbase:
         Raises:
             ValueError: If no API key is available either as parameter or in environment.
         """
-        self.api_key = api_key or os.getenv('FUSIONBASE_API_KEY_COM') or os.getenv("FUSIONBASE_API_KEY")
+        self.api_key = api_key or os.getenv(
+            'FUSIONBASE_API_KEY_COM') or os.getenv("FUSIONBASE_API_KEY")
         if not self.api_key:
             raise ValueError(
                 "No API key provided. Pass it explicitly or set FUSIONBASE_API_KEY "

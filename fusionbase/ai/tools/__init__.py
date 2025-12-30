@@ -30,32 +30,15 @@ try:
     from .web.search import google_search
 
     __all__ = [
-        "organization_search",
-        "organization_detail",
-        "async_organization_search",
-        "async_organization_detail",
-        "person_search",
-        "person_detail",
-        "async_person_search",
-        "async_person_detail",
-        "relation_search",
-        "relation_detail",
-        "relation_resolve",
-        "async_relation_search",
-        "async_relation_detail",
-        "async_relation_resolve",
-        "financial_kpi",
-        "network",
-        "related_persons",
-        "profit_and_loss_account",
-        "publications",
-        "balance_sheet_accounts",
-        "insolvency_publications",
-        "annual_financial_statements",
-        "news",
-        "google_search",
-        "async_google_search",
-        "web_content",
+        "organization_search", "organization_detail",
+        "async_organization_search", "async_organization_detail",
+        "person_search", "person_detail", "async_person_search",
+        "async_person_detail", "relation_search", "relation_detail",
+        "relation_resolve", "async_relation_search", "async_relation_detail",
+        "async_relation_resolve", "financial_kpi", "network", "related_persons",
+        "profit_and_loss_account", "publications", "balance_sheet_accounts",
+        "insolvency_publications", "annual_financial_statements", "news",
+        "google_search", "async_google_search", "web_content",
         "async_web_content"
     ]
 except ImportError as e:
@@ -66,8 +49,7 @@ except ImportError as e:
             "Please install the required dependencies: "
             "pip install fusionbase[ai] "
             "or "
-            "pip install langchain>=0.3.0 langchain-core>=0.3.0"
-        ) from e
+            "pip install langchain>=0.3.0 langchain-core>=0.3.0") from e
     __all__ = []
 
 
@@ -80,5 +62,6 @@ def get_registry():
     """
     from . import registry
     return registry
+
 
 __all__.append("get_registry")

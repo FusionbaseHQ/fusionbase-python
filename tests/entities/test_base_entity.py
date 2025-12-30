@@ -16,20 +16,14 @@ class TestEntityBasics(unittest.TestCase):
 
     def test_entity_required_fields(self):
         """Test that Entity requires fb_entity_id and fb_entity_version."""
-        entity = Entity(
-            fb_entity_id="test_123",
-            fb_entity_version="v1"
-        )
+        entity = Entity(fb_entity_id="test_123", fb_entity_version="v1")
 
         self.assertEqual(entity.fb_entity_id, "test_123")
         self.assertEqual(entity.fb_entity_version, "v1")
 
     def test_entity_optional_fields_defaults(self):
         """Test that optional fields have correct defaults."""
-        entity = Entity(
-            fb_entity_id="test_123",
-            fb_entity_version="v1"
-        )
+        entity = Entity(fb_entity_id="test_123", fb_entity_version="v1")
 
         self.assertIsNone(entity.name)
         self.assertEqual(entity.metadata, {})
@@ -37,33 +31,27 @@ class TestEntityBasics(unittest.TestCase):
 
     def test_entity_with_name(self):
         """Test Entity with name field."""
-        entity = Entity(
-            fb_entity_id="test_123",
-            fb_entity_version="v1",
-            name="Test Entity"
-        )
+        entity = Entity(fb_entity_id="test_123",
+                        fb_entity_version="v1",
+                        name="Test Entity")
 
         self.assertEqual(entity.name, "Test Entity")
 
     def test_entity_with_metadata(self):
         """Test Entity with metadata."""
         metadata = {"source": "api", "version": 2}
-        entity = Entity(
-            fb_entity_id="test_123",
-            fb_entity_version="v1",
-            metadata=metadata
-        )
+        entity = Entity(fb_entity_id="test_123",
+                        fb_entity_version="v1",
+                        metadata=metadata)
 
         self.assertEqual(entity.metadata, {"source": "api", "version": 2})
 
     def test_entity_with_external_ids(self):
         """Test Entity with external_ids."""
         external_ids = {"crm": "CRM123", "erp": "ERP456"}
-        entity = Entity(
-            fb_entity_id="test_123",
-            fb_entity_version="v1",
-            external_ids=external_ids
-        )
+        entity = Entity(fb_entity_id="test_123",
+                        fb_entity_version="v1",
+                        external_ids=external_ids)
 
         self.assertEqual(entity.external_ids["crm"], "CRM123")
         self.assertEqual(entity.external_ids["erp"], "ERP456")
@@ -79,7 +67,9 @@ class TestEntityBasics(unittest.TestCase):
             "fb_entity_id": "validated_123",
             "fb_entity_version": "v2",
             "name": "Validated Entity",
-            "metadata": {"key": "value"}
+            "metadata": {
+                "key": "value"
+            }
         }
 
         entity = Entity.model_validate(data)
@@ -90,11 +80,9 @@ class TestEntityBasics(unittest.TestCase):
 
     def test_entity_model_dump(self):
         """Test Entity serialization via model_dump."""
-        entity = Entity(
-            fb_entity_id="dump_123",
-            fb_entity_version="v1",
-            name="Dump Test"
-        )
+        entity = Entity(fb_entity_id="dump_123",
+                        fb_entity_version="v1",
+                        name="Dump Test")
 
         dumped = entity.model_dump()
 
@@ -207,7 +195,8 @@ class TestEntityGetRelations(unittest.TestCase):
         entity = Entity(fb_entity_id="test_123", fb_entity_version="v1")
 
         # This will call list_relations with the provided client
-        with patch.object(Entity, 'list_relations', return_value=[]) as mock_list:
+        with patch.object(Entity, 'list_relations',
+                          return_value=[]) as mock_list:
             result = entity.get_relations(client=mock_client)
 
             mock_list.assert_called_once_with(mock_client)
@@ -223,7 +212,8 @@ class TestEntityGetRelations(unittest.TestCase):
 
         entity = Entity(fb_entity_id="test_123", fb_entity_version="v1")
 
-        with patch.object(Entity, 'list_relations', return_value=[]) as mock_list:
+        with patch.object(Entity, 'list_relations',
+                          return_value=[]) as mock_list:
             entity.get_relations()
 
             mock_list.assert_called_once_with(mock_client)
@@ -240,27 +230,30 @@ class TestEntityListRelations(unittest.TestCase):
         Entity.list_relations(mock_client)
 
         mock_client.request.assert_called_once_with(
-            "GET", "relation/list/organization"
-        )
+            "GET", "relation/list/organization")
 
     def test_list_relations_parses_response(self):
         """Test list_relations() correctly parses API response."""
         mock_client = MagicMock()
-        mock_client.request.return_value = [
-            {
-                "id": "rel_1",
-                "key": "test_relation",
-                "name": {"en": "Test Relation"},
-                "description": {"en": "A test relation"},
-                "label": "TEST_RELATION",
-                "model_from": "organization",
-                "model_to": "person",
-                "meta": {},
-                "resolve": {"parameter_definition": []},
-                "created_at": "2024-01-01",
-                "updated_at": "2024-01-02"
-            }
-        ]
+        mock_client.request.return_value = [{
+            "id": "rel_1",
+            "key": "test_relation",
+            "name": {
+                "en": "Test Relation"
+            },
+            "description": {
+                "en": "A test relation"
+            },
+            "label": "TEST_RELATION",
+            "model_from": "organization",
+            "model_to": "person",
+            "meta": {},
+            "resolve": {
+                "parameter_definition": []
+            },
+            "created_at": "2024-01-01",
+            "updated_at": "2024-01-02"
+        }]
 
         relations = Entity.list_relations(mock_client)
 
@@ -289,8 +282,10 @@ class TestEntityFromId(unittest.TestCase):
         """Test _from_id() with mocked API."""
         mock_client = MagicMock()
 
-        with patch('fusionbase.utils.api_utils.fetch_entity_sync') as mock_fetch:
-            mock_entity = Entity(fb_entity_id="fetched_123", fb_entity_version="v1")
+        with patch(
+                'fusionbase.utils.api_utils.fetch_entity_sync') as mock_fetch:
+            mock_entity = Entity(fb_entity_id="fetched_123",
+                                 fb_entity_version="v1")
             mock_fetch.return_value = mock_entity
 
             result = Entity._from_id(mock_client, "test_id")
@@ -305,7 +300,8 @@ async def test_afrom_id_mock():
     mock_client = MagicMock()
 
     with patch('fusionbase.utils.api_utils.fetch_entity_async') as mock_fetch:
-        mock_entity = Entity(fb_entity_id="async_fetched", fb_entity_version="v1")
+        mock_entity = Entity(fb_entity_id="async_fetched",
+                             fb_entity_version="v1")
         mock_fetch.return_value = mock_entity
 
         result = await Entity._afrom_id(mock_client, "async_id")

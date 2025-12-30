@@ -9,22 +9,22 @@ try:
     from langchain_core.tools import InjectedToolArg
     from langchain_core.tools import tool
 except ImportError:
-    raise ImportError(
-        "Could not import langchain package. "
-        "Please install the required dependencies: "
-        "pip install fusionbase[ai] "
-        "or "
-        "pip install langchain>=0.3.0 langchain-core>=0.3.0"
-    )
+    raise ImportError("Could not import langchain package. "
+                      "Please install the required dependencies: "
+                      "pip install fusionbase[ai] "
+                      "or "
+                      "pip install langchain>=0.3.0 langchain-core>=0.3.0")
 
 from fusionbase import Fusionbase
 
 
 @tool
 def person_search(
-    query: Annotated[str, "The person name to search for (works best with exact person names)"],
-    client: Annotated[Fusionbase, InjectedToolArg] = None
-) -> List[Dict[str, Any]]:
+    query: Annotated[
+        str,
+        "The person name to search for (works best with exact person names)"],
+    client: Annotated[Fusionbase,
+                      InjectedToolArg] = None) -> List[Dict[str, Any]]:
     """Search for persons in the Fusionbase database by name.
 
     This tool works best with specific person names, not generic descriptive queries.
@@ -64,8 +64,10 @@ def person_search(
                     formatted_results.append(person_info)
                 except Exception as e:
                     formatted_results.append({
-                        "entity_id": getattr(person_ref, "entity_id", "unknown"),
-                        "error": str(e)
+                        "entity_id":
+                            getattr(person_ref, "entity_id", "unknown"),
+                        "error":
+                            str(e)
                     })
 
         return formatted_results
@@ -76,9 +78,11 @@ def person_search(
 
 @tool
 async def async_person_search(
-    query: Annotated[str, "The person name to search for (works best with exact person names)"],
-    client: Annotated[Fusionbase, InjectedToolArg] = None
-) -> List[Dict[str, Any]]:
+    query: Annotated[
+        str,
+        "The person name to search for (works best with exact person names)"],
+    client: Annotated[Fusionbase,
+                      InjectedToolArg] = None) -> List[Dict[str, Any]]:
     """Asynchronously search for persons in the Fusionbase database by name.
 
     This tool works best with specific person names, not generic descriptive queries.
@@ -125,9 +129,10 @@ async def async_person_search(
 
 @tool
 def person_detail(
-    entity_id: Annotated[str, "Entity ID of the person to retrieve details for"],
-    client: Annotated[Fusionbase, InjectedToolArg] = None
-) -> Dict[str, Any]:
+        entity_id: Annotated[str,
+                             "Entity ID of the person to retrieve details for"],
+        client: Annotated[Fusionbase,
+                          InjectedToolArg] = None) -> Dict[str, Any]:
     """Get detailed information about a person using their entity ID.
 
     Use this tool after finding a person with person_search
@@ -211,9 +216,10 @@ def person_detail(
 
 @tool
 async def async_person_detail(
-    entity_id: Annotated[str, "Entity ID of the person to retrieve details for"],
-    client: Annotated[Fusionbase, InjectedToolArg] = None
-) -> Dict[str, Any]:
+        entity_id: Annotated[str,
+                             "Entity ID of the person to retrieve details for"],
+        client: Annotated[Fusionbase,
+                          InjectedToolArg] = None) -> Dict[str, Any]:
     """Get detailed information about a person using their entity ID asynchronously.
 
     Use this tool after finding a person with person_search

@@ -36,8 +36,7 @@ except ImportError as exc:
         "Please install the required dependencies: "
         "pip install fusionbase[ai] "
         "or "
-        "pip install langchain>=0.3.0 langchain-core>=0.3.0"
-    ) from exc
+        "pip install langchain>=0.3.0 langchain-core>=0.3.0") from exc
 
 from fusionbase import Fusionbase
 from fusionbase.search.relation_search import RelationSearchParams
@@ -47,8 +46,8 @@ from fusionbase.search.relation_search import RelationSearchParams
 def relation_search(
     query: Annotated[str, "The relation name or concept to search for"],
     limit: Annotated[int, "Maximum number of results to return"] = 5,
-    client: Annotated[Fusionbase, InjectedToolArg] = None
-) -> List[Dict[str, Any]]:
+    client: Annotated[Fusionbase,
+                      InjectedToolArg] = None) -> List[Dict[str, Any]]:
     """Search for relations (connection types) in the Fusionbase database.
 
     Relations define how different entities are connected to each other or to statistical data. For example:
@@ -78,8 +77,7 @@ def relation_search(
 
     # Execute the search
     results = client.search.relations.search(
-        RelationSearchParams(q=query, limit=limit)
-    )
+        RelationSearchParams(q=query, limit=limit))
 
     # Format results in a readable way for LLM
     formatted_results = []
@@ -103,13 +101,20 @@ def relation_search(
 
             # Prepare relation summary
             relation_info = {
-                "relation_id": relation.relation_id,
-                "name": relation.relation_name,
-                "label": relation.label,
-                "model_from": relation.model_from.value if relation.model_from else None,
-                "model_to": relation.model_to.value if relation.model_to else None,
-                "can_resolve": bool(relation.resolve_config),
-                "parameters": parameters if parameters else None,
+                "relation_id":
+                    relation.relation_id,
+                "name":
+                    relation.relation_name,
+                "label":
+                    relation.label,
+                "model_from":
+                    relation.model_from.value if relation.model_from else None,
+                "model_to":
+                    relation.model_to.value if relation.model_to else None,
+                "can_resolve":
+                    bool(relation.resolve_config),
+                "parameters":
+                    parameters if parameters else None,
             }
             formatted_results.append(relation_info)
         except Exception as e:
@@ -125,8 +130,8 @@ def relation_search(
 async def async_relation_search(
     query: Annotated[str, "The relation name or concept to search for"],
     limit: Annotated[int, "Maximum number of results to return"] = 5,
-    client: Annotated[Fusionbase, InjectedToolArg] = None
-) -> List[Dict[str, Any]]:
+    client: Annotated[Fusionbase,
+                      InjectedToolArg] = None) -> List[Dict[str, Any]]:
     """Asynchronously search for relations (connection types) in the Fusionbase database.
 
     Relations define how different entities are connected to each other or to statistical data. For example:
@@ -156,8 +161,7 @@ async def async_relation_search(
 
     # Execute the search
     results = await client.search.relations.asearch(
-        RelationSearchParams(q=query, limit=limit)
-    )
+        RelationSearchParams(q=query, limit=limit))
 
     # Format results in a readable way for LLM
     formatted_results = []
@@ -181,13 +185,20 @@ async def async_relation_search(
 
             # Prepare relation summary
             relation_info = {
-                "relation_id": relation.relation_id,
-                "name": relation.relation_name,
-                "label": relation.label,
-                "model_from": relation.model_from.value if relation.model_from else None,
-                "model_to": relation.model_to.value if relation.model_to else None,
-                "can_resolve": bool(relation.resolve_config),
-                "parameters": parameters if parameters else None,
+                "relation_id":
+                    relation.relation_id,
+                "name":
+                    relation.relation_name,
+                "label":
+                    relation.label,
+                "model_from":
+                    relation.model_from.value if relation.model_from else None,
+                "model_to":
+                    relation.model_to.value if relation.model_to else None,
+                "can_resolve":
+                    bool(relation.resolve_config),
+                "parameters":
+                    parameters if parameters else None,
             }
             formatted_results.append(relation_info)
         except Exception as e:
@@ -201,9 +212,10 @@ async def async_relation_search(
 
 @tool
 def relation_detail(
-    relation_id: Annotated[str, "ID of the relation to retrieve details for"],
-    client: Annotated[Fusionbase, InjectedToolArg] = None
-) -> Dict[str, Any]:
+        relation_id: Annotated[str,
+                               "ID of the relation to retrieve details for"],
+        client: Annotated[Fusionbase,
+                          InjectedToolArg] = None) -> Dict[str, Any]:
     """Get detailed information about a relation type using its ID.
 
     VIEWING a relation (this function) simply tells you WHAT the relation represents
@@ -237,24 +249,37 @@ def relation_detail(
 
         # Build a comprehensive result
         result = {
-            "relation_id": relation.relation_id,
-            "name": relation.relation_name,
-            "label": relation.label,
-            "description": relation.relation_description,
-            "model_from": relation.model_from.value if relation.model_from else None,
-            "model_to": relation.model_to.value if relation.model_to else None,
-            "can_resolve": bool(relation.resolve_config),
+            "relation_id":
+                relation.relation_id,
+            "name":
+                relation.relation_name,
+            "label":
+                relation.label,
+            "description":
+                relation.relation_description,
+            "model_from":
+                relation.model_from.value if relation.model_from else None,
+            "model_to":
+                relation.model_to.value if relation.model_to else None,
+            "can_resolve":
+                bool(relation.resolve_config),
         }
 
         # Add parameter information if available
         if relation.resolve_config and relation.resolve_config.parameter_definition:
             result["parameters"] = [
                 {
-                    "name": param.name,
-                    "type": param.type,
-                    "description": param.description.en if param.description and hasattr(param.description, "en") else None,
-                    "required": param.required,
-                    "default": param.default
+                    "name":
+                        param.name,
+                    "type":
+                        param.type,
+                    "description":
+                        param.description.en if param.description and
+                        hasattr(param.description, "en") else None,
+                    "required":
+                        param.required,
+                    "default":
+                        param.default
                 }
                 for param in relation.resolve_config.parameter_definition
                 if param.name  # Only include params with names
@@ -272,9 +297,10 @@ def relation_detail(
 
 @tool
 async def async_relation_detail(
-    relation_id: Annotated[str, "ID of the relation to retrieve details for"],
-    client: Annotated[Fusionbase, InjectedToolArg] = None
-) -> Dict[str, Any]:
+        relation_id: Annotated[str,
+                               "ID of the relation to retrieve details for"],
+        client: Annotated[Fusionbase,
+                          InjectedToolArg] = None) -> Dict[str, Any]:
     """Asynchronously get detailed information about a relation type using its ID.
 
     VIEWING a relation (this function) simply tells you WHAT the relation represents
@@ -308,24 +334,37 @@ async def async_relation_detail(
 
         # Build a comprehensive result
         result = {
-            "relation_id": relation.relation_id,
-            "name": relation.relation_name,
-            "label": relation.label,
-            "description": relation.relation_description,
-            "model_from": relation.model_from.value if relation.model_from else None,
-            "model_to": relation.model_to.value if relation.model_to else None,
-            "can_resolve": bool(relation.resolve_config),
+            "relation_id":
+                relation.relation_id,
+            "name":
+                relation.relation_name,
+            "label":
+                relation.label,
+            "description":
+                relation.relation_description,
+            "model_from":
+                relation.model_from.value if relation.model_from else None,
+            "model_to":
+                relation.model_to.value if relation.model_to else None,
+            "can_resolve":
+                bool(relation.resolve_config),
         }
 
         # Add parameter information if available
         if relation.resolve_config and relation.resolve_config.parameter_definition:
             result["parameters"] = [
                 {
-                    "name": param.name,
-                    "type": param.type,
-                    "description": param.description.en if param.description and hasattr(param.description, "en") else None,
-                    "required": param.required,
-                    "default": param.default
+                    "name":
+                        param.name,
+                    "type":
+                        param.type,
+                    "description":
+                        param.description.en if param.description and
+                        hasattr(param.description, "en") else None,
+                    "required":
+                        param.required,
+                    "default":
+                        param.default
                 }
                 for param in relation.resolve_config.parameter_definition
                 if param.name  # Only include params with names
@@ -343,11 +382,13 @@ async def async_relation_detail(
 
 @tool
 def relation_resolve(
-    relation_id: Annotated[str, "ID of the relation to resolve"],
-    entity_id: Annotated[str, "ID of the entity to resolve the relation with"],
-    parameters: Annotated[Optional[Dict[str, Any]], "Optional parameters for relation resolution"] = None,
-    client: Annotated[Fusionbase, InjectedToolArg] = None
-) -> Dict[str, Any]:
+        relation_id: Annotated[str, "ID of the relation to resolve"],
+        entity_id: Annotated[str,
+                             "ID of the entity to resolve the relation with"],
+        parameters: Annotated[Optional[Dict[
+            str, Any]], "Optional parameters for relation resolution"] = None,
+        client: Annotated[Fusionbase,
+                          InjectedToolArg] = None) -> Dict[str, Any]:
     """Get entities or statistical data connected through a specific relation type.
 
     RESOLVING a relation (this function) actually retrieves the connected entities or data,
@@ -408,11 +449,13 @@ def relation_resolve(
 
 @tool
 async def async_relation_resolve(
-    relation_id: Annotated[str, "ID of the relation to resolve"],
-    entity_id: Annotated[str, "ID of the entity to resolve the relation with"],
-    parameters: Annotated[Optional[Dict[str, Any]], "Optional parameters for relation resolution"] = None,
-    client: Annotated[Fusionbase, InjectedToolArg] = None
-) -> Dict[str, Any]:
+        relation_id: Annotated[str, "ID of the relation to resolve"],
+        entity_id: Annotated[str,
+                             "ID of the entity to resolve the relation with"],
+        parameters: Annotated[Optional[Dict[
+            str, Any]], "Optional parameters for relation resolution"] = None,
+        client: Annotated[Fusionbase,
+                          InjectedToolArg] = None) -> Dict[str, Any]:
     """Asynchronously get entities or statistical data connected through a specific relation type.
 
     RESOLVING a relation (this function) actually retrieves the connected entities or data,

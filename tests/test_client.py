@@ -173,7 +173,8 @@ class TestFusionbaseGetDatastream(unittest.TestCase):
 
             result = client.get_datastream("test_stream_id")
 
-            mock_from_id.assert_called_once_with("test_stream_id", validate=True)
+            mock_from_id.assert_called_once_with("test_stream_id",
+                                                 validate=True)
             self.assertEqual(result, mock_stream)
 
     @patch("httpx.Client")
@@ -187,7 +188,8 @@ class TestFusionbaseGetDatastream(unittest.TestCase):
 
             client.get_datastream("test_stream_id", validate=False)
 
-            mock_from_id.assert_called_once_with("test_stream_id", validate=False)
+            mock_from_id.assert_called_once_with("test_stream_id",
+                                                 validate=False)
 
 
 class TestFusionbaseGetDataservice(unittest.TestCase):
@@ -208,7 +210,8 @@ class TestFusionbaseGetDataservice(unittest.TestCase):
 
             result = client.get_dataservice("test_service_id")
 
-            mock_from_id.assert_called_once_with("test_service_id", validate=True)
+            mock_from_id.assert_called_once_with("test_service_id",
+                                                 validate=True)
             self.assertEqual(result, mock_service)
 
     @patch("httpx.Client")
@@ -222,7 +225,8 @@ class TestFusionbaseGetDataservice(unittest.TestCase):
 
             client.get_dataservice("test_service_id", validate=False)
 
-            mock_from_id.assert_called_once_with("test_service_id", validate=False)
+            mock_from_id.assert_called_once_with("test_service_id",
+                                                 validate=False)
 
 
 @pytest.mark.asyncio
@@ -231,13 +235,15 @@ async def test_aget_datastream():
     with patch("httpx.Client"):
         client = Fusionbase(api_key="test_api_key")
 
-        with patch.object(DataStreamManager, 'afrom_id', new_callable=AsyncMock) as mock_afrom_id:
+        with patch.object(DataStreamManager, 'afrom_id',
+                          new_callable=AsyncMock) as mock_afrom_id:
             mock_stream = MagicMock()
             mock_afrom_id.return_value = mock_stream
 
             result = await client.aget_datastream("async_stream_id")
 
-            mock_afrom_id.assert_called_once_with("async_stream_id", validate=True)
+            mock_afrom_id.assert_called_once_with("async_stream_id",
+                                                  validate=True)
             assert result == mock_stream
 
 
@@ -247,13 +253,15 @@ async def test_aget_datastream_with_validate_false():
     with patch("httpx.Client"):
         client = Fusionbase(api_key="test_api_key")
 
-        with patch.object(DataStreamManager, 'afrom_id', new_callable=AsyncMock) as mock_afrom_id:
+        with patch.object(DataStreamManager, 'afrom_id',
+                          new_callable=AsyncMock) as mock_afrom_id:
             mock_stream = MagicMock()
             mock_afrom_id.return_value = mock_stream
 
             await client.aget_datastream("async_stream_id", validate=False)
 
-            mock_afrom_id.assert_called_once_with("async_stream_id", validate=False)
+            mock_afrom_id.assert_called_once_with("async_stream_id",
+                                                  validate=False)
 
 
 @pytest.mark.asyncio
@@ -262,13 +270,16 @@ async def test_aget_dataservice():
     with patch("httpx.Client"):
         client = Fusionbase(api_key="test_api_key")
 
-        with patch.object(DataServiceManager, 'afrom_id', new_callable=AsyncMock) as mock_afrom_id:
+        with patch.object(DataServiceManager,
+                          'afrom_id',
+                          new_callable=AsyncMock) as mock_afrom_id:
             mock_service = MagicMock()
             mock_afrom_id.return_value = mock_service
 
             result = await client.aget_dataservice("async_service_id")
 
-            mock_afrom_id.assert_called_once_with("async_service_id", validate=True)
+            mock_afrom_id.assert_called_once_with("async_service_id",
+                                                  validate=True)
             assert result == mock_service
 
 
@@ -278,13 +289,16 @@ async def test_aget_dataservice_with_validate_false():
     with patch("httpx.Client"):
         client = Fusionbase(api_key="test_api_key")
 
-        with patch.object(DataServiceManager, 'afrom_id', new_callable=AsyncMock) as mock_afrom_id:
+        with patch.object(DataServiceManager,
+                          'afrom_id',
+                          new_callable=AsyncMock) as mock_afrom_id:
             mock_service = MagicMock()
             mock_afrom_id.return_value = mock_service
 
             await client.aget_dataservice("async_service_id", validate=False)
 
-            mock_afrom_id.assert_called_once_with("async_service_id", validate=False)
+            mock_afrom_id.assert_called_once_with("async_service_id",
+                                                  validate=False)
 
 
 if __name__ == "__main__":

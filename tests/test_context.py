@@ -215,6 +215,7 @@ class TestAsyncContextIsolation(unittest.TestCase):
 
     def test_async_context_preserved(self):
         """Test that context is preserved across async await."""
+
         async def async_func():
             mock_client = MagicMock()
             mock_client.name = "async_client"
@@ -233,6 +234,7 @@ class TestAsyncContextIsolation(unittest.TestCase):
 
     def test_async_tasks_share_context_by_default(self):
         """Test context behavior with concurrent tasks."""
+
         async def main():
             results = {}
 
@@ -282,6 +284,7 @@ class TestContextUsagePatterns(unittest.TestCase):
         mock_client = MagicMock()
 
         class ClientContext:
+
             def __init__(self, client):
                 self.client = client
                 self.token = None

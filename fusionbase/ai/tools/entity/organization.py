@@ -9,22 +9,22 @@ try:
     from langchain_core.tools import InjectedToolArg
     from langchain_core.tools import tool
 except ImportError:
-    raise ImportError(
-        "Could not import langchain package. "
-        "Please install the required dependencies: "
-        "pip install fusionbase[ai] "
-        "or "
-        "pip install langchain>=0.3.0 langchain-core>=0.3.0"
-    )
+    raise ImportError("Could not import langchain package. "
+                      "Please install the required dependencies: "
+                      "pip install fusionbase[ai] "
+                      "or "
+                      "pip install langchain>=0.3.0 langchain-core>=0.3.0")
 
 from fusionbase import Fusionbase
 
 
 @tool
 def organization_search(
-    query: Annotated[str, "The company name to search for (works best with exact company names)"],
-    client: Annotated[Fusionbase, InjectedToolArg] = None
-) -> List[Dict[str, Any]]:
+    query: Annotated[
+        str,
+        "The company name to search for (works best with exact company names)"],
+    client: Annotated[Fusionbase,
+                      InjectedToolArg] = None) -> List[Dict[str, Any]]:
     """Search for organizations in the Fusionbase database by name.
 
     This tool works best with specific company names, not generic descriptive queries.
@@ -75,9 +75,11 @@ def organization_search(
 
 @tool
 async def async_organization_search(
-    query: Annotated[str, "The company name to search for (works best with exact company names)"],
-    client: Annotated[Fusionbase, InjectedToolArg] = None
-) -> List[Dict[str, Any]]:
+    query: Annotated[
+        str,
+        "The company name to search for (works best with exact company names)"],
+    client: Annotated[Fusionbase,
+                      InjectedToolArg] = None) -> List[Dict[str, Any]]:
     """Asynchronously search for organizations in the Fusionbase database by name.
 
     This tool works best with specific company names, not generic descriptive queries.
@@ -123,9 +125,10 @@ async def async_organization_search(
 
 @tool
 def organization_detail(
-    entity_id: Annotated[str, "Entity ID of the organization to retrieve details for"],
-    client: Annotated[Fusionbase, InjectedToolArg] = None
-) -> Dict[str, Any]:
+        entity_id: Annotated[
+            str, "Entity ID of the organization to retrieve details for"],
+        client: Annotated[Fusionbase,
+                          InjectedToolArg] = None) -> Dict[str, Any]:
     """Get detailed information about an organization using its entity ID.
 
     Use this tool after finding an organization with fusionbase_organization_search
@@ -158,9 +161,12 @@ def organization_detail(
 
     # Add industry classifications if available
     if (hasattr(org, "classifications") and org.classifications and
-        hasattr(org.classifications, "web") and org.classifications.web):
+            hasattr(org.classifications, "web") and org.classifications.web):
         result["industries"] = [
-            {"source": c.source, "value": c.value.de}
+            {
+                "source": c.source,
+                "value": c.value.de
+            }
             for c in org.classifications.web
             if hasattr(c, "value") and hasattr(c.value, "de")
         ]
@@ -196,9 +202,10 @@ def organization_detail(
 
 @tool
 async def async_organization_detail(
-    entity_id: Annotated[str, "Entity ID of the organization to retrieve details for"],
-    client: Annotated[Fusionbase, InjectedToolArg] = None
-) -> Dict[str, Any]:
+        entity_id: Annotated[
+            str, "Entity ID of the organization to retrieve details for"],
+        client: Annotated[Fusionbase,
+                          InjectedToolArg] = None) -> Dict[str, Any]:
     """Get detailed information about an organization using its entity ID asynchronously.
 
     Use this tool after finding an organization with fusionbase_organization_search
@@ -231,9 +238,12 @@ async def async_organization_detail(
 
     # Add industry classifications if available
     if (hasattr(org, "classifications") and org.classifications and
-        hasattr(org.classifications, "web") and org.classifications.web):
+            hasattr(org.classifications, "web") and org.classifications.web):
         result["industries"] = [
-            {"source": c.source, "value": c.value.de}
+            {
+                "source": c.source,
+                "value": c.value.de
+            }
             for c in org.classifications.web
             if hasattr(c, "value") and hasattr(c.value, "de")
         ]

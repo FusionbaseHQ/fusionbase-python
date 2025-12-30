@@ -17,15 +17,16 @@ except ImportError as exc:
         "Please install the required dependencies: "
         "pip install fusionbase[ai] "
         "or "
-        "pip install langchain>=0.3.0 langchain-core>=0.3.0"
-    ) from exc
+        "pip install langchain>=0.3.0 langchain-core>=0.3.0") from exc
 
 
 @tool
 def web_content(
     url: Annotated[str, "The URL of the web page to extract content from"],
-    proxies: Annotated[Optional[Dict[str, str]], "HTTP proxies to use for this specific request"] = None,
-    verify_ssl: Annotated[Optional[bool], "Whether to verify SSL certificates"] = True,
+    proxies: Annotated[Optional[Dict[str, str]],
+                       "HTTP proxies to use for this specific request"] = None,
+    verify_ssl: Annotated[Optional[bool],
+                          "Whether to verify SSL certificates"] = True,
 ) -> str:
     """Extract and process the main content from a webpage.
 
@@ -40,7 +41,9 @@ def web_content(
     try:
         # Configure httpx client with proxies if provided
         client_kwargs = {
-            "headers": {"User-Agent": "Mozilla/5.0 Fusionbase/1.0"},
+            "headers": {
+                "User-Agent": "Mozilla/5.0 Fusionbase/1.0"
+            },
             "follow_redirects": True,
             "timeout": 15.0
         }
@@ -58,15 +61,19 @@ def web_content(
             content_type = response.headers.get("Content-Type", "").lower()
             if "text/html" not in content_type:
                 return {
-                    "error": f"URL returned non-HTML content: {content_type}",
-                    "content": response.text[:1000] if len(response.text) > 1000 else response.text
+                    "error":
+                        f"URL returned non-HTML content: {content_type}",
+                    "content":
+                        response.text[:1000]
+                        if len(response.text) > 1000 else response.text
                 }
 
             # Parse with BeautifulSoup
             soup = BeautifulSoup(response.text, "html.parser")
 
             # Clean the HTML
-            for element in soup(["script", "style", "iframe", "nav", "footer", "ad", "ads"]):
+            for element in soup(
+                ["script", "style", "iframe", "nav", "footer", "ad", "ads"]):
                 element.decompose()
 
             # Extract title
@@ -103,8 +110,10 @@ def web_content(
 @tool
 async def async_web_content(
     url: Annotated[str, "The URL of the web page to extract content from"],
-    proxies: Annotated[Optional[Dict[str, str]], "HTTP proxies to use for this specific request"] = None,
-    verify_ssl: Annotated[Optional[bool], "Whether to verify SSL certificates"] = True,
+    proxies: Annotated[Optional[Dict[str, str]],
+                       "HTTP proxies to use for this specific request"] = None,
+    verify_ssl: Annotated[Optional[bool],
+                          "Whether to verify SSL certificates"] = True,
 ) -> str:
     """Extract and process the main content from a webpage asynchronously.
 
@@ -119,7 +128,9 @@ async def async_web_content(
     try:
         # Configure httpx client with proxies if provided
         client_kwargs = {
-            "headers": {"User-Agent": "Mozilla/5.0 Fusionbase/1.0"},
+            "headers": {
+                "User-Agent": "Mozilla/5.0 Fusionbase/1.0"
+            },
             "follow_redirects": True,
             "timeout": 15.0
         }
@@ -137,15 +148,19 @@ async def async_web_content(
             content_type = response.headers.get("Content-Type", "").lower()
             if "text/html" not in content_type:
                 return {
-                    "error": f"URL returned non-HTML content: {content_type}",
-                    "content": response.text[:1000] if len(response.text) > 1000 else response.text
+                    "error":
+                        f"URL returned non-HTML content: {content_type}",
+                    "content":
+                        response.text[:1000]
+                        if len(response.text) > 1000 else response.text
                 }
 
             # Parse with BeautifulSoup
             soup = BeautifulSoup(response.text, "html.parser")
 
             # Clean the HTML
-            for element in soup(["script", "style", "iframe", "nav", "footer", "ad", "ads"]):
+            for element in soup(
+                ["script", "style", "iframe", "nav", "footer", "ad", "ads"]):
                 element.decompose()
 
             # Extract title

@@ -19,7 +19,8 @@ class TestSensitiveDataFilter(unittest.TestCase):
 
         self.assertIsNotNone(filter_obj.patterns)
         self.assertGreater(len(filter_obj.patterns), 0)
-        self.assertEqual(len(filter_obj.compiled_patterns), len(filter_obj.patterns))
+        self.assertEqual(len(filter_obj.compiled_patterns),
+                         len(filter_obj.patterns))
 
     def test_filter_creation_custom_patterns(self):
         """Test creating filter with custom patterns."""
@@ -85,10 +86,7 @@ class TestSensitiveDataFilter(unittest.TestCase):
     def test_filter_redacts_password(self):
         """Test filter applies redaction pattern to password."""
         filter_obj = SensitiveDataFilter()
-        record = {
-            "message": 'password: "super_secret_pass123"',
-            "extra": {}
-        }
+        record = {"message": 'password: "super_secret_pass123"', "extra": {}}
 
         result = filter_obj(record)
 
@@ -98,10 +96,7 @@ class TestSensitiveDataFilter(unittest.TestCase):
     def test_filter_redacts_token(self):
         """Test filter applies redaction pattern to token."""
         filter_obj = SensitiveDataFilter()
-        record = {
-            "message": 'token = "abc123token"',
-            "extra": {}
-        }
+        record = {"message": 'token = "abc123token"', "extra": {}}
 
         result = filter_obj(record)
 
@@ -133,13 +128,16 @@ class TestSensitiveDataFilter(unittest.TestCase):
         filter_obj = SensitiveDataFilter()
         record = {
             "message": "Normal log message with no secrets",
-            "extra": {"user_id": "12345"}
+            "extra": {
+                "user_id": "12345"
+            }
         }
 
         result = filter_obj(record)
 
         self.assertTrue(result)
-        self.assertEqual(record["message"], "Normal log message with no secrets")
+        self.assertEqual(record["message"],
+                         "Normal log message with no secrets")
         self.assertEqual(record["extra"]["user_id"], "12345")
 
     def test_filter_always_returns_true(self):
@@ -148,9 +146,18 @@ class TestSensitiveDataFilter(unittest.TestCase):
 
         # Test with various record types
         records = [
-            {"message": "simple", "extra": {}},
-            {"message": "X-API-KEY: secret", "extra": {}},
-            {"message": "", "extra": {}},
+            {
+                "message": "simple",
+                "extra": {}
+            },
+            {
+                "message": "X-API-KEY: secret",
+                "extra": {}
+            },
+            {
+                "message": "",
+                "extra": {}
+            },
         ]
 
         for record in records:
@@ -161,9 +168,18 @@ class TestSensitiveDataFilter(unittest.TestCase):
         filter_obj = SensitiveDataFilter()
 
         records = [
-            {"message": 'x-api-key: "secret1"', "extra": {}},
-            {"message": 'X-API-KEY: "secret2"', "extra": {}},
-            {"message": 'x-Api-Key: "secret3"', "extra": {}},
+            {
+                "message": 'x-api-key: "secret1"',
+                "extra": {}
+            },
+            {
+                "message": 'X-API-KEY: "secret2"',
+                "extra": {}
+            },
+            {
+                "message": 'x-Api-Key: "secret3"',
+                "extra": {}
+            },
         ]
 
         for record in records:
@@ -212,10 +228,8 @@ class TestRequestIdFilter(unittest.TestCase):
         filter_obj(record1)
         filter_obj(record2)
 
-        self.assertEqual(
-            record1["extra"]["request_id"],
-            record2["extra"]["request_id"]
-        )
+        self.assertEqual(record1["extra"]["request_id"],
+                         record2["extra"]["request_id"])
 
     def test_filter_different_threads_different_ids(self):
         """Test different threads get different request IDs."""
@@ -343,14 +357,8 @@ class TestFilterIntegration(unittest.TestCase):
 
     def test_filters_order_independent(self):
         """Test filters work in any order."""
-        record1 = {
-            "message": 'password: "pass123"',
-            "extra": {}
-        }
-        record2 = {
-            "message": 'password: "pass123"',
-            "extra": {}
-        }
+        record1 = {"message": 'password: "pass123"', "extra": {}}
+        record2 = {"message": 'password: "pass123"', "extra": {}}
 
         # Order 1: sensitive first
         SensitiveDataFilter()(record1)
