@@ -194,8 +194,8 @@ class TestRequestIdFilter(unittest.TestCase):
         """Test creating RequestIdFilter."""
         filter_obj = RequestIdFilter()
 
-        self.assertIsNotNone(filter_obj.request_ids)
-        self.assertEqual(len(filter_obj.request_ids), 0)
+        # Uses thread-local storage internally
+        self.assertIsNotNone(filter_obj._local)
 
     def test_filter_adds_request_id(self):
         """Test filter adds request_id to record."""

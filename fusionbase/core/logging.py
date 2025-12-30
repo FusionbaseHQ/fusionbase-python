@@ -58,8 +58,8 @@ class RequestIdFilter:
     """Add request ID to log records for traceability."""
 
     def __init__(self):
-        """Initialize with empty request ID map."""
-        self.request_ids = {}
+        """Initialize with thread-local storage for request IDs."""
+        self._local = threading.local()
 
     def __call__(self, record: Dict[str, Any]) -> bool:
         """Process the log record to add request ID.
@@ -70,13 +70,11 @@ class RequestIdFilter:
         Returns:
             Always True to allow the record
         """
-        # Get or create a request ID for this thread
-        thread_id = threading.get_ident()
+        # Get or create a request ID for this thread using thread-local storage
+        if not hasattr(self._local, 'request_id'):
+            self._local.request_id = str(uuid.uuid4())
 
-        if thread_id not in self.request_ids:
-            self.request_ids[thread_id] = str(uuid.uuid4())
-
-        record["extra"]["request_id"] = self.request_ids[thread_id]
+        record["extra"]["request_id"] = self._local.request_id
         return True
 
 
