@@ -74,7 +74,7 @@ class Fusionbase:
         Raises:
             ValueError: If no API key is available either as parameter or in environment.
         """
-        self.api_key = api_key or os.getenv("FUSIONBASE_API_KEY")
+        self.api_key = api_key or os.getenv('FUSIONBASE_API_KEY_COM') or os.getenv("FUSIONBASE_API_KEY")
         if not self.api_key:
             raise ValueError(
                 "No API key provided. Pass it explicitly or set FUSIONBASE_API_KEY "
@@ -135,6 +135,10 @@ class Fusionbase:
         # Create and register search manager
         self.search = SearchManager(self)
 
+        # Lazy-initialized managers for data operations
+        self._datastreams = None
+        self._dataservices = None
+
         # Set the context variables for this instance
         self._client_token = None
         self._manager_token = None
@@ -181,7 +185,7 @@ class Fusionbase:
         try:
             return importlib.metadata.version("fusionbase")
         except Exception:
-            return "1.0.0"
+            return "0.8.0"
 
     def _should_retry(self, exception: Exception) -> bool:
         """Determine if a request should be retried based on exception.
@@ -569,3 +573,104 @@ class Fusionbase:
         self._client_token = None
         self._manager_token = None
         self.close()
+
+    @property
+    def datastreams(self):
+        """Get the DataStream manager for accessing data streams.
+
+        Returns:
+            DataStreamManager instance for stream operations.
+
+        Example:
+            >>> stream = client.datastreams.from_id("my_stream_id")
+            >>> data = stream.get_data()
+        """
+        if self._datastreams is None:
+            from fusionbase.managers.datastream_manager import DataStreamManager
+            self._datastreams = DataStreamManager(self)
+        return self._datastreams
+
+    @property
+    def dataservices(self):
+        """Get the DataService manager for accessing data services.
+
+        Returns:
+            DataServiceManager instance for service operations.
+
+        Example:
+            >>> service = client.dataservices.from_id("my_service_id")
+            >>> result = service.invoke({"param": "value"})
+        """
+        if self._dataservices is None:
+            from fusionbase.managers.dataservice_manager import DataServiceManager
+            self._dataservices = DataServiceManager(self)
+        return self._dataservices
+
+    def get_datastream(self, stream_id: str, validate: bool = True):
+        """Get a DataStream by ID.
+
+        Args:
+            stream_id: The ID of the data stream to retrieve.
+            validate: Whether to validate the stream exists (default: True).
+
+        Returns:
+            DataStream instance.
+
+        Raises:
+            ResourceNotFoundError: If validate=True and the stream doesn't exist.
+
+        Example:
+            >>> stream = client.get_datastream("my_stream_id")
+            >>> for row in stream.get_data():
+            ...     print(row)
+        """
+        return self.datastreams.from_id(stream_id, validate=validate)
+
+    async def aget_datastream(self, stream_id: str, validate: bool = True):
+        """Asynchronously get a DataStream by ID.
+
+        Args:
+            stream_id: The ID of the data stream to retrieve.
+            validate: Whether to validate the stream exists (default: True).
+
+        Returns:
+            DataStream instance.
+
+        Raises:
+            ResourceNotFoundError: If validate=True and the stream doesn't exist.
+        """
+        return await self.datastreams.afrom_id(stream_id, validate=validate)
+
+    def get_dataservice(self, service_id: str, validate: bool = True):
+        """Get a DataService by ID.
+
+        Args:
+            service_id: The ID of the data service to retrieve.
+            validate: Whether to validate the service exists (default: True).
+
+        Returns:
+            DataService instance.
+
+        Raises:
+            ResourceNotFoundError: If validate=True and the service doesn't exist.
+
+        Example:
+            >>> service = client.get_dataservice("my_service_id")
+            >>> result = service.invoke({"input": "value"})
+        """
+        return self.dataservices.from_id(service_id, validate=validate)
+
+    async def aget_dataservice(self, service_id: str, validate: bool = True):
+        """Asynchronously get a DataService by ID.
+
+        Args:
+            service_id: The ID of the data service to retrieve.
+            validate: Whether to validate the service exists (default: True).
+
+        Returns:
+            DataService instance.
+
+        Raises:
+            ResourceNotFoundError: If validate=True and the service doesn't exist.
+        """
+        return await self.dataservices.afrom_id(service_id, validate=validate)

@@ -157,7 +157,7 @@ For more detailed examples, check the [examples directory](https://github.com/Fu
 
 ## Changelog
 
-### Version 1.0.0 (2025.05.07)
+### Version 0.8.0 (2025.05.07)
 - Major version release with completely revamped architecture
 - Full support for Fusionbase entity types (Organizations, Persons, Locations, etc.)
 - New search functionality with type hinting and specialized search managers
