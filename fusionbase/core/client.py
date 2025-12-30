@@ -274,8 +274,16 @@ class Fusionbase:
             response = _retried_request()
             return self._process_response(response, response_format)
         except RetryError as exc:
-            response = getattr(exc.last_attempt, "result", None)
-            if response:
+            # Get the result from the last attempt - result() is a method, not a property
+            response = None
+            if exc.last_attempt is not None:
+                try:
+                    response = exc.last_attempt.result()
+                except Exception:
+                    # If result() raises an exception, we don't have a valid response
+                    pass
+
+            if response is not None:
                 # If we have a response, process it to get appropriate error
                 self._process_response(
                     response, response_format
