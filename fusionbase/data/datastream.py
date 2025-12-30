@@ -31,6 +31,24 @@ except ImportError:
     Table = None
     RICH_AVAILABLE = False
 
+try:
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+    PYARROW_AVAILABLE = True
+except ImportError:
+    pa = None
+    pq = None
+    PYARROW_AVAILABLE = False
+
+try:
+    from openpyxl import Workbook
+    from openpyxl.utils.dataframe import dataframe_to_rows
+    OPENPYXL_AVAILABLE = True
+except ImportError:
+    Workbook = None
+    dataframe_to_rows = None
+    OPENPYXL_AVAILABLE = False
+
 from pydantic import BaseModel
 from pydantic import ConfigDict
 
@@ -1485,7 +1503,7 @@ class DataStream:
 
         Args:
             file_path: Path to save the file
-            file_format: Format to use (json, jsonl, csv) - defaults to extension if not specified
+            file_format: Format to use (json, jsonl, csv, xlsx, parquet, pickle) - defaults to extension
             include_metadata: Whether to include stream metadata in the export
             skip: Number of records to skip (for pagination)
             limit: Maximum number of records to export
@@ -1516,8 +1534,12 @@ class DataStream:
 
         # Validate file format
         file_format = file_format.lower()
-        if file_format not in ['json', 'jsonl', 'csv', 'pickle']:
-            raise ValueError(f"Unsupported file format: {file_format}")
+        supported_formats = ['json', 'jsonl', 'csv', 'pickle', 'xlsx', 'parquet']
+        if file_format not in supported_formats:
+            raise ValueError(
+                f"Unsupported file format: {file_format}. "
+                f"Supported formats: {', '.join(supported_formats)}"
+            )
 
         # For pickle format, ensure we have the module
         if file_format == 'pickle':
@@ -1525,6 +1547,20 @@ class DataStream:
                 import pickle
             except ImportError:
                 raise ImportError("Pickle module is required for pickle format")
+
+        # For xlsx format, ensure openpyxl is available
+        if file_format == 'xlsx' and not OPENPYXL_AVAILABLE:
+            raise ImportError(
+                "openpyxl is required for XLSX export. "
+                "Install it with: pip install openpyxl"
+            )
+
+        # For parquet format, ensure pyarrow is available
+        if file_format == 'parquet' and not PYARROW_AVAILABLE:
+            raise ImportError(
+                "pyarrow is required for Parquet export. "
+                "Install it with: pip install pyarrow"
+            )
 
         # Get metadata if requested
         metadata = None
@@ -1629,7 +1665,148 @@ class DataStream:
                 else:
                     pickle.dump(data, f)
 
+        elif file_format == 'xlsx':
+            # Write as Excel file
+            if not data:
+                # Create empty workbook
+                wb = Workbook()
+                wb.save(file_path)
+                return file_path
+
+            # Use pandas if available for better performance
+            if PANDAS_AVAILABLE:
+                df = pd.DataFrame(data)
+                with pd.ExcelWriter(file_path, engine='openpyxl') as writer:
+                    df.to_excel(writer, sheet_name='Data', index=False)
+
+                    # Add metadata sheet if requested
+                    if include_metadata:
+                        metadata_dict = metadata.model_dump() if hasattr(
+                            metadata, "model_dump") else metadata
+                        # Flatten metadata for Excel
+                        flat_metadata = self._flatten_dict(metadata_dict)
+                        meta_df = pd.DataFrame([
+                            {"Field": k, "Value": str(v)}
+                            for k, v in flat_metadata.items()
+                        ])
+                        meta_df.to_excel(writer, sheet_name='Metadata', index=False)
+            else:
+                # Manual openpyxl export without pandas
+                wb = Workbook()
+                ws = wb.active
+                ws.title = "Data"
+
+                # Write header
+                fieldnames = list(data[0].keys())
+                for col_idx, field in enumerate(fieldnames, 1):
+                    ws.cell(row=1, column=col_idx, value=field)
+
+                # Write data rows
+                for row_idx, row in enumerate(data, 2):
+                    for col_idx, field in enumerate(fieldnames, 1):
+                        value = row.get(field, "")
+                        # Convert complex types to string
+                        if isinstance(value, (dict, list)):
+                            value = json.dumps(value, default=str)
+                        ws.cell(row=row_idx, column=col_idx, value=value)
+
+                # Add metadata sheet if requested
+                if include_metadata:
+                    meta_ws = wb.create_sheet(title="Metadata")
+                    metadata_dict = metadata.model_dump() if hasattr(
+                        metadata, "model_dump") else metadata
+                    flat_metadata = self._flatten_dict(metadata_dict)
+
+                    meta_ws.cell(row=1, column=1, value="Field")
+                    meta_ws.cell(row=1, column=2, value="Value")
+
+                    for row_idx, (key, value) in enumerate(flat_metadata.items(), 2):
+                        meta_ws.cell(row=row_idx, column=1, value=key)
+                        meta_ws.cell(row=row_idx, column=2, value=str(value))
+
+                wb.save(file_path)
+
+        elif file_format == 'parquet':
+            # Write as Parquet file
+            if not data:
+                # Create empty parquet file
+                empty_table = pa.table({})
+                pq.write_table(empty_table, file_path)
+                return file_path
+
+            # Use pandas if available for easier conversion
+            if PANDAS_AVAILABLE:
+                df = pd.DataFrame(data)
+                # Convert to parquet with metadata
+                table = pa.Table.from_pandas(df)
+
+                # Add custom metadata if requested
+                if include_metadata:
+                    metadata_dict = metadata.model_dump() if hasattr(
+                        metadata, "model_dump") else metadata
+                    existing_meta = table.schema.metadata or {}
+                    new_meta = {
+                        **existing_meta,
+                        b'fusionbase_metadata': json.dumps(metadata_dict, default=str).encode()
+                    }
+                    table = table.replace_schema_metadata(new_meta)
+
+                pq.write_table(table, file_path)
+            else:
+                # Manual pyarrow export without pandas
+                # Build arrays for each column
+                if data:
+                    columns = {}
+                    fieldnames = list(data[0].keys())
+
+                    for field in fieldnames:
+                        values = [row.get(field) for row in data]
+                        # Convert complex types to strings
+                        values = [
+                            json.dumps(v, default=str) if isinstance(v, (dict, list)) else v
+                            for v in values
+                        ]
+                        columns[field] = values
+
+                    table = pa.table(columns)
+
+                    # Add custom metadata if requested
+                    if include_metadata:
+                        metadata_dict = metadata.model_dump() if hasattr(
+                            metadata, "model_dump") else metadata
+                        existing_meta = table.schema.metadata or {}
+                        new_meta = {
+                            **existing_meta,
+                            b'fusionbase_metadata': json.dumps(metadata_dict, default=str).encode()
+                        }
+                        table = table.replace_schema_metadata(new_meta)
+
+                    pq.write_table(table, file_path)
+
         return file_path
+
+    def _flatten_dict(self, d: Dict[str, Any], parent_key: str = '', sep: str = '.') -> Dict[str, Any]:
+        """Flatten a nested dictionary for export.
+
+        Args:
+            d: Dictionary to flatten
+            parent_key: Prefix for keys (used in recursion)
+            sep: Separator between nested keys
+
+        Returns:
+            Flattened dictionary with dot-separated keys
+        """
+        items = []
+        for k, v in d.items():
+            new_key = f"{parent_key}{sep}{k}" if parent_key else k
+            if isinstance(v, dict):
+                items.extend(self._flatten_dict(v, new_key, sep=sep).items())
+            elif isinstance(v, list):
+                # Convert list to string representation
+                items.append((new_key, json.dumps(v, default=str)))
+            else:
+                items.append((new_key, v))
+        return dict(items)
 
     def load_from_file(
         self, file_path: Union[str, Path]
@@ -1844,7 +2021,7 @@ class DataStream:
 
         Args:
             file_path: Path to save the file
-            file_format: Format to use (json, jsonl, csv) - defaults to extension if not specified
+            file_format: Format to use (json, jsonl, csv, xlsx, parquet, pickle) - defaults to extension
             include_metadata: Whether to include stream metadata in the export
             skip: Number of records to skip (for pagination)
             limit: Maximum number of records to export
@@ -1875,8 +2052,12 @@ class DataStream:
 
         # Validate file format
         file_format = file_format.lower()
-        if file_format not in ['json', 'jsonl', 'csv', 'pickle']:
-            raise ValueError(f"Unsupported file format: {file_format}")
+        supported_formats = ['json', 'jsonl', 'csv', 'pickle', 'xlsx', 'parquet']
+        if file_format not in supported_formats:
+            raise ValueError(
+                f"Unsupported file format: {file_format}. "
+                f"Supported formats: {', '.join(supported_formats)}"
+            )
 
         # For pickle format, ensure we have the module
         if file_format == 'pickle':
@@ -1884,6 +2065,20 @@ class DataStream:
                 import pickle
             except ImportError:
                 raise ImportError("Pickle module is required for pickle format")
+
+        # For xlsx format, ensure openpyxl is available
+        if file_format == 'xlsx' and not OPENPYXL_AVAILABLE:
+            raise ImportError(
+                "openpyxl is required for XLSX export. "
+                "Install it with: pip install openpyxl"
+            )
+
+        # For parquet format, ensure pyarrow is available
+        if file_format == 'parquet' and not PYARROW_AVAILABLE:
+            raise ImportError(
+                "pyarrow is required for Parquet export. "
+                "Install it with: pip install pyarrow"
+            )
 
         # Get metadata if requested
         metadata = None
@@ -1989,6 +2184,123 @@ class DataStream:
                             }, f)
                     else:
                         pickle.dump(data, f)
+
+            elif file_format == 'xlsx':
+                # Write as Excel file
+                if not data:
+                    # Create empty workbook
+                    wb = Workbook()
+                    wb.save(file_path)
+                    return
+
+                # Use pandas if available for better performance
+                if PANDAS_AVAILABLE:
+                    df = pd.DataFrame(data)
+                    with pd.ExcelWriter(file_path, engine='openpyxl') as writer:
+                        df.to_excel(writer, sheet_name='Data', index=False)
+
+                        # Add metadata sheet if requested
+                        if include_metadata:
+                            metadata_dict = metadata.model_dump() if hasattr(
+                                metadata, "model_dump") else metadata
+                            # Flatten metadata for Excel
+                            flat_metadata = self._flatten_dict(metadata_dict)
+                            meta_df = pd.DataFrame([
+                                {"Field": k, "Value": str(v)}
+                                for k, v in flat_metadata.items()
+                            ])
+                            meta_df.to_excel(writer, sheet_name='Metadata', index=False)
+                else:
+                    # Manual openpyxl export without pandas
+                    wb = Workbook()
+                    ws = wb.active
+                    ws.title = "Data"
+
+                    # Write header
+                    fieldnames = list(data[0].keys())
+                    for col_idx, field in enumerate(fieldnames, 1):
+                        ws.cell(row=1, column=col_idx, value=field)
+
+                    # Write data rows
+                    for row_idx, row in enumerate(data, 2):
+                        for col_idx, field in enumerate(fieldnames, 1):
+                            value = row.get(field, "")
+                            # Convert complex types to string
+                            if isinstance(value, (dict, list)):
+                                value = json.dumps(value, default=str)
+                            ws.cell(row=row_idx, column=col_idx, value=value)
+
+                    # Add metadata sheet if requested
+                    if include_metadata:
+                        meta_ws = wb.create_sheet(title="Metadata")
+                        metadata_dict = metadata.model_dump() if hasattr(
+                            metadata, "model_dump") else metadata
+                        flat_metadata = self._flatten_dict(metadata_dict)
+
+                        meta_ws.cell(row=1, column=1, value="Field")
+                        meta_ws.cell(row=1, column=2, value="Value")
+
+                        for row_idx, (key, value) in enumerate(flat_metadata.items(), 2):
+                            meta_ws.cell(row=row_idx, column=1, value=key)
+                            meta_ws.cell(row=row_idx, column=2, value=str(value))
+
+                    wb.save(file_path)
+
+            elif file_format == 'parquet':
+                # Write as Parquet file
+                if not data:
+                    # Create empty parquet file
+                    empty_table = pa.table({})
+                    pq.write_table(empty_table, file_path)
+                    return
+
+                # Use pandas if available for easier conversion
+                if PANDAS_AVAILABLE:
+                    df = pd.DataFrame(data)
+                    # Convert to parquet with metadata
+                    table = pa.Table.from_pandas(df)
+
+                    # Add custom metadata if requested
+                    if include_metadata:
+                        metadata_dict = metadata.model_dump() if hasattr(
+                            metadata, "model_dump") else metadata
+                        existing_meta = table.schema.metadata or {}
+                        new_meta = {
+                            **existing_meta,
+                            b'fusionbase_metadata': json.dumps(metadata_dict, default=str).encode()
+                        }
+                        table = table.replace_schema_metadata(new_meta)
+
+                    pq.write_table(table, file_path)
+                else:
+                    # Manual pyarrow export without pandas
+                    # Build arrays for each column
+                    columns = {}
+                    fieldnames = list(data[0].keys())
+
+                    for field in fieldnames:
+                        values = [row.get(field) for row in data]
+                        # Convert complex types to strings
+                        values = [
+                            json.dumps(v, default=str) if isinstance(v, (dict, list)) else v
+                            for v in values
+                        ]
+                        columns[field] = values
+
+                    table = pa.table(columns)
+
+                    # Add custom metadata if requested
+                    if include_metadata:
+                        metadata_dict = metadata.model_dump() if hasattr(
+                            metadata, "model_dump") else metadata
+                        existing_meta = table.schema.metadata or {}
+                        new_meta = {
+                            **existing_meta,
+                            b'fusionbase_metadata': json.dumps(metadata_dict, default=str).encode()
+                        }
+                        table = table.replace_schema_metadata(new_meta)
+
+                    pq.write_table(table, file_path)
 
         # Run file writing in a thread to avoid blocking the event loop
         await asyncio.to_thread(write_file)
