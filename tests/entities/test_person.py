@@ -1,9 +1,9 @@
 """Tests for the Person entity."""
 
-import os
 import unittest
 
 import pytest
+from conftest import get_api_key
 
 from fusionbase import Fusionbase
 from fusionbase.exceptions import ResourceNotFoundError
@@ -19,7 +19,7 @@ class TestPerson(unittest.TestCase):
         self.invalid_person_id = "non_existing_id"
 
         # Use API key from environment or skip tests if not available
-        self.api_key = os.environ.get("FUSIONBASE_API_KEY")
+        self.api_key = get_api_key()
         if not self.api_key:
             self.skipTest("FUSIONBASE_API_KEY environment variable not set")
 
@@ -87,7 +87,7 @@ class TestPerson(unittest.TestCase):
 @pytest.mark.asyncio
 async def test_person_async_real_api():
     """Test async person fetching with real API."""
-    api_key = os.environ.get("FUSIONBASE_API_KEY")
+    api_key = get_api_key()
     if not api_key:
         pytest.skip("FUSIONBASE_API_KEY environment variable not set")
 

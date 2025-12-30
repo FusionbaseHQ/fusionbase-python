@@ -1,10 +1,10 @@
 """Tests for Data search functionality (streams and services)."""
 
-import os
 import unittest
 from unittest.mock import patch
 
 import pytest
+from conftest import get_api_key
 
 from fusionbase import Fusionbase
 from fusionbase.entities.lazy_reference import LazyReference
@@ -17,7 +17,7 @@ class TestDataSearch(unittest.TestCase):
     def setUp(self):
         """Set up test fixtures."""
         # Use API key from environment or skip tests if not available
-        self.api_key = os.environ.get("FUSIONBASE_API_KEY")
+        self.api_key = get_api_key()
         if not self.api_key:
             self.skipTest("FUSIONBASE_API_KEY environment variable not set")
 
@@ -110,7 +110,7 @@ class TestDataSearch(unittest.TestCase):
 @pytest.mark.asyncio
 async def test_data_search_async():
     """Test async data searching with real API."""
-    api_key = os.environ.get("FUSIONBASE_API_KEY")
+    api_key = get_api_key()
     if not api_key:
         pytest.skip("FUSIONBASE_API_KEY environment variable not set")
 

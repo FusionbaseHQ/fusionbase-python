@@ -1,12 +1,13 @@
 """Tests for the cache functionality."""
 
-import os
+import sys
 from tempfile import TemporaryDirectory
 import time
 import unittest
 
 import pytest
 
+from conftest import get_api_key
 from fusionbase import Fusionbase
 from fusionbase.core.cache import FusionbaseCache
 from fusionbase.core.config import CacheConfig
@@ -16,9 +17,13 @@ from fusionbase.core.config import FusionbaseConfig
 class TestFusionbaseCache(unittest.TestCase):
 
     def test_caching(self):
+        api_key = get_api_key()
+        if not api_key:
+            self.skipTest("API key environment variable not set")
+
         config = FusionbaseConfig(
             cache=CacheConfig(enabled=True, ttl_seconds=10))
-        with Fusionbase(config=config) as client:
+        with Fusionbase(api_key=api_key, config=config) as client:
             # First request (cache miss)
             start = time.time()
             loc1 = client.entities.locations.from_id(
@@ -41,7 +46,11 @@ class TestCache(unittest.TestCase):
 
     def setUp(self):
         """Set up test fixtures."""
-        self.temp_dir = TemporaryDirectory()
+        # ignore_cleanup_errors was added in Python 3.10
+        if sys.version_info >= (3, 10):
+            self.temp_dir = TemporaryDirectory(ignore_cleanup_errors=True)
+        else:
+            self.temp_dir = TemporaryDirectory()
         self.cache = FusionbaseCache(
             cache_dir=self.temp_dir.name,
             ttl=60,
@@ -51,7 +60,11 @@ class TestCache(unittest.TestCase):
     def tearDown(self):
         """Clean up test fixtures."""
         self.cache.close()
-        self.temp_dir.cleanup()
+        # On Windows + Python 3.9, cleanup may fail due to file locking
+        try:
+            self.temp_dir.cleanup()
+        except (PermissionError, OSError):
+            pass  # Ignore cleanup errors on older Python versions
 
     def test_cache_get_set(self):
         """Test basic cache set and get operations."""
@@ -98,9 +111,9 @@ class TestCache(unittest.TestCase):
 async def test_client_caching():
     """Test caching in the client."""
     # Use an API key from environment or skip
-    api_key = os.environ.get("FUSIONBASE_API_KEY")
+    api_key = get_api_key()
     if not api_key:
-        pytest.skip("FUSIONBASE_API_KEY environment variable not set")
+        pytest.skip("API key environment variable not set")
 
     # Create a client with caching enabled
     config = FusionbaseConfig(cache={"enabled": True, "ttl_seconds": 60})

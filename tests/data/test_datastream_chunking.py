@@ -1,11 +1,11 @@
 """Tests for DataStream chunking and iteration functionality."""
 
-import os
 import unittest
 from unittest.mock import MagicMock
 from unittest.mock import patch
 
 import pytest
+from conftest import get_api_key
 
 from fusionbase import Fusionbase
 from fusionbase.data.datastream import ChunkingStrategy
@@ -20,7 +20,7 @@ class TestDataStreamChunking(unittest.TestCase):
         self.test_stream_id = "23532363"
 
         # Use API key from environment or skip tests if not available
-        self.api_key = os.environ.get("FUSIONBASE_API_KEY")
+        self.api_key = get_api_key()
         if not self.api_key:
             self.skipTest("FUSIONBASE_API_KEY environment variable not set")
 
@@ -310,7 +310,7 @@ class TestDataStreamChunking(unittest.TestCase):
 @pytest.mark.asyncio
 async def test_async_chunking():
     """Test asynchronous chunk iteration."""
-    api_key = os.environ.get("FUSIONBASE_API_KEY")
+    api_key = get_api_key()
     if not api_key:
         pytest.skip("FUSIONBASE_API_KEY environment variable not set")
 

@@ -1,9 +1,9 @@
 """Integration tests for DataService functionality."""
 
-import os
 import unittest
 
 import pytest
+from conftest import get_api_key
 
 from fusionbase import Fusionbase
 from fusionbase.data.dataservice import DataService
@@ -17,7 +17,7 @@ class TestDataServiceIntegration(unittest.TestCase):
     def setUp(self):
         """Set up test fixtures."""
         # Use API key from environment or skip tests if not available
-        self.api_key = os.environ.get("FUSIONBASE_API_KEY")
+        self.api_key = get_api_key()
         if not self.api_key:
             self.skipTest("FUSIONBASE_API_KEY environment variable not set")
 
@@ -87,7 +87,7 @@ class TestDataServiceIntegration(unittest.TestCase):
 @pytest.mark.asyncio
 async def test_client_async_context_manager():
     """Test using the client as an async context manager."""
-    api_key = os.environ.get("FUSIONBASE_API_KEY")
+    api_key = get_api_key()
     if not api_key:
         pytest.skip("FUSIONBASE_API_KEY environment variable not set")
 
@@ -110,7 +110,7 @@ async def test_client_async_context_manager():
 @pytest.mark.asyncio
 async def test_batch_invoke_parallel_integration():
     """Test batch invoke parallel with real API."""
-    api_key = os.environ.get("FUSIONBASE_API_KEY")
+    api_key = get_api_key()
     if not api_key:
         pytest.skip("FUSIONBASE_API_KEY environment variable not set")
 

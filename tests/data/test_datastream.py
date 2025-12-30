@@ -7,6 +7,7 @@ from unittest.mock import patch
 
 import pytest
 
+from conftest import get_api_key
 from fusionbase import Fusionbase
 from fusionbase.data.datastream import DataStream
 from fusionbase.data.datastream import FilterOperator
@@ -31,7 +32,7 @@ class TestDataStreamBasic(unittest.TestCase):
         self.test_stream_id = "23532363"  # Test stream ID
 
         # Use API key from environment or skip tests if not available
-        self.api_key = os.environ.get("FUSIONBASE_API_KEY")
+        self.api_key = get_api_key()
         if not self.api_key:
             self.skipTest("FUSIONBASE_API_KEY environment variable not set")
 
@@ -367,7 +368,7 @@ class TestDataStreamBasic(unittest.TestCase):
 @pytest.mark.asyncio
 async def test_async_metadata_retrieval():
     """Test asynchronously retrieving stream metadata."""
-    api_key = os.environ.get("FUSIONBASE_API_KEY")
+    api_key = get_api_key()
     if not api_key:
         pytest.skip("FUSIONBASE_API_KEY environment variable not set")
 
@@ -476,7 +477,7 @@ async def test_async_data_retrieval():
 @pytest.mark.asyncio
 async def test_async_data_retrieval_real_api():
     """Test asynchronously retrieving stream data from real API."""
-    api_key = os.environ.get("FUSIONBASE_API_KEY")
+    api_key = get_api_key()
     if not api_key:
         pytest.skip("FUSIONBASE_API_KEY environment variable not set")
 
@@ -516,7 +517,7 @@ async def test_async_data_retrieval_real_api():
                                            reason="pandas not installed"))])
 def test_return_types(return_type, expected_type):
     """Test different return types."""
-    api_key = os.environ.get("FUSIONBASE_API_KEY")
+    api_key = get_api_key()
     if not api_key:
         pytest.skip("FUSIONBASE_API_KEY environment variable not set")
 

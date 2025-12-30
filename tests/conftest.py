@@ -19,10 +19,19 @@ def mock_response():
     return mock
 
 
+def get_api_key():
+    """Get the API key from environment variables.
+
+    Checks FUSIONBASE_API_KEY first, then FUSIONBASE_API_KEY_COM as fallback.
+    Returns None if neither is set.
+    """
+    return os.environ.get("FUSIONBASE_API_KEY_COM") or os.environ.get("FUSIONBASE_API_KEY")
+
+
 @pytest.fixture
 def api_key():
     """Get the API key from environment or use a test one."""
-    return os.environ.get("FUSIONBASE_API_KEY", "test_api_key")
+    return get_api_key() or "test_api_key"
 
 
 @pytest.fixture

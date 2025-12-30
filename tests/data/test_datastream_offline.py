@@ -1,7 +1,6 @@
 """Tests for DataStream offline mode and file operations."""
 
 import json
-import os
 from pathlib import Path
 import tempfile
 import unittest
@@ -9,6 +8,7 @@ from unittest.mock import MagicMock
 from unittest.mock import patch
 
 import pytest
+from conftest import get_api_key
 
 from fusionbase import Fusionbase
 from fusionbase.data.datastream import DataStream
@@ -22,7 +22,7 @@ class TestDataStreamOffline(unittest.TestCase):
         self.test_stream_id = "23532363"
 
         # Use API key from environment or skip tests if not available
-        self.api_key = os.environ.get("FUSIONBASE_API_KEY")
+        self.api_key = get_api_key()
         if not self.api_key:
             self.skipTest("FUSIONBASE_API_KEY environment variable not set")
 
@@ -370,7 +370,7 @@ class TestDataStreamOffline(unittest.TestCase):
 @pytest.mark.asyncio
 async def test_async_file_export():
     """Test asynchronous file export."""
-    api_key = os.environ.get("FUSIONBASE_API_KEY")
+    api_key = get_api_key()
     if not api_key:
         pytest.skip("FUSIONBASE_API_KEY environment variable not set")
 

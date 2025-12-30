@@ -7,6 +7,7 @@ from unittest.mock import patch
 
 import pytest
 
+from conftest import get_api_key
 from fusionbase import Fusionbase
 from fusionbase.data.dataservice import DataService
 from fusionbase.data.dataservice import DataServiceMetadata
@@ -25,7 +26,7 @@ class TestDataService(unittest.TestCase):
         self.service_id = "4658603456"  # Web Context service
 
         # Use API key from environment or skip tests if not available
-        self.api_key = os.environ.get("FUSIONBASE_API_KEY")
+        self.api_key = get_api_key()
         if not self.api_key:
             self.skipTest("FUSIONBASE_API_KEY environment variable not set")
 
@@ -431,7 +432,7 @@ class TestDataService(unittest.TestCase):
 @pytest.mark.asyncio
 async def test_service_async_metadata():
     """Test asynchronously getting service metadata."""
-    api_key = os.environ.get("FUSIONBASE_API_KEY")
+    api_key = get_api_key()
     if not api_key:
         pytest.skip("FUSIONBASE_API_KEY environment variable not set")
 
@@ -465,7 +466,7 @@ async def test_service_async_metadata():
 @pytest.mark.asyncio
 async def test_service_async_invoke():
     """Test asynchronously invoking a service."""
-    api_key = os.environ.get("FUSIONBASE_API_KEY")
+    api_key = get_api_key()
     if not api_key:
         pytest.skip("FUSIONBASE_API_KEY environment variable not set")
 
@@ -507,7 +508,7 @@ async def test_service_async_invoke():
 @pytest.mark.asyncio
 async def test_service_async_invoke_with_kwargs():
     """Test asynchronously invoking a service with kwargs."""
-    api_key = os.environ.get("FUSIONBASE_API_KEY")
+    api_key = get_api_key()
     if not api_key:
         pytest.skip("FUSIONBASE_API_KEY environment variable not set")
 
@@ -564,7 +565,7 @@ async def test_service_async_invoke_with_kwargs():
 @pytest.mark.asyncio
 async def test_service_async_batch_invoke():
     """Test asynchronously batch invoking services."""
-    api_key = os.environ.get("FUSIONBASE_API_KEY")
+    api_key = get_api_key()
     if not api_key:
         pytest.skip("FUSIONBASE_API_KEY environment variable not set")
 
@@ -679,7 +680,7 @@ async def test_service_async_batch_invoke():
 @pytest.mark.asyncio
 async def test_service_async_validation_error():
     """Test validation error handling in async mode."""
-    api_key = os.environ.get("FUSIONBASE_API_KEY")
+    api_key = get_api_key()
     if not api_key:
         pytest.skip("FUSIONBASE_API_KEY environment variable not set")
 
@@ -759,7 +760,7 @@ async def test_service_async_validation_error():
 @pytest.mark.asyncio
 async def test_service_async_invalid_id():
     """Test async validation of invalid service IDs during instantiation."""
-    api_key = os.environ.get("FUSIONBASE_API_KEY")
+    api_key = get_api_key()
     if not api_key:
         pytest.skip("FUSIONBASE_API_KEY environment variable not set")
 

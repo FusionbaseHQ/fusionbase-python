@@ -1,10 +1,10 @@
 """Tests for DataStream filtering and pagination functionality."""
 
-import os
 import unittest
 from unittest.mock import MagicMock
 
 import pytest
+from conftest import get_api_key
 
 from fusionbase import Fusionbase
 from fusionbase.data.datastream import DataStream
@@ -21,7 +21,7 @@ class TestDataStreamFiltering(unittest.TestCase):
         self.test_stream_id = "23532363"
 
         # Use API key from environment or skip tests if not available
-        self.api_key = os.environ.get("FUSIONBASE_API_KEY")
+        self.api_key = get_api_key()
         if not self.api_key:
             self.skipTest("FUSIONBASE_API_KEY environment variable not set")
 
@@ -564,7 +564,7 @@ class TestDataStreamFiltering(unittest.TestCase):
 @pytest.mark.asyncio
 async def test_async_pagination():
     """Test async pagination."""
-    api_key = os.environ.get("FUSIONBASE_API_KEY")
+    api_key = get_api_key()
     if not api_key:
         pytest.skip("FUSIONBASE_API_KEY environment variable not set")
 

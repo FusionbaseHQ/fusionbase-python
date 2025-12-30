@@ -1,10 +1,10 @@
 """Tests for DataStream pandas integration."""
 
-import os
 import unittest
 from unittest.mock import MagicMock
 
 import pytest
+from conftest import get_api_key
 
 from fusionbase import Fusionbase
 from fusionbase.data.datastream import DataStream
@@ -31,7 +31,7 @@ class TestDataStreamPandas(unittest.TestCase):
         self.test_stream_id = "23532363"
 
         # Use API key from environment or skip tests if not available
-        self.api_key = os.environ.get("FUSIONBASE_API_KEY")
+        self.api_key = get_api_key()
         if not self.api_key:
             self.skipTest("FUSIONBASE_API_KEY environment variable not set")
 
@@ -320,7 +320,7 @@ class TestDataStreamPandas(unittest.TestCase):
 @pytest.mark.asyncio
 async def test_async_to_pandas():
     """Test asynchronous pandas conversion."""
-    api_key = os.environ.get("FUSIONBASE_API_KEY")
+    api_key = get_api_key()
     if not api_key:
         pytest.skip("FUSIONBASE_API_KEY environment variable not set")
 
@@ -353,7 +353,7 @@ async def test_async_to_pandas():
 @pytest.mark.asyncio
 async def test_async_iter_chunks_pandas():
     """Test asynchronous DataFrame chunk iteration."""
-    api_key = os.environ.get("FUSIONBASE_API_KEY")
+    api_key = get_api_key()
     if not api_key:
         pytest.skip("FUSIONBASE_API_KEY environment variable not set")
 
@@ -398,7 +398,7 @@ async def test_async_iter_chunks_pandas():
 @pytest.mark.parametrize("limit,expected_rows", [(5, 5), (100, 100)])
 def test_pandas_row_count(limit, expected_rows):
     """Test that pandas conversion returns correct row counts."""
-    api_key = os.environ.get("FUSIONBASE_API_KEY")
+    api_key = get_api_key()
     if not api_key:
         pytest.skip("FUSIONBASE_API_KEY environment variable not set")
 

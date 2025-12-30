@@ -1,11 +1,11 @@
 """Tests for the Relation entity."""
 
-import os
 import unittest
 from unittest.mock import MagicMock
 from unittest.mock import patch
 
 import pytest
+from conftest import get_api_key
 
 from fusionbase import Fusionbase
 from fusionbase.entities.feature import Feature
@@ -26,7 +26,7 @@ class TestRelation(unittest.TestCase):
         self.invalid_relation_id = "non_existing_id"
 
         # Use API key from environment or skip tests if not available
-        self.api_key = os.environ.get("FUSIONBASE_API_KEY")
+        self.api_key = get_api_key()
         if not self.api_key:
             self.skipTest("FUSIONBASE_API_KEY environment variable not set")
 
@@ -412,7 +412,7 @@ class TestRelation(unittest.TestCase):
 @pytest.mark.asyncio
 async def test_relation_async_real_api():
     """Test async relation fetching with real API."""
-    api_key = os.environ.get("FUSIONBASE_API_KEY")
+    api_key = get_api_key()
     if not api_key:
         pytest.skip("FUSIONBASE_API_KEY environment variable not set")
 
@@ -449,7 +449,7 @@ async def test_relation_async_real_api():
 @pytest.mark.asyncio
 async def test_relation_async_resolve():
     """Test async relation resolution with real API."""
-    api_key = os.environ.get("FUSIONBASE_API_KEY")
+    api_key = get_api_key()
     if not api_key:
         pytest.skip("FUSIONBASE_API_KEY environment variable not set")
 
@@ -485,7 +485,7 @@ async def test_relation_async_resolve():
 @pytest.mark.asyncio
 async def test_relation_async_resolve_with_parameters():
     """Test async relation resolution with parameters."""
-    api_key = os.environ.get("FUSIONBASE_API_KEY")
+    api_key = get_api_key()
     if not api_key:
         pytest.skip("FUSIONBASE_API_KEY environment variable not set")
 
@@ -579,7 +579,7 @@ async def test_relation_async_resolve_with_parameters():
 @pytest.mark.asyncio
 async def test_relation_async_resolve_with_parameters_real_api():
     """Test async relation resolution with parameters using real API."""
-    api_key = os.environ.get("FUSIONBASE_API_KEY")
+    api_key = get_api_key()
     if not api_key:
         pytest.skip("FUSIONBASE_API_KEY environment variable not set")
 

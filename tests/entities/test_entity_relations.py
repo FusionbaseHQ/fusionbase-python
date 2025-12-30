@@ -1,9 +1,9 @@
 """Tests for entity relation listing functionality."""
 
-import os
 import unittest
 
 import pytest
+from conftest import get_api_key
 
 from fusionbase import Fusionbase
 from fusionbase.entities.location import Location
@@ -17,7 +17,7 @@ class TestEntityRelations(unittest.TestCase):
     def setUp(self):
         """Set up test fixtures."""
         # Use API key from environment or skip tests if not available
-        self.api_key = os.environ.get("FUSIONBASE_API_KEY")
+        self.api_key = get_api_key()
         if not self.api_key:
             self.skipTest("FUSIONBASE_API_KEY environment variable not set")
 
@@ -97,7 +97,7 @@ class TestEntityRelations(unittest.TestCase):
 @pytest.mark.asyncio
 async def test_async_list_relations():
     """Test async relation listing for entity types."""
-    api_key = os.environ.get("FUSIONBASE_API_KEY")
+    api_key = get_api_key()
     if not api_key:
         pytest.skip("FUSIONBASE_API_KEY environment variable not set")
 
@@ -133,7 +133,7 @@ async def test_async_list_relations():
 @pytest.mark.asyncio
 async def test_async_entity_instance_get_relations():
     """Test async relation getting from entity instance."""
-    api_key = os.environ.get("FUSIONBASE_API_KEY")
+    api_key = get_api_key()
     if not api_key:
         pytest.skip("FUSIONBASE_API_KEY environment variable not set")
 

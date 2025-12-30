@@ -1,10 +1,10 @@
 """Tests for Relation search functionality."""
 
-import os
 import traceback
 import unittest
 
 import pytest
+from conftest import get_api_key
 
 from fusionbase import Fusionbase
 from fusionbase.entities.lazy_reference import LazyReference
@@ -18,7 +18,7 @@ class TestRelationSearch(unittest.TestCase):
     def setUp(self):
         """Set up test fixtures."""
         # Use API key from environment or skip tests if not available
-        self.api_key = os.environ.get("FUSIONBASE_API_KEY")
+        self.api_key = get_api_key()
         if not self.api_key:
             self.skipTest("FUSIONBASE_API_KEY environment variable not set")
 
@@ -95,7 +95,7 @@ class TestRelationSearch(unittest.TestCase):
 @pytest.mark.asyncio
 async def test_relation_search_async():
     """Test async relation searching with real API."""
-    api_key = os.environ.get("FUSIONBASE_API_KEY")
+    api_key = get_api_key()
     if not api_key:
         pytest.skip("FUSIONBASE_API_KEY environment variable not set")
 
@@ -144,7 +144,7 @@ async def test_relation_search_async():
 @pytest.mark.asyncio
 async def test_relation_search_async_with_limit():
     """Test async relation searching with limit parameter."""
-    api_key = os.environ.get("FUSIONBASE_API_KEY")
+    api_key = get_api_key()
     if not api_key:
         pytest.skip("FUSIONBASE_API_KEY environment variable not set")
 
@@ -168,7 +168,7 @@ async def test_relation_search_async_with_limit():
 @pytest.mark.asyncio
 async def test_relation_search_async_with_missing_required_params():
     """Test that async search fails when required parameters are missing."""
-    api_key = os.environ.get("FUSIONBASE_API_KEY")
+    api_key = get_api_key()
     if not api_key:
         pytest.skip("FUSIONBASE_API_KEY environment variable not set")
 
