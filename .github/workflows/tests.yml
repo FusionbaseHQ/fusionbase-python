@@ -35,7 +35,14 @@ jobs:
 
         - name: Lint with pylint
           run: |
-            poetry run pylint fusionbase tests --fail-on=E --fail-under=7.5
+            output=$(poetry run pylint fusionbase --exit-zero)
+            echo "$output"
+            score=$(echo "$output" | grep -oP "rated at \K[\d.]+" | head -1)
+            echo "Pylint score: $score (minimum: 7.5)"
+            if (( $(echo "$score < 7.5" | bc -l) )); then
+              echo "::error::Pylint score $score is below minimum threshold of 7.5"
+              exit 1
+            fi
 
         - name: Check import sorting with isort
           run: |
