@@ -107,14 +107,11 @@ class TestDataStreamFiltering(unittest.TestCase):
         mock_client.request.assert_called_with(
             "GET",
             f"stream/data/{self.test_stream_id}",
+            response_format=stream._default_format,
             params={
-                "skip":
-                    0,
-                "limit":
-                    3,
-                "format":
-                    stream.
-                    _default_format  # This should be msgpack when available
+                "skip": 0,
+                "format": stream._default_format,
+                "limit": 3,
             })
 
         # Get second page
@@ -126,14 +123,11 @@ class TestDataStreamFiltering(unittest.TestCase):
         mock_client.request.assert_called_with(
             "GET",
             f"stream/data/{self.test_stream_id}",
+            response_format=stream._default_format,
             params={
-                "skip":
-                    3,
-                "limit":
-                    2,
-                "format":
-                    stream.
-                    _default_format  # This should be msgpack when available
+                "skip": 3,
+                "format": stream._default_format,
+                "limit": 2,
             })
 
     def test_filtering_mock(self):
@@ -457,7 +451,7 @@ class TestDataStreamFiltering(unittest.TestCase):
             self.skipTest("Stream is empty, can't test pagination")
 
         # Get first page (5 records) - explicitly use JSON format to avoid binary format issues
-        page1 = stream.get_data(skip=0, limit=5, format="json")
+        page1 = stream.get_data(skip=0, limit=5, _format="json")
 
         # Skip test if stream has fewer than 6 records
         if total_count < 6:
@@ -466,7 +460,7 @@ class TestDataStreamFiltering(unittest.TestCase):
             )
 
         # Get second page (next 5 records) - explicitly use JSON format
-        page2 = stream.get_data(skip=5, limit=5, format="json")
+        page2 = stream.get_data(skip=5, limit=5, _format="json")
 
         # Basic validation
         self.assertEqual(len(page1),
@@ -521,13 +515,13 @@ class TestDataStreamFiltering(unittest.TestCase):
         asc_data = stream.get_data(sort_keys=[sortable_column],
                                    sort_order=["asc"],
                                    limit=10,
-                                   format="json")
+                                   _format="json")
 
         # Get data sorted descending - explicitly use JSON format
         desc_data = stream.get_data(sort_keys=[sortable_column],
                                     sort_order=["desc"],
                                     limit=10,
-                                    format="json")
+                                    _format="json")
 
         # Skip further checks if not enough data
         if len(asc_data) < 2 or len(desc_data) < 2:
@@ -586,7 +580,7 @@ async def test_async_pagination():
             pytest.skip("Stream is empty, can't test pagination")
 
         # Get first page (5 records) - explicitly use JSON format
-        page1 = await stream.aget_data(skip=0, limit=5, format="json")
+        page1 = await stream.aget_data(skip=0, limit=5, _format="json")
 
         # Skip test if stream has fewer than 6 records
         if total_count < 6:
@@ -595,7 +589,7 @@ async def test_async_pagination():
             )
 
         # Get second page (next 5 records) - explicitly use JSON format
-        page2 = await stream.aget_data(skip=5, limit=5, format="json")
+        page2 = await stream.aget_data(skip=5, limit=5, _format="json")
 
         # Basic validation
         assert len(page1) == 5  # First page should have exactly 5 records

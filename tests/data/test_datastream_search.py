@@ -87,7 +87,7 @@ class TestDataStreamSearch(unittest.TestCase):
 
         try:
             # Get some data first to see what we can search for
-            sample_data = stream.get_data(limit=1, format="json")
+            sample_data = stream.get_data(limit=1, _format="json")
 
             # Skip test if no data available
             if not sample_data:
@@ -109,7 +109,7 @@ class TestDataStreamSearch(unittest.TestCase):
                 self.skipTest("No suitable search term found in data")
 
             # Search for data using that term - explicitly use JSON format for test stability
-            results = stream.search_data(q=search_term, format="json")
+            results = stream.search_data(q=search_term, _format="json")
 
             # Basic validation - just check that it returns a list
             # (could be empty if nothing matches)
@@ -203,7 +203,7 @@ async def test_async_search_data():
 
         try:
             # Get some data first to see what we can search for
-            sample_data = await stream.aget_data(limit=1, format="json")
+            sample_data = await stream.aget_data(limit=1, _format="json")
 
             # Skip test if no data available
             if not sample_data:
@@ -225,7 +225,7 @@ async def test_async_search_data():
                 pytest.skip("No suitable search term found in data")
 
             # Search for data using that term - explicitly use JSON format for test stability
-            results = await stream.asearch_data(q=search_term, format="json")
+            results = await stream.asearch_data(q=search_term, _format="json")
 
             # Basic validation
             assert isinstance(results, list)

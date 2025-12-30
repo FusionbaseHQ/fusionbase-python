@@ -290,7 +290,7 @@ class TestDataStreamChunking(unittest.TestCase):
                 f"Stream has only {total_count} records, need at least 10")
 
         # Set a small chunk size for testing and explicitly use JSON format for stability
-        stream.set_query_options(chunk_size=5, format="json")
+        stream.set_query_options(chunk_size=5, _format="json")
 
         # Iterate through rows
         rows = []
@@ -333,11 +333,11 @@ async def test_async_chunking():
                 f"Stream has only {total_count} records, need at least 10")
 
         # Collect chunks asynchronously using the public API method
-        # Explicitly specify format="json" for test stability
+        # Explicitly specify _format="json" for test stability
         chunks = []
         async for chunk in stream.aiter_chunks(chunk_size=5,
                                                show_progress=False,
-                                               format="json"):
+                                               _format="json"):
             chunks.append(chunk)
             if len(chunks) >= 2:
                 break
@@ -432,7 +432,7 @@ async def test_async_row_iteration():
     stream = DataStream(mock_client, "23532363")
 
     # Set chunk size for testing - ensure format is JSON for stability
-    stream.set_query_options(chunk_size=5, format="json")
+    stream.set_query_options(chunk_size=5, _format="json")
 
     # Iterate through rows asynchronously
     rows = []

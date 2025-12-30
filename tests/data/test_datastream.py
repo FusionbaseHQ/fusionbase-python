@@ -143,7 +143,7 @@ class TestDataStreamBasic(unittest.TestCase):
         # Test with plain ID
         stream1 = DataStream(self.client, self.test_stream_id)
         self.assertEqual(stream1.stream_key, self.test_stream_id)
-        self.assertIsNone(stream1.stream_id)  # Should remain None for plain IDs
+        self.assertIsNone(stream1.stream_id)  # None initially, populated after get_metadata()
 
         # Test with collection prefix
         full_id = f"data_streams/{self.test_stream_id}"
@@ -222,14 +222,11 @@ class TestDataStreamBasic(unittest.TestCase):
         test_client.request.assert_called_with(
             "GET",
             f"stream/data/{self.test_stream_id}",
+            response_format=stream._default_format,
             params={
-                "skip":
-                    0,
-                "limit":
-                    10,
-                "format":
-                    stream.
-                    _default_format  # This should be msgpack when available
+                "skip": 0,
+                "format": stream._default_format,
+                "limit": 10,
             })
 
     def test_filter_creation(self):
@@ -295,7 +292,7 @@ class TestDataStreamBasic(unittest.TestCase):
         stream = self.client.streams.from_id(self.test_stream_id)
 
         # First test with JSON to ensure compatibility
-        data_json = stream.get_data(limit=5, format="json")
+        data_json = stream.get_data(limit=5, _format="json")
 
         # Basic validation of response
         self.assertIsInstance(data_json, list)
@@ -312,7 +309,7 @@ class TestDataStreamBasic(unittest.TestCase):
         if MSGPACK_AVAILABLE:
             try:
                 # Test with msgpack format
-                data_msgpack = stream.get_data(limit=5, format="msgpack")
+                data_msgpack = stream.get_data(limit=5, _format="msgpack")
 
                 self.assertIsInstance(data_msgpack, list)
                 self.assertTrue(len(data_msgpack) <= 5)
@@ -462,7 +459,7 @@ async def test_async_data_retrieval():
     stream = DataStream(mock_client, "23532363")
 
     # Execute async data retrieval with explicit JSON format for test stability
-    data = await stream.aget_data(limit=5, format="json")
+    data = await stream.aget_data(limit=5, _format="json")
 
     # Basic validation
     assert isinstance(data, list)
@@ -491,7 +488,7 @@ async def test_async_data_retrieval_real_api():
         stream = client.streams.from_id(test_stream_id)
 
         # Use JSON format for test stability
-        data = await stream.aget_data(limit=5, format="json")
+        data = await stream.aget_data(limit=5, _format="json")
 
         # Basic validation
         assert isinstance(data, list)
@@ -537,7 +534,7 @@ def test_return_types(return_type, expected_type):
         # Fetch data with specified return type - always use JSON for test stability
         result = stream.get_data(limit=5,
                                  return_type=return_type,
-                                 format="json")
+                                 _format="json")
 
         # Check type
         if expected_type == "pandas.DataFrame":

@@ -22,6 +22,15 @@ except ImportError:
     pd = None
     PANDAS_AVAILABLE = False
 
+try:
+    from rich.console import Console
+    from rich.table import Table
+    RICH_AVAILABLE = True
+except ImportError:
+    Console = None
+    Table = None
+    RICH_AVAILABLE = False
+
 from pydantic import BaseModel
 from pydantic import ConfigDict
 
@@ -252,8 +261,7 @@ class DataStream:
             # Handle key format (12345)
             else:
                 self._stream_key = stream_identifier
-                # Do NOT set _stream_id for plain keys to match test expectations
-                # The test expects _stream_id to remain None
+                # _stream_id is populated later from metadata when get_metadata() is called
 
         self._metadata = None
         self._use_cache = use_cache
@@ -354,6 +362,9 @@ class DataStream:
                                       dict) and "metadata" in cache_data:
                             self._metadata = DataStreamMetadata.model_validate(
                                 cache_data["metadata"])
+                            # Populate _stream_id from metadata if not already set
+                            if self._stream_id is None and self._metadata.id:
+                                self._stream_id = self._metadata.id
                             return self._metadata
 
             # Updated endpoint format to match API structure
@@ -381,6 +392,11 @@ class DataStream:
 
                 # Parse response into metadata object
                 self._metadata = DataStreamMetadata.model_validate(data)
+
+                # Populate _stream_id from metadata if not already set
+                if self._stream_id is None and self._metadata.id:
+                    self._stream_id = self._metadata.id
+
                 return self._metadata
             except ResourceNotFoundError as e:
                 # Reraise ResourceNotFoundError with clear message
@@ -433,6 +449,9 @@ class DataStream:
                                       dict) and "metadata" in cache_data:
                             self._metadata = DataStreamMetadata.model_validate(
                                 cache_data["metadata"])
+                            # Populate _stream_id from metadata if not already set
+                            if self._stream_id is None and self._metadata.id:
+                                self._stream_id = self._metadata.id
                             return self._metadata
 
             # Updated endpoint format to match API structure
@@ -450,6 +469,11 @@ class DataStream:
 
             # Parse response into metadata object
             self._metadata = DataStreamMetadata.model_validate(data)
+
+            # Populate _stream_id from metadata if not already set
+            if self._stream_id is None and self._metadata.id:
+                self._stream_id = self._metadata.id
+
             return self._metadata
 
         except Exception as e:
@@ -609,21 +633,20 @@ class DataStream:
                     chunk_size: int = None,
                     strategy: ChunkingStrategy = ChunkingStrategy.AUTO,
                     max_memory_percent: float = 0.05,
-                    format: str = None,
                     filters: List[Dict[str, Any]] = None,
                     project_fields: List[str] = None,
                     sort_keys: List[str] = None,
                     sort_order: List[str] = None,
                     version_boundary: Optional[str] = None,
                     show_progress: bool = True,
-                    force_live: bool = False) -> Iterator[List[Dict[str, Any]]]:
+                    force_live: bool = False,
+                    _format: str = None) -> Iterator[List[Dict[str, Any]]]:
         """Iterate through the stream data in chunks.
 
         Args:
             chunk_size: Number of records per chunk (for FIXED strategy)
             strategy: Chunking strategy to determine chunk size
             max_memory_percent: Maximum percent of available memory to use (0-1)
-            format: Response format (json, msgpack)
             filters: List of filter objects
             project_fields: List of fields to include
             sort_keys: Fields to sort by
@@ -674,7 +697,7 @@ class DataStream:
 
         # Get internal iterator
         iterator = self._iter_chunks_internal(chunk_size=chunk_size,
-                                              format=format,
+                                              format=_format,
                                               filters=filters,
                                               project_fields=project_fields,
                                               sort_keys=sort_keys,
@@ -769,21 +792,20 @@ class DataStream:
             chunk_size: int = None,
             strategy: ChunkingStrategy = ChunkingStrategy.AUTO,
             max_memory_percent: float = 0.05,
-            format: str = None,
             filters: List[Dict[str, Any]] = None,
             project_fields: List[str] = None,
             sort_keys: List[str] = None,
             sort_order: List[str] = None,
             version_boundary: Optional[str] = None,
             show_progress: bool = True,
-            force_live: bool = False) -> AsyncIterator[List[Dict[str, Any]]]:
+            force_live: bool = False,
+            _format: str = None) -> AsyncIterator[List[Dict[str, Any]]]:
         """Asynchronously iterate through the stream data in chunks.
 
         Args:
             chunk_size: Number of records per chunk (for FIXED strategy)
             strategy: Chunking strategy to determine chunk size
             max_memory_percent: Maximum percent of available memory to use (0-1)
-            format: Response format (json, msgpack)
             filters: List of filter objects
             project_fields: List of fields to include
             sort_keys: Fields to sort by
@@ -833,7 +855,7 @@ class DataStream:
         # Get internal iterator
         iterator = self._aiter_chunks_internal(
             chunk_size=chunk_size,
-            format=format,
+            format=_format,
             filters=filters,
             project_fields=project_fields,
             sort_keys=sort_keys,
@@ -943,7 +965,6 @@ class DataStream:
         sort_keys: List[str] = None,
         sort_order: List[str] = None,
         query_parameters: Dict[str, Any] = None,
-        format: str = None,
         filters: List[Dict[str, Any]] = None,
         project_fields: List[str] = None,
         version_boundary: Optional[str] = None,
@@ -951,7 +972,8 @@ class DataStream:
         use_chunking: bool = True,
         max_data_size: int = 10000,
         return_type: Union[str, ReturnType] = ReturnType.DICT,
-        pandas_kwargs: Dict[str, Any] = None
+        pandas_kwargs: Dict[str, Any] = None,
+        _format: str = None
     ) -> Union[List[Dict[str, Any]], "pd.DataFrame"]:
         """Get data from the stream with pagination, sorting, filtering, and projection options.
 
@@ -961,14 +983,13 @@ class DataStream:
             sort_keys: Fields to sort by
             sort_order: Sort direction for each key (asc/desc)
             query_parameters: Additional query parameters
-            format: Response format (json, msgpack)
             filters: List of filter objects
             project_fields: List of fields to include (projection)
             version_boundary: Version boundary for time-series data
             force_live: Force fetching from API even in offline mode
             use_chunking: Whether to use chunking for large datasets
             max_data_size: Maximum data size before chunking
-            return_type: Type of return value (dict, dataframe)
+            return_type: Type of return value ("dict" or "dataframe")
             pandas_kwargs: Additional arguments for pandas DataFrame creation
 
         Returns:
@@ -992,7 +1013,7 @@ class DataStream:
                                        sort_keys=sort_keys,
                                        sort_order=sort_order,
                                        query_parameters=query_parameters,
-                                       format=format,
+                                       format=_format,
                                        filters=filters,
                                        project_fields=project_fields,
                                        version_boundary=version_boundary,
@@ -1016,7 +1037,6 @@ class DataStream:
         sort_keys: List[str] = None,
         sort_order: List[str] = None,
         query_parameters: Dict[str, Any] = None,
-        format: str = None,
         filters: List[Dict[str, Any]] = None,
         project_fields: List[str] = None,
         version_boundary: Optional[str] = None,
@@ -1024,7 +1044,8 @@ class DataStream:
         use_chunking: bool = True,
         max_data_size: int = 10000,
         return_type: Union[str, ReturnType] = ReturnType.DICT,
-        pandas_kwargs: Dict[str, Any] = None
+        pandas_kwargs: Dict[str, Any] = None,
+        _format: str = None
     ) -> Union[List[Dict[str, Any]], "pd.DataFrame"]:
         """Asynchronously get data from the stream with pagination, sorting, filtering, and projection options.
 
@@ -1034,14 +1055,13 @@ class DataStream:
             sort_keys: Fields to sort by
             sort_order: Sort direction for each key (asc/desc)
             query_parameters: Additional query parameters
-            format: Response format (json, msgpack)
             filters: List of filter objects
             project_fields: List of fields to include (projection)
             version_boundary: Version boundary for time-series data
             force_live: Force fetching from API even in offline mode
             use_chunking: Whether to use chunking for large datasets
             max_data_size: Maximum data size before chunking
-            return_type: Type of return value (dict, dataframe)
+            return_type: Type of return value ("dict" or "dataframe")
             pandas_kwargs: Additional arguments for pandas DataFrame creation
 
         Returns:
@@ -1065,7 +1085,7 @@ class DataStream:
                                               sort_keys=sort_keys,
                                               sort_order=sort_order,
                                               query_parameters=query_parameters,
-                                              format=format,
+                                              format=_format,
                                               filters=filters,
                                               project_fields=project_fields,
                                               version_boundary=version_boundary,
@@ -1131,7 +1151,7 @@ class DataStream:
 
             # Use the existing iter_chunks method to fetch data in chunks
             for chunk in self.iter_chunks(chunk_size=chunk_size,
-                                          format=format,
+                                          _format=format,
                                           filters=filters,
                                           project_fields=project_fields,
                                           sort_keys=sort_keys,
@@ -1188,6 +1208,7 @@ class DataStream:
         try:
             response = self._client.request("GET",
                                             f"stream/data/{self._stream_key}",
+                                            response_format=response_format,
                                             params=params)
 
             # If in offline mode, save to cache file
@@ -1318,10 +1339,12 @@ class DataStream:
             # Use the appropriate async method based on client capabilities
             if hasattr(self._client, "arequest"):
                 response = await self._client.arequest(
-                    "GET", f"stream/data/{self._stream_key}", params=params)
+                    "GET", f"stream/data/{self._stream_key}",
+                    response_format=response_format, params=params)
             elif hasattr(self._client, "aget"):
                 response = await self._client.aget(
-                    f"stream/data/{self._stream_key}", params=params)
+                    f"stream/data/{self._stream_key}",
+                    response_format=response_format, params=params)
             else:
                 # Fallback to sync method in a threadpool
                 response = await asyncio.to_thread(
@@ -1385,6 +1408,7 @@ class DataStream:
             params = {"skip": skip, "limit": chunk_size, "format": format}
             chunk = self._client.request("GET",
                                          f"stream/data/{self._stream_key}",
+                                         response_format=format,
                                          params=params)
 
             # Stop if no data
@@ -1517,7 +1541,7 @@ class DataStream:
             sort_order=sort_order,
             version_boundary=version_boundary,
             force_live=force_live,
-            format=format  # Pass format parameter to get_data
+            _format=format  # Pass format parameter to get_data
         )
 
         # Create parent directories if needed
@@ -1876,7 +1900,7 @@ class DataStream:
             sort_order=sort_order,
             version_boundary=version_boundary,
             force_live=force_live,
-            format=format  # Pass format parameter to aget_data
+            _format=format  # Pass format parameter to aget_data
         )
 
         # Create parent directories if needed
@@ -1975,7 +1999,6 @@ class DataStream:
                            chunk_size: int = None,
                            strategy: ChunkingStrategy = ChunkingStrategy.AUTO,
                            max_memory_percent: float = 0.05,
-                           format: str = None,
                            filters: List[Dict[str, Any]] = None,
                            project_fields: List[str] = None,
                            sort_keys: List[str] = None,
@@ -1983,6 +2006,7 @@ class DataStream:
                            version_boundary: Optional[str] = None,
                            show_progress: bool = True,
                            force_live: bool = False,
+                           _format: str = None,
                            **kwargs) -> Iterator["pd.DataFrame"]:
         """Iterate through the stream data in chunks as pandas DataFrames.
 
@@ -1993,7 +2017,6 @@ class DataStream:
             chunk_size: Number of records per chunk (for FIXED strategy)
             strategy: Chunking strategy to determine chunk size
             max_memory_percent: Maximum percent of available memory to use (0-1)
-            format: Response format (json, msgpack)
             filters: List of filter objects
             project_fields: List of fields to include
             sort_keys: Fields to sort by
@@ -2026,7 +2049,7 @@ class DataStream:
                 chunk_size=chunk_size,
                 strategy=strategy,
                 max_memory_percent=max_memory_percent,
-                format=format,
+                _format=_format,
                 filters=filters,
                 project_fields=project_fields,
                 sort_keys=sort_keys,
@@ -2042,7 +2065,6 @@ class DataStream:
             chunk_size: int = None,
             strategy: ChunkingStrategy = ChunkingStrategy.AUTO,
             max_memory_percent: float = 0.05,
-            format: str = None,
             filters: List[Dict[str, Any]] = None,
             project_fields: List[str] = None,
             sort_keys: List[str] = None,
@@ -2050,6 +2072,7 @@ class DataStream:
             version_boundary: Optional[str] = None,
             show_progress: bool = True,
             force_live: bool = False,
+            _format: str = None,
             **kwargs) -> AsyncIterator["pd.DataFrame"]:
         """Asynchronously iterate through the stream data in chunks as pandas DataFrames.
 
@@ -2060,7 +2083,6 @@ class DataStream:
             chunk_size: Number of records per chunk (for FIXED strategy)
             strategy: Chunking strategy to determine chunk size
             max_memory_percent: Maximum percent of available memory to use (0-1)
-            format: Response format (json, msgpack)
             filters: List of filter objects
             project_fields: List of fields to include
             sort_keys: Fields to sort by
@@ -2093,7 +2115,7 @@ class DataStream:
                 chunk_size=chunk_size,
                 strategy=strategy,
                 max_memory_percent=max_memory_percent,
-                format=format,
+                _format=_format,
                 filters=filters,
                 project_fields=project_fields,
                 sort_keys=sort_keys,
@@ -2110,9 +2132,9 @@ class DataStream:
         q: str,
         skip: int = 0,
         limit: int = 10,
-        format: str = None,
         return_type: Union[str, ReturnType] = ReturnType.DICT,
-        pandas_kwargs: Dict[str, Any] = None
+        pandas_kwargs: Dict[str, Any] = None,
+        _format: str = None
     ) -> Union[List[Dict[str, Any]], "pd.DataFrame"]:
         """Search for data rows containing the specified query string.
 
@@ -2120,8 +2142,7 @@ class DataStream:
             q: Search query string to match across all fields
             skip: Number of records to skip (for pagination)
             limit: Maximum number of records to return
-            format: Response format (json, msgpack)
-            return_type: Type of return value (dict, dataframe)
+            return_type: Type of return value ("dict" or "dataframe")
             pandas_kwargs: Additional arguments for pandas DataFrame creation
 
         Returns:
@@ -2146,7 +2167,7 @@ class DataStream:
             )
 
         # Always use msgpack format if available, otherwise use JSON
-        response_format = format or self._default_format
+        response_format = _format or self._default_format
 
         # Set up parameters
         params = {"q": q, "skip": skip, "format": response_format}
@@ -2157,7 +2178,8 @@ class DataStream:
         # Make the API request
         try:
             response = self._client.request(
-                "GET", f"stream/data/search/{self._stream_key}", params=params)
+                "GET", f"stream/data/search/{self._stream_key}",
+                response_format=response_format, params=params)
 
             # Convert to DataFrame if requested
             if return_type in (ReturnType.DATAFRAME, ReturnType.DF, "dataframe",
@@ -2180,9 +2202,9 @@ class DataStream:
         q: str,
         skip: int = 0,
         limit: int = 10,
-        format: str = None,
         return_type: Union[str, ReturnType] = ReturnType.DICT,
-        pandas_kwargs: Dict[str, Any] = None
+        pandas_kwargs: Dict[str, Any] = None,
+        _format: str = None
     ) -> Union[List[Dict[str, Any]], "pd.DataFrame"]:
         """Asynchronously search for data rows containing the specified query string.
 
@@ -2190,8 +2212,7 @@ class DataStream:
             q: Search query string to match across all fields
             skip: Number of records to skip (for pagination)
             limit: Maximum number of records to return
-            format: Response format (json, msgpack)
-            return_type: Type of return value (dict, dataframe)
+            return_type: Type of return value ("dict" or "dataframe")
             pandas_kwargs: Additional arguments for pandas DataFrame creation
 
         Returns:
@@ -2216,7 +2237,7 @@ class DataStream:
             )
 
         # Always use msgpack format if available, otherwise use JSON
-        response_format = format or self._default_format
+        response_format = _format or self._default_format
 
         # Set up parameters
         params = {"q": q, "skip": skip, "format": response_format}
@@ -2231,10 +2252,12 @@ class DataStream:
                 response = await self._client.arequest(
                     "GET",
                     f"stream/data/search/{self._stream_key}",
+                    response_format=response_format,
                     params=params)
             elif hasattr(self._client, "aget"):
                 response = await self._client.aget(
-                    f"stream/data/search/{self._stream_key}", params=params)
+                    f"stream/data/search/{self._stream_key}",
+                    response_format=response_format, params=params)
             else:
                 # Fallback to sync method in a threadpool
                 response = await asyncio.to_thread(
@@ -2242,7 +2265,7 @@ class DataStream:
                     q=q,
                     skip=skip,
                     limit=limit,
-                    format=format,
+                    _format=_format,
                     return_type="dict"  # We'll convert later if needed
                 )
 
@@ -2263,6 +2286,99 @@ class DataStream:
             logger.error(f"Error searching stream data asynchronously: {e}")
             logger.debug(traceback.format_exc())
             raise
+
+    def pretty_metadata(self) -> None:
+        """Print stream metadata in a nicely formatted table.
+
+        Retrieves the metadata from the stream and prints it to the console
+        in a formatted table using rich if available, otherwise falls back
+        to plain text output.
+
+        Example:
+            ```python
+            stream = client.get_datastream("my_stream")
+            stream.pretty_metadata()
+            ```
+        """
+        metadata = self.get_metadata()
+
+        # Helper function to safely get attribute value
+        def get_value(obj, attr: str, default: str = "N/A") -> str:
+            if obj is None:
+                return default
+            value = getattr(obj, attr, None)
+            if value is None:
+                return default
+            return str(value)
+
+        # Get the display name for the table title
+        title = metadata.name.en if metadata.name and metadata.name.en else (
+            metadata.name.de if metadata.name and metadata.name.de else self._stream_key or "DataStream"
+        )
+
+        if RICH_AVAILABLE:
+            # Use rich table for pretty output
+            table = Table(title=title)
+            table.add_column("Property", justify="right", style="magenta", no_wrap=True)
+            table.add_column("Value", style="cyan")
+
+            # Add rows for each metadata property
+            table.add_row("Key", get_value(metadata, "key"))
+            table.add_row("ID", get_value(metadata, "id"))
+            table.add_row("# Entries", get_value(metadata.meta, "entry_count") if metadata.meta else "N/A")
+            table.add_row("# Properties", get_value(metadata.meta, "main_property_count") if metadata.meta else "N/A")
+            table.add_row("Is Active", get_value(metadata.meta, "is_active") if metadata.meta else "N/A")
+            table.add_row("Data Version", get_value(metadata, "data_version"))
+            table.add_row("Data Updated At", get_value(metadata, "data_updated_at"))
+            table.add_row("Created At", get_value(metadata, "created_at"))
+            table.add_row("Updated At", get_value(metadata, "updated_at"))
+
+            # Add source info if available
+            if metadata.source:
+                table.add_row("Source ID", get_value(metadata.source, "_id"))
+
+            # Add description if available
+            if metadata.description:
+                desc = metadata.description.en or metadata.description.de
+                if desc:
+                    # Truncate long descriptions
+                    if len(desc) > 100:
+                        desc = desc[:97] + "..."
+                    table.add_row("Description", desc)
+
+            # Print the table
+            console = Console()
+            print("\n")
+            console.print(table)
+            print("\n")
+        else:
+            # Fallback to plain text output
+            print("\n")
+            print("=" * 60)
+            print(f"  {title}")
+            print("=" * 60)
+            print(f"  {'Key:':<20} {get_value(metadata, 'key')}")
+            print(f"  {'ID:':<20} {get_value(metadata, 'id')}")
+            print(f"  {'# Entries:':<20} {get_value(metadata.meta, 'entry_count') if metadata.meta else 'N/A'}")
+            print(f"  {'# Properties:':<20} {get_value(metadata.meta, 'main_property_count') if metadata.meta else 'N/A'}")
+            print(f"  {'Is Active:':<20} {get_value(metadata.meta, 'is_active') if metadata.meta else 'N/A'}")
+            print(f"  {'Data Version:':<20} {get_value(metadata, 'data_version')}")
+            print(f"  {'Data Updated At:':<20} {get_value(metadata, 'data_updated_at')}")
+            print(f"  {'Created At:':<20} {get_value(metadata, 'created_at')}")
+            print(f"  {'Updated At:':<20} {get_value(metadata, 'updated_at')}")
+
+            if metadata.source:
+                print(f"  {'Source ID:':<20} {get_value(metadata.source, '_id')}")
+
+            if metadata.description:
+                desc = metadata.description.en or metadata.description.de
+                if desc:
+                    if len(desc) > 100:
+                        desc = desc[:97] + "..."
+                    print(f"  {'Description:':<20} {desc}")
+
+            print("=" * 60)
+            print("\n")
 
     @classmethod
     def _from_id(cls, client, stream_id: str) -> 'DataStream':

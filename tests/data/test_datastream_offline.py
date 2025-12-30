@@ -222,7 +222,7 @@ class TestDataStreamOffline(unittest.TestCase):
         self.assertFalse(cache_path.exists())
 
         # Get some data, which should create the cache file - explicitly use JSON format for test stability
-        data = stream.get_data(limit=10, format="json")
+        data = stream.get_data(limit=10, _format="json")
 
         # Verify we got data
         self.assertIsInstance(data, list)
@@ -240,7 +240,7 @@ class TestDataStreamOffline(unittest.TestCase):
         # Get data - should use cache - explicitly use JSON format for test stability
         with patch.object(self.client, 'request') as mock_request:
             # Mock should not be called since we use cache
-            offline_data = offline_stream.get_data(limit=10, format="json")
+            offline_data = offline_stream.get_data(limit=10, _format="json")
             mock_request.assert_not_called()
 
         # Verify we got the same data
@@ -249,7 +249,7 @@ class TestDataStreamOffline(unittest.TestCase):
         # Force live mode to bypass cache - explicitly use JSON format for test stability
         with patch.object(self.client, 'request') as mock_request:
             # Mock should be called since we force live mode
-            offline_stream.get_data(limit=10, force_live=True, format="json")
+            offline_stream.get_data(limit=10, force_live=True, _format="json")
             mock_request.assert_called()
 
     @unittest.skipIf(not hasattr(DataStream, "from_file"),
@@ -392,7 +392,7 @@ async def test_async_file_export():
             await stream.aexport_to_file(json_path,
                                          limit=5,
                                          include_metadata=True,
-                                         format="json")
+                                         file_format="json")
 
             # Verify the file was created
             assert json_path.exists()

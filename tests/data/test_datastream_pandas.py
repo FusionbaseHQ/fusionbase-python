@@ -256,7 +256,7 @@ class TestDataStreamPandas(unittest.TestCase):
 
         # Convert to DataFrame with limit - explicitly use JSON format for stability
         # Use get_data with return_type="dataframe" instead of to_pandas
-        df = stream.get_data(limit=10, return_type="dataframe", format="json")
+        df = stream.get_data(limit=10, return_type="dataframe", _format="json")
 
         # Verify DataFrame structure
         self.assertIsInstance(df, pd.DataFrame)
@@ -272,7 +272,7 @@ class TestDataStreamPandas(unittest.TestCase):
         stream = self.client.streams.from_id(self.test_stream_id)
 
         # Get data as DataFrame with limit - explicitly use JSON format for stability
-        df = stream.get_data(limit=10, return_type="dataframe", format="json")
+        df = stream.get_data(limit=10, return_type="dataframe", _format="json")
 
         # Verify DataFrame structure
         self.assertIsInstance(df, pd.DataFrame)
@@ -280,7 +280,7 @@ class TestDataStreamPandas(unittest.TestCase):
         self.assertTrue(df.shape[1] > 0)  # Should have at least one column
 
         # Test with "df" alias for return_type - explicitly use JSON format
-        df2 = stream.get_data(limit=10, return_type="df", format="json")
+        df2 = stream.get_data(limit=10, return_type="df", _format="json")
         self.assertIsInstance(df2, pd.DataFrame)
         self.assertEqual(df.shape[0], df2.shape[0])
 
@@ -303,7 +303,7 @@ class TestDataStreamPandas(unittest.TestCase):
 
         # Process chunks as DataFrames - explicitly use JSON format for stability
         dfs = []
-        for df_chunk in stream.iter_chunks_pandas(chunk_size=5, format="json"):
+        for df_chunk in stream.iter_chunks_pandas(chunk_size=5, _format="json"):
             dfs.append(df_chunk)
             if len(dfs) >= 2:
                 break
@@ -335,7 +335,7 @@ async def test_async_to_pandas():
 
         # Convert to DataFrame asynchronously using aget_data with return_type="dataframe"
         df = await stream.aget_data(limit=10,
-                                    format="json",
+                                    _format="json",
                                     return_type="dataframe")
 
         # Verify DataFrame structure
@@ -378,7 +378,7 @@ async def test_async_iter_chunks_pandas():
         # Process chunks as DataFrames asynchronously - explicitly use JSON format for stability
         dfs = []
         async for df_chunk in stream.aiter_chunks_pandas(chunk_size=5,
-                                                         format="json"):
+                                                         _format="json"):
             dfs.append(df_chunk)
             if len(dfs) >= 2:
                 break
@@ -422,7 +422,7 @@ def test_pandas_row_count(limit, expected_rows):
 
         # Convert to DataFrame using get_data instead of to_pandas
         df = stream.get_data(limit=limit,
-                             format="json",
+                             _format="json",
                              return_type="dataframe")
 
         # Verify row count
