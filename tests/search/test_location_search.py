@@ -4,8 +4,8 @@ import traceback
 import unittest
 
 import pytest
-from conftest import get_api_key
 
+from conftest import get_api_key
 from fusionbase import Fusionbase
 from fusionbase.entities.lazy_reference import LazyReference
 from fusionbase.entities.location import Location

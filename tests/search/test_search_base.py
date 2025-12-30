@@ -5,7 +5,9 @@ from unittest.mock import MagicMock
 
 from fusionbase.entities.base import Entity
 from fusionbase.entities.person import Person
-from fusionbase.search.base import BaseSearch, SearchParams, SearchResult
+from fusionbase.search.base import BaseSearch
+from fusionbase.search.base import SearchParams
+from fusionbase.search.base import SearchResult
 
 
 class TestSearchParams(unittest.TestCase):
@@ -236,8 +238,8 @@ class TestBaseSearch(unittest.TestCase):
 
     def test_base_search_with_different_entity_classes(self):
         """Test BaseSearch with different entity classes."""
-        from fusionbase.entities.organization import Organization
         from fusionbase.entities.location import Location
+        from fusionbase.entities.organization import Organization
 
         mock_client = MagicMock()
 

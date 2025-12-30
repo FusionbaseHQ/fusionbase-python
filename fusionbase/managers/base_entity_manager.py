@@ -1,7 +1,8 @@
 """Base entity manager for Fusionbase SDK."""
 
 import asyncio
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import as_completed
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict, Generic, List, Optional, Type, TypeVar, Union
 
 from fusionbase.entities.base import Entity

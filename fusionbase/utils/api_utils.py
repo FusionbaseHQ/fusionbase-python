@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import inspect
-from typing import Any, Dict, Type, TypeVar, TYPE_CHECKING
+from typing import Any, Dict, Type, TYPE_CHECKING, TypeVar
 
 import httpx
 

@@ -1,16 +1,14 @@
 """Tests for context management functionality."""
 
 import asyncio
-import unittest
 from concurrent.futures import ThreadPoolExecutor
+import unittest
 from unittest.mock import MagicMock
 
-from fusionbase.core.context import (
-    get_current_client,
-    get_current_entity_manager,
-    set_current_client,
-    set_current_entity_manager,
-)
+from fusionbase.core.context import get_current_client
+from fusionbase.core.context import get_current_entity_manager
+from fusionbase.core.context import set_current_client
+from fusionbase.core.context import set_current_entity_manager
 
 
 class TestClientContext(unittest.TestCase):

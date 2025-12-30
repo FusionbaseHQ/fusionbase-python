@@ -4,14 +4,13 @@ import io
 import logging
 import sys
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
+from unittest.mock import patch
 
-from fusionbase.utils.progress import (
-    RICH_AVAILABLE,
-    create_chunk_iterator,
-    create_item_iterator,
-    should_show_progress,
-)
+from fusionbase.utils.progress import create_chunk_iterator
+from fusionbase.utils.progress import create_item_iterator
+from fusionbase.utils.progress import RICH_AVAILABLE
+from fusionbase.utils.progress import should_show_progress
 
 
 class TestShouldShowProgress(unittest.TestCase):

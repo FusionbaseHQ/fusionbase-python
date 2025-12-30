@@ -3,8 +3,8 @@
 import unittest
 
 import pytest
-from conftest import get_api_key
 
+from conftest import get_api_key
 from fusionbase import Fusionbase
 from fusionbase.data.dataservice import DataService
 from fusionbase.data.dataservice import DataServiceMetadata

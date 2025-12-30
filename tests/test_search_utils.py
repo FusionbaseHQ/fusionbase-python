@@ -2,21 +2,21 @@
 
 import json
 import unittest
-from unittest.mock import MagicMock, AsyncMock
+from unittest.mock import AsyncMock
+from unittest.mock import MagicMock
 
 import pytest
 
 from fusionbase.entities.lazy_reference import LazyReference
-from fusionbase.entities.person import Person
 from fusionbase.entities.organization import Organization
+from fusionbase.entities.person import Person
 from fusionbase.exceptions import APIError
-from fusionbase.search.base import SearchParams, SearchResult
-from fusionbase.utils.search_utils import (
-    make_search_request,
-    make_search_request_async,
-    prepare_search_params,
-    process_search_results,
-)
+from fusionbase.search.base import SearchParams
+from fusionbase.search.base import SearchResult
+from fusionbase.utils.search_utils import make_search_request
+from fusionbase.utils.search_utils import make_search_request_async
+from fusionbase.utils.search_utils import prepare_search_params
+from fusionbase.utils.search_utils import process_search_results
 
 
 class TestSearchParams(SearchParams):

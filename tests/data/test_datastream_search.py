@@ -4,8 +4,8 @@ import unittest
 from unittest.mock import MagicMock
 
 import pytest
-from conftest import get_api_key
 
+from conftest import get_api_key
 from fusionbase import Fusionbase
 from fusionbase.data.datastream import DataStream
 from fusionbase.exceptions import APIError

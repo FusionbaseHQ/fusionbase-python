@@ -5,8 +5,8 @@ from unittest.mock import MagicMock
 from unittest.mock import patch
 
 import pytest
-from conftest import get_api_key
 
+from conftest import get_api_key
 from fusionbase import Fusionbase
 from fusionbase.entities.feature import Feature
 from fusionbase.entities.organization import Organization

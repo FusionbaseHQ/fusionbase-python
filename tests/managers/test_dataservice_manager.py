@@ -2,12 +2,15 @@
 
 import asyncio
 import unittest
-from unittest.mock import MagicMock, AsyncMock, patch
+from unittest.mock import AsyncMock
+from unittest.mock import MagicMock
+from unittest.mock import patch
 
 import pytest
 
 from fusionbase.data.dataservice import DataService
-from fusionbase.exceptions import APIError, ResourceNotFoundError
+from fusionbase.exceptions import APIError
+from fusionbase.exceptions import ResourceNotFoundError
 from fusionbase.managers.dataservice_manager import DataServiceManager
 
 

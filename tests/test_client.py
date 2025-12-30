@@ -2,15 +2,17 @@
 
 import os
 import unittest
-from unittest.mock import patch, MagicMock, AsyncMock
+from unittest.mock import AsyncMock
+from unittest.mock import MagicMock
+from unittest.mock import patch
 
 import pytest
 
 from fusionbase import Fusionbase
 from fusionbase.core.config import FusionbaseConfig
 from fusionbase.core.config import RetryConfig
-from fusionbase.managers.datastream_manager import DataStreamManager
 from fusionbase.managers.dataservice_manager import DataServiceManager
+from fusionbase.managers.datastream_manager import DataStreamManager
 
 
 class TestFusionbaseClient(unittest.TestCase):

@@ -1,13 +1,12 @@
 """Tests for the base Entity class."""
 
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
+from unittest.mock import patch
 
 import pytest
 
-from fusionbase.core.context import (
-    set_current_entity_manager,
-)
+from fusionbase.core.context import set_current_entity_manager
 from fusionbase.entities.base import Entity
 from fusionbase.types.entities import EntityType
 
@@ -320,8 +319,8 @@ class TestEntityInheritance(unittest.TestCase):
 
     def test_subclass_can_override_entity_type(self):
         """Test that subclasses can override entity_type."""
-        from fusionbase.entities.person import Person
         from fusionbase.entities.location import Location
+        from fusionbase.entities.person import Person
 
         self.assertEqual(Person.entity_type, EntityType.PERSON)
         self.assertEqual(Location.entity_type, EntityType.LOCATION)

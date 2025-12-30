@@ -4,12 +4,10 @@ import os
 import tempfile
 import unittest
 
-from fusionbase.core.config import (
-    CacheConfig,
-    FusionbaseConfig,
-    LoggingConfig,
-    RetryConfig,
-)
+from fusionbase.core.config import CacheConfig
+from fusionbase.core.config import FusionbaseConfig
+from fusionbase.core.config import LoggingConfig
+from fusionbase.core.config import RetryConfig
 
 
 class TestRetryConfig(unittest.TestCase):

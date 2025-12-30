@@ -1,19 +1,19 @@
 """Tests for SearchManager class."""
 
 import unittest
-from unittest.mock import MagicMock, AsyncMock, patch
+from unittest.mock import AsyncMock
+from unittest.mock import MagicMock
+from unittest.mock import patch
 
 import pytest
 
 from fusionbase.managers.search_manager import SearchManager
-from fusionbase.managers.search_wrappers import (
-    DataSearch,
-    FusionSearch,
-    LocationSearch,
-    OrganizationSearch,
-    PersonSearch,
-    RelationSearch,
-)
+from fusionbase.managers.search_wrappers import DataSearch
+from fusionbase.managers.search_wrappers import FusionSearch
+from fusionbase.managers.search_wrappers import LocationSearch
+from fusionbase.managers.search_wrappers import OrganizationSearch
+from fusionbase.managers.search_wrappers import PersonSearch
+from fusionbase.managers.search_wrappers import RelationSearch
 
 
 class TestSearchManagerInitialization(unittest.TestCase):

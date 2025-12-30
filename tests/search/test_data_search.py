@@ -4,8 +4,8 @@ import unittest
 from unittest.mock import patch
 
 import pytest
-from conftest import get_api_key
 
+from conftest import get_api_key
 from fusionbase import Fusionbase
 from fusionbase.entities.lazy_reference import LazyReference
 

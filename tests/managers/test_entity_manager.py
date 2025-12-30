@@ -1,7 +1,9 @@
 """Tests for EntityManager class."""
 
 import unittest
-from unittest.mock import MagicMock, AsyncMock, patch
+from unittest.mock import AsyncMock
+from unittest.mock import MagicMock
+from unittest.mock import patch
 
 import pytest
 
@@ -11,13 +13,11 @@ from fusionbase.entities.organization import Organization
 from fusionbase.entities.person import Person
 from fusionbase.entities.relation import Relation
 from fusionbase.managers.entity_manager import EntityManager
-from fusionbase.managers.entity_managers import (
-    EventManager,
-    LocationManager,
-    OrganizationManager,
-    PersonManager,
-    RelationManager,
-)
+from fusionbase.managers.entity_managers import EventManager
+from fusionbase.managers.entity_managers import LocationManager
+from fusionbase.managers.entity_managers import OrganizationManager
+from fusionbase.managers.entity_managers import PersonManager
+from fusionbase.managers.entity_managers import RelationManager
 
 
 class TestEntityManagerInitialization(unittest.TestCase):

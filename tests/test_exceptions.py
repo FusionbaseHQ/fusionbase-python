@@ -3,20 +3,18 @@
 import unittest
 from unittest.mock import MagicMock
 
-from fusionbase.exceptions import (
-    APIError,
-    AuthenticationError,
-    AuthorizationError,
-    FusionbaseError,
-    InvalidArgumentError,
-    RateLimitError,
-    RequestValidationError,
-    ResourceNotFoundError,
-    ServerError,
-    ValidationError,
-    handle_http_error,
-    parse_error_response,
-)
+from fusionbase.exceptions import APIError
+from fusionbase.exceptions import AuthenticationError
+from fusionbase.exceptions import AuthorizationError
+from fusionbase.exceptions import FusionbaseError
+from fusionbase.exceptions import handle_http_error
+from fusionbase.exceptions import InvalidArgumentError
+from fusionbase.exceptions import parse_error_response
+from fusionbase.exceptions import RateLimitError
+from fusionbase.exceptions import RequestValidationError
+from fusionbase.exceptions import ResourceNotFoundError
+from fusionbase.exceptions import ServerError
+from fusionbase.exceptions import ValidationError
 
 
 class TestFusionbaseError(unittest.TestCase):

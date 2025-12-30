@@ -2,14 +2,17 @@
 
 import asyncio
 import unittest
-from unittest.mock import MagicMock, AsyncMock, patch
+from unittest.mock import AsyncMock
+from unittest.mock import MagicMock
+from unittest.mock import patch
 
 import pytest
 
 from fusionbase.entities.base import Entity
-from fusionbase.entities.person import Person
 from fusionbase.entities.organization import Organization
-from fusionbase.exceptions import APIError, ResourceNotFoundError
+from fusionbase.entities.person import Person
+from fusionbase.exceptions import APIError
+from fusionbase.exceptions import ResourceNotFoundError
 from fusionbase.managers.base_entity_manager import BaseEntityManager
 
 

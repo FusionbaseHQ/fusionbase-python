@@ -5,11 +5,9 @@ import sys
 import threading
 import unittest
 
-from fusionbase.core.logging import (
-    RequestIdFilter,
-    SensitiveDataFilter,
-    configure_logging,
-)
+from fusionbase.core.logging import configure_logging
+from fusionbase.core.logging import RequestIdFilter
+from fusionbase.core.logging import SensitiveDataFilter
 
 
 class TestSensitiveDataFilter(unittest.TestCase):
@@ -300,8 +298,9 @@ class TestConfigureLogging(unittest.TestCase):
 
     def test_configure_logging_to_file_path(self):
         """Test configure_logging can accept file path."""
-        import tempfile
         import os
+        import tempfile
+
         from loguru import logger
 
         # Create a temp file that we can clean up manually

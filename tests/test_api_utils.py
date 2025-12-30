@@ -1,20 +1,21 @@
 """Tests for API utility functions."""
 
 import unittest
-from unittest.mock import MagicMock, AsyncMock, patch
+from unittest.mock import AsyncMock
+from unittest.mock import MagicMock
+from unittest.mock import patch
 
 import httpx
 import pytest
 
 from fusionbase.entities.base import Entity
 from fusionbase.entities.person import Person
-from fusionbase.exceptions import APIError, ResourceNotFoundError
-from fusionbase.utils.api_utils import (
-    fetch_entity_async,
-    fetch_entity_sync,
-    make_entity_request,
-    make_entity_request_async,
-)
+from fusionbase.exceptions import APIError
+from fusionbase.exceptions import ResourceNotFoundError
+from fusionbase.utils.api_utils import fetch_entity_async
+from fusionbase.utils.api_utils import fetch_entity_sync
+from fusionbase.utils.api_utils import make_entity_request
+from fusionbase.utils.api_utils import make_entity_request_async
 
 
 class TestMakeEntityRequest(unittest.TestCase):
