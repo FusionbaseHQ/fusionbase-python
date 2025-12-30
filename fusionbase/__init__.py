@@ -1,5 +1,7 @@
 """Fusionbase Python SDK."""
 
+import importlib.metadata
+
 from fusionbase.core.client import Fusionbase as CoreFusionbase
 from fusionbase.core.config import FusionbaseConfig
 from fusionbase.data.datastream import DataStream
@@ -19,6 +21,11 @@ from fusionbase.search import PersonSearch
 from fusionbase.search import PersonSearchParams
 from fusionbase.search import RelationSearch
 from fusionbase.search import RelationSearchParams
+
+try:
+    __version__ = importlib.metadata.version("fusionbase")
+except importlib.metadata.PackageNotFoundError:
+    __version__ = "0.8.0"  # Fallback for development
 
 
 class Fusionbase(CoreFusionbase):
@@ -70,6 +77,7 @@ class Fusionbase(CoreFusionbase):
 
 
 __all__ = [
+    '__version__',
     'Fusionbase', 'FusionbaseConfig', 'APIError', 'AuthenticationError',
     'AuthorizationError', 'FusionbaseError', 'ResourceNotFoundError',
     'ValidationError', 'LocationSearch', 'LocationSearchParams',
