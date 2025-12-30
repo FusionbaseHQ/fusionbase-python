@@ -29,6 +29,14 @@ msgpack = "^1.1.0"
 
 # Optional dependency groups
 langchain = "^0.3.25"
+
+[tool.poetry.group.export]
+optional = true
+
+[tool.poetry.group.export.dependencies]
+openpyxl = "^3.1.0"  # For XLSX export
+pyarrow = ">=14.0.0"  # For Parquet export
+
 [tool.poetry.group.ai]
 optional = true
 
